@@ -53,10 +53,10 @@ export const useAuthStore = defineStore('auth', () => {
    * Kembalikan membership entry untuk outlet tertentu, atau null jika tidak terdaftar.
    */
   const getOutletMembership = (outletId) => {
-    // Accept both encoded hash and raw numeric ID
-    const id = typeof outletId === 'string' && isNaN(parseInt(outletId))
-      ? decodeOutletId(outletId)
-      : parseInt(outletId)
+    if (!outletId) return null
+    // Detect encoded hash: exactly 8 hex chars
+    const isEncoded = typeof outletId === 'string' && /^[0-9a-f]{8}$/i.test(outletId)
+    const id = isEncoded ? decodeOutletId(outletId) : parseInt(outletId)
     return outletMemberships.value.find(m => m.outlet_id === id) || null
   }
 
