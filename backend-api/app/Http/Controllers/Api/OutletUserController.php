@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Outlet;
 use App\Models\OutletUser;
+use App\Services\OutletAccess;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Validator;
@@ -17,6 +18,13 @@ use Illuminate\Support\Facades\Validator;
  */
 class OutletUserController extends Controller
 {
+    private OutletAccess $access;
+
+    public function __construct(OutletAccess $access)
+    {
+        $this->access = $access;
+    }
+
     /**
      * @OA\Get(
      *     path="/api/outlets/{outlet}/users",
@@ -28,29 +36,22 @@ class OutletUserController extends Controller
      */
     public function index($outletId)
     {
-        $user = Auth::user();
-        $outlet = Outlet::find($outletId);
-
-        if (!$outlet) {
-            return response()->json(['message' => 'Outlet not found'], 404);
-        }
-
-        // Check permission
-        if (!$user->isSuperAdmin() && $outlet->user_id !== $user->id) {
-            return response()->json(['message' => 'Unauthorized'], 403);
-        }
+        ['outlet' => $outlet] = $this->access->authorize($outletId, [
+            'permission' => 'manage_users',
+            'setSchema'  => false,
+        ]);
 
         try {
             $users = OutletUser::getAllFromSchema($outlet->schema_name, $outlet->id);
 
             return response()->json([
-                'users' => $users,
-                'outlet' => $outlet
+                'users'  => $users,
+                'outlet' => $outlet,
             ]);
         } catch (\Exception $e) {
             return response()->json([
                 'message' => 'Failed to fetch users',
-                'error' => $e->getMessage()
+                'error'   => $e->getMessage(),
             ], 500);
         }
     }
@@ -66,64 +67,51 @@ class OutletUserController extends Controller
      */
     public function store(Request $request, $outletId)
     {
-        $user = Auth::user();
-        $outlet = Outlet::find($outletId);
-
-        if (!$outlet) {
-            return response()->json(['message' => 'Outlet not found'], 404);
-        }
-
-        // Check permission
-        if (!$user->isSuperAdmin() && $outlet->user_id !== $user->id) {
-            return response()->json(['message' => 'Unauthorized'], 403);
-        }
+        ['outlet' => $outlet] = $this->access->authorize($outletId, [
+            'permission' => 'manage_users',
+            'setSchema'  => false,
+        ]);
 
         $validator = Validator::make($request->all(), [
-            'name' => 'required|string|max:255',
-            'email' => 'required|email|max:255',
-            'password' => 'required|string|min:6',
-            'phone' => 'nullable|string|max:50',
-            'role_id' => 'required|integer',
+            'name'      => 'required|string|max:255',
+            'email'     => 'required|email|max:255',
+            'password'  => 'required|string|min:6',
+            'phone'     => 'nullable|string|max:50',
+            'role_id'   => 'required|integer',
             'is_active' => 'boolean',
         ]);
 
         if ($validator->fails()) {
             return response()->json([
                 'message' => 'Validation failed',
-                'errors' => $validator->errors()
+                'errors'  => $validator->errors(),
             ], 422);
         }
 
         try {
             $data = $validator->validated();
-            $data['outlet_id'] = $outlet->id;
+            $data['outlet_id']  = $outlet->id;
             $data['created_at'] = now();
             $data['updated_at'] = now();
 
             $userId = OutletUser::createInSchema($outlet->schema_name, $data);
 
-            // Assign role to user
             if (isset($data['role_id'])) {
                 OutletUser::assignRole($outlet->schema_name, $userId, $data['role_id']);
             }
 
-            $newUser = OutletUser::getFromSchema($outlet->schema_name, $userId);
-
-            // Get user roles and permissions
-            $roles = OutletUser::getUserRoles($outlet->schema_name, $userId);
-            $permissions = OutletUser::getUserPermissions($outlet->schema_name, $userId);
-            
-            $newUser->roles = $roles;
-            $newUser->permissions = $permissions;
+            $newUser              = OutletUser::getFromSchema($outlet->schema_name, $userId);
+            $newUser->roles       = OutletUser::getUserRoles($outlet->schema_name, $userId);
+            $newUser->permissions = OutletUser::getUserPermissions($outlet->schema_name, $userId);
 
             return response()->json([
                 'message' => 'User created successfully',
-                'user' => $newUser
+                'user'    => $newUser,
             ], 201);
         } catch (\Exception $e) {
             return response()->json([
                 'message' => 'Failed to create user',
-                'error' => $e->getMessage()
+                'error'   => $e->getMessage(),
             ], 500);
         }
     }
@@ -139,17 +127,10 @@ class OutletUserController extends Controller
      */
     public function show($outletId, $id)
     {
-        $user = Auth::user();
-        $outlet = Outlet::find($outletId);
-
-        if (!$outlet) {
-            return response()->json(['message' => 'Outlet not found'], 404);
-        }
-
-        // Check permission
-        if (!$user->isSuperAdmin() && $outlet->user_id !== $user->id) {
-            return response()->json(['message' => 'Unauthorized'], 403);
-        }
+        ['outlet' => $outlet] = $this->access->authorize($outletId, [
+            'permission' => 'manage_users',
+            'setSchema'  => false,
+        ]);
 
         try {
             $outletUser = OutletUser::getFromSchema($outlet->schema_name, $id);
@@ -158,18 +139,14 @@ class OutletUserController extends Controller
                 return response()->json(['message' => 'User not found'], 404);
             }
 
-            // Get user roles and permissions
-            $roles = OutletUser::getUserRoles($outlet->schema_name, $id);
-            $permissions = OutletUser::getUserPermissions($outlet->schema_name, $id);
-            
-            $outletUser->roles = $roles;
-            $outletUser->permissions = $permissions;
+            $outletUser->roles       = OutletUser::getUserRoles($outlet->schema_name, $id);
+            $outletUser->permissions = OutletUser::getUserPermissions($outlet->schema_name, $id);
 
             return response()->json($outletUser);
         } catch (\Exception $e) {
             return response()->json([
                 'message' => 'Failed to fetch user',
-                'error' => $e->getMessage()
+                'error'   => $e->getMessage(),
             ], 500);
         }
     }
@@ -185,67 +162,52 @@ class OutletUserController extends Controller
      */
     public function update(Request $request, $outletId, $id)
     {
-        $user = Auth::user();
-        $outlet = Outlet::find($outletId);
-
-        if (!$outlet) {
-            return response()->json(['message' => 'Outlet not found'], 404);
-        }
-
-        // Check permission
-        if (!$user->isSuperAdmin() && $outlet->user_id !== $user->id) {
-            return response()->json(['message' => 'Unauthorized'], 403);
-        }
+        ['outlet' => $outlet] = $this->access->authorize($outletId, [
+            'permission' => 'manage_users',
+            'setSchema'  => false,
+        ]);
 
         $validator = Validator::make($request->all(), [
-            'name' => 'string|max:255',
-            'email' => 'email|max:255',
-            'password' => 'nullable|string|min:6',
-            'phone' => 'nullable|string|max:50',
-            'role_id' => 'nullable|integer',
+            'name'      => 'string|max:255',
+            'email'     => 'email|max:255',
+            'password'  => 'nullable|string|min:6',
+            'phone'     => 'nullable|string|max:50',
+            'role_id'   => 'nullable|integer',
             'is_active' => 'boolean',
         ]);
 
         if ($validator->fails()) {
             return response()->json([
                 'message' => 'Validation failed',
-                'errors' => $validator->errors()
+                'errors'  => $validator->errors(),
             ], 422);
         }
 
         try {
             $data = $validator->validated();
-            
+
             OutletUser::updateInSchema($outlet->schema_name, $id, $data);
 
-            // Update role if provided
             if (isset($data['role_id'])) {
-                // Remove old roles
                 \Illuminate\Support\Facades\DB::statement("SET search_path TO {$outlet->schema_name}, public");
                 \Illuminate\Support\Facades\DB::table('user_roles')->where('user_id', $id)->delete();
-                \Illuminate\Support\Facades\DB::statement("SET search_path TO public");
-                
-                // Assign new role
+                \Illuminate\Support\Facades\DB::statement('SET search_path TO public');
+
                 OutletUser::assignRole($outlet->schema_name, $id, $data['role_id']);
             }
 
-            $updatedUser = OutletUser::getFromSchema($outlet->schema_name, $id);
-
-            // Get user roles and permissions
-            $roles = OutletUser::getUserRoles($outlet->schema_name, $id);
-            $permissions = OutletUser::getUserPermissions($outlet->schema_name, $id);
-            
-            $updatedUser->roles = $roles;
-            $updatedUser->permissions = $permissions;
+            $updatedUser              = OutletUser::getFromSchema($outlet->schema_name, $id);
+            $updatedUser->roles       = OutletUser::getUserRoles($outlet->schema_name, $id);
+            $updatedUser->permissions = OutletUser::getUserPermissions($outlet->schema_name, $id);
 
             return response()->json([
                 'message' => 'User updated successfully',
-                'user' => $updatedUser
+                'user'    => $updatedUser,
             ]);
         } catch (\Exception $e) {
             return response()->json([
                 'message' => 'Failed to update user',
-                'error' => $e->getMessage()
+                'error'   => $e->getMessage(),
             ], 500);
         }
     }
@@ -261,28 +223,19 @@ class OutletUserController extends Controller
      */
     public function destroy($outletId, $id)
     {
-        $user = Auth::user();
-        $outlet = Outlet::find($outletId);
-
-        if (!$outlet) {
-            return response()->json(['message' => 'Outlet not found'], 404);
-        }
-
-        // Check permission
-        if (!$user->isSuperAdmin() && $outlet->user_id !== $user->id) {
-            return response()->json(['message' => 'Unauthorized'], 403);
-        }
+        ['outlet' => $outlet] = $this->access->authorize($outletId, [
+            'permission' => 'manage_users',
+            'setSchema'  => false,
+        ]);
 
         try {
             OutletUser::deleteInSchema($outlet->schema_name, $id);
 
-            return response()->json([
-                'message' => 'User deleted successfully'
-            ]);
+            return response()->json(['message' => 'User deleted successfully']);
         } catch (\Exception $e) {
             return response()->json([
                 'message' => 'Failed to delete user',
-                'error' => $e->getMessage()
+                'error'   => $e->getMessage(),
             ], 500);
         }
     }
