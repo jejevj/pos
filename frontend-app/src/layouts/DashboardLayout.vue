@@ -1,9 +1,9 @@
 <template>
   <!-- Theme switcher: renders Vuero layout or default layout -->
   <VueroDashboardLayout v-if="themeStore.activeTheme === 'vuero'" />
-  <div v-else class="dashboard-layout">
-    <!-- Sidebar (Fixed) -->
-    <aside class="sidebar">
+  <div v-else class="dashboard-layout" :class="{ 'no-sidebar': !showSidebar }">
+    <!-- Sidebar: hanya tampil untuk superadmin -->
+    <aside v-if="showSidebar" class="sidebar">
       <div class="sidebar-header">
         <i class="pi pi-box logo-icon"></i>
         <span class="logo-text">SaaS App</span>
@@ -64,7 +64,7 @@
     </aside>
 
     <!-- Main Content Wrapper -->
-    <div class="main-wrapper">
+    <div class="main-wrapper" :class="{ 'full-width': !showSidebar }">
       <!-- Header (Sticky) -->
       <header class="header">
         <div class="header-left">
@@ -158,6 +158,9 @@ const menusLoading = ref(true)
 
 const menus = computed(() => authStore.menus)
 
+// Sidebar hanya untuk superadmin — outlet user navigasi via dashboard grid
+const showSidebar = computed(() => authStore.isSuperAdmin)
+
 const pageTitle = computed(() => {
   return route.meta.title || t('common.dashboard')
 })
@@ -223,7 +226,7 @@ const toggleSubmenu = (menuId) => {
 
 onMounted(async () => {
   menusLoading.value = true
-  if (authStore.menus.length === 0) {
+  if (authStore.isSuperAdmin && authStore.menus.length === 0) {
     await authStore.fetchMenus()
   }
   menusLoading.value = false
@@ -376,6 +379,11 @@ onMounted(async () => {
   display: flex;
   flex-direction: column;
   min-height: 100vh;
+}
+
+/* Full width when no sidebar (outlet user) */
+.main-wrapper.full-width {
+  margin-left: 0;
 }
 
 /* Header (Sticky) */
