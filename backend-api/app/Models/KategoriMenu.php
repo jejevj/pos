@@ -11,12 +11,17 @@ class KategoriMenu extends Model
 
     protected $table = 'kategori_menu';
 
-    protected $fillable = ['nama', 'deskripsi', 'urutan', 'is_active'];
+    protected $fillable = ['nama', 'deskripsi', 'urutan', 'station_id', 'is_active'];
 
     protected $casts = ['is_active' => 'boolean'];
 
     public function menu()
     {
         return $this->hasMany(MenuOutlet::class, 'kategori_id');
+    }
+
+    public function station()
+    {
+        return $this->belongsTo(Station::class, 'station_id');
     }
 }
