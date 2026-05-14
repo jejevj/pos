@@ -31,17 +31,33 @@
         <DataTable :value="materials" :loading="loading" paginator :rows="10"
                    :rowsPerPageOptions="[5, 10, 20, 50]" stripedRows showGridlines>
           <template #header>
-            <div class="table-header">
-              <div class="flex gap-2">
-                <IconField>
-                  <InputIcon><i class="pi pi-search" /></InputIcon>
-                  <InputText v-model="filters.search" :placeholder="$t('common.search')" @input="fetchMaterials" />
-                </IconField>
-                <Select v-model="filters.kategori_id" :options="categories" optionLabel="nama" optionValue="id"
-                        :placeholder="$t('bahanBaku.filterByCategory')" style="width: 180px" @change="fetchMaterials" showClear />
-                <Select v-model="filters.stock_status" :options="stockStatuses" optionLabel="label" optionValue="value"
-                        :placeholder="$t('bahanBaku.filterByStatus')" style="width: 180px" @change="fetchMaterials" showClear />
+            <div class="filter-bar">
+              <div class="filter-fields">
+                <div class="filter-group">
+                  <label class="filter-label"><i class="pi pi-search" /> {{ $t('common.search') }}</label>
+                  <InputText v-model="filters.search" :placeholder="$t('common.search') + '...'" @input="fetchMaterials" class="filter-input" />
+                </div>
+                <div class="filter-group">
+                  <label class="filter-label"><i class="pi pi-tag" /> {{ $t('bahanBaku.category') }}</label>
+                  <Select v-model="filters.kategori_id" :options="categories" optionLabel="nama" optionValue="id"
+                          :placeholder="$t('bahanBaku.allCategories')" class="filter-select" @change="fetchMaterials" showClear />
+                </div>
+                <div class="filter-group">
+                  <label class="filter-label"><i class="pi pi-chart-bar" /> {{ $t('bahanBaku.stockStatus') }}</label>
+                  <Select v-model="filters.stock_status" :options="stockStatuses" optionLabel="label" optionValue="value"
+                          :placeholder="$t('bahanBaku.allStatuses')" class="filter-select" @change="fetchMaterials" showClear />
+                </div>
               </div>
+              <Button
+                v-if="filters.search || filters.kategori_id || filters.stock_status"
+                :label="$t('common.reset')"
+                icon="pi pi-filter-slash"
+                severity="secondary"
+                outlined
+                size="small"
+                class="filter-reset-btn"
+                @click="resetFilters"
+              />
             </div>
           </template>
           <template #empty>
@@ -565,6 +581,11 @@ const deleteMaterial = async (id) => {
   }
 }
 
+const resetFilters = () => {
+  filters.value = { search: '', kategori_id: null, stock_status: null }
+  fetchMaterials()
+}
+
 onMounted(() => {
   fetchOutlet()
   fetchMaterials()
@@ -608,10 +629,51 @@ onMounted(() => {
   width: 100%;
 }
 
-.table-header {
+.filter-bar {
   display: flex;
-  justify-content: flex-end;
-  margin-bottom: 1rem;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.5rem;
+}
+
+.filter-fields {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  flex: 1;
+}
+
+.filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.filter-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.filter-input {
+  width: 220px;
+}
+
+.filter-select {
+  width: 200px;
+}
+
+.filter-reset-btn {
+  white-space: nowrap;
+  align-self: flex-end;
 }
 
 .action-buttons {
