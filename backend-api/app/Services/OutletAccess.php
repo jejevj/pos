@@ -82,15 +82,14 @@ class OutletAccess
         // Try to resolve outlet_user mapping (by email) even for owner/SA —
         // some employee-facing endpoints need the outlet_user.id even when
         // the caller is the owner.
-        if ($opts['setSchema']) {
-            DB::statement("SET search_path TO {$outlet->schema_name}, public");
-        }
+        // Always set schema temporarily to query outlet_users — even when setSchema=false.
+        // Without this, the query falls to the public schema where outlet_users does not exist.
+        DB::statement("SET search_path TO {$outlet->schema_name}, public");
 
         $outletUser = null;
         try {
             $outletUser = DB::table('outlet_users')
-                ->where('outlet_id', $outlet->id)
-                ->where('email', $user->email)
+                ->whereRaw('LOWER(email) = ?', [strtolower($user->email)])
                 ->where('is_active', true)
                 ->whereNull('deleted_at')
                 ->first();
@@ -98,6 +97,11 @@ class OutletAccess
             // Schema may not have outlet_users yet (very fresh outlet). Treat
             // as no mapping rather than 500ing the request.
             $outletUser = null;
+        }
+
+        // If caller does not want the schema to remain set, reset it now.
+        if (!$opts['setSchema']) {
+            DB::statement("SET search_path TO public");
         }
 
         $hasMapping = $outletUser !== null;
