@@ -4,7 +4,8 @@
     :page-title="pageTitle"
     :theme="vueroTheme"
     :is-dark="isDark"
-    open-on-mounted
+    :show-sidebar="showSidebar"
+    :open-on-mounted="showSidebar"
   >
     <template #logo>
       <i class="pi pi-box logo-icon"></i>
@@ -64,12 +65,16 @@ const outletId = computed(() => route.params.outletId)
 
 const pageTitle = computed(() => route.meta.title || t('common.dashboard'))
 
+// Sidebar hanya untuk superadmin — outlet user tidak boleh ada sidebar
+const showSidebar = computed(() => authStore.isSuperAdmin)
+
 const currentLanguage = computed(() =>
   availableLocales.find(l => l.code === locale.value) || availableLocales[0]
 )
 
-// Build nav links from auth store menus
+// Build nav links hanya untuk superadmin
 const navLinks = computed(() => {
+  if (!authStore.isSuperAdmin) return []
   return (authStore.menus || []).map(menu => {
     if (menu.children?.length) {
       return {
@@ -120,7 +125,10 @@ const goToWhatsApp = () => {
 }
 
 onMounted(async () => {
-  if (authStore.menus.length === 0) await authStore.fetchMenus()
+  // Hanya fetch menus untuk superadmin
+  if (authStore.isSuperAdmin && authStore.menus.length === 0) {
+    await authStore.fetchMenus()
+  }
 })
 </script>
 
