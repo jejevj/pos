@@ -142,7 +142,7 @@
         </div>
         <div class="field">
           <label>{{ $t('menu.sellingPrice') }} *</label>
-          <InputNumber v-model="form.harga_jual" style="width: 100%" mode="currency" currency="IDR" locale="id-ID" />
+          <InputNumber v-model="form.harga_jual" style="width: 100%" locale="id-ID" :minFractionDigits="0" :maxFractionDigits="0" />
           <small v-if="recommendedPrice > 0" class="text-success">
             {{ $t('menu.recommendedPrice') }}: Rp {{ Number(recommendedPrice).toLocaleString('id-ID') }}
           </small>
@@ -161,10 +161,9 @@
           <div v-for="(item, index) in form.bahan_baku" :key="index" class="ingredient-row">
             <Select v-model="item.bahan_baku_id" :options="materials" optionLabel="nama" optionValue="id"
                     :placeholder="$t('menu.selectIngredient')" class="ingredient-select" @change="onIngredientChange(item)" />
-            <InputNumber v-model="item.jumlah" :placeholder="$t('menu.quantity')" class="ingredient-quantity" :minFractionDigits="0" :maxFractionDigits="2" @input="calculateRecommendedPrice" />
-            <div class="ingredient-unit-display">
-              {{ getMaterialUnit(item.bahan_baku_id) || '-' }}
-            </div>
+            <InputNumber v-model="item.jumlah" :placeholder="$t('menu.quantity')" class="ingredient-quantity" :minFractionDigits="0" :maxFractionDigits="4" @input="calculateRecommendedPrice" />
+            <Select v-model="item.satuan_id" :options="getFilteredUnits(item.bahan_baku_id)" optionLabel="singkatan" optionValue="id"
+                    :placeholder="'-'" class="ingredient-unit-select" @change="calculateRecommendedPrice" :disabled="!item.bahan_baku_id" />
             <div class="ingredient-cost">
               <span v-if="item.bahan_baku_id && item.jumlah">
                 Rp {{ calculateIngredientCost(item).toLocaleString('id-ID') }}
@@ -449,15 +448,28 @@ const calculateIngredientCost = (item) => {
   if (!item.bahan_baku_id || !item.jumlah) return 0
   const material = materials.value.find(m => m.id === item.bahan_baku_id)
   if (!material) return 0
-  // Use harga_per_satuan_dasar if available (with unit conversion), otherwise use harga_beli
-  const pricePerUnit = material.harga_per_satuan_dasar || material.harga_beli
-  return pricePerUnit * item.jumlah
+  // Use harga_per_satuan_dasar if available (price per base unit), otherwise use harga_beli
+  const pricePerBaseUnit = material.harga_per_satuan_dasar || material.harga_beli
+  // Get conversion factor for the selected satuan
+  const satuan = units.value.find(u => u.id === item.satuan_id)
+  const convFactor = satuan
+    ? (satuan.is_base_unit ? 1 : Number(satuan.conversion_to_base))
+    : 1
+  return pricePerBaseUnit * (item.jumlah * convFactor)
 }
 
 const getMaterialUnit = (materialId) => {
   if (!materialId) return ''
   const material = materials.value.find(m => m.id === materialId)
   return material?.satuan?.singkatan || ''
+}
+
+// Return units with the same tipe as the selected bahan baku's satuan
+const getFilteredUnits = (materialId) => {
+  if (!materialId) return units.value
+  const material = materials.value.find(m => m.id === materialId)
+  if (!material?.satuan?.tipe) return units.value
+  return units.value.filter(u => u.tipe === material.satuan.tipe)
 }
 
 const getInitials = (name) => {
@@ -569,8 +581,11 @@ const onIngredientChange = (item) => {
   if (item.bahan_baku_id) {
     const material = materials.value.find(m => m.id === item.bahan_baku_id)
     if (material) {
+      // Default to the bahan baku's own satuan (base unit of that material)
       item.satuan_id = material.satuan_id
     }
+  } else {
+    item.satuan_id = null
   }
   calculateRecommendedPrice()
 }
@@ -657,7 +672,7 @@ onMounted(() => {
 
 .ingredient-row { 
   display: grid;
-  grid-template-columns: 2fr 100px 60px 100px 40px;
+  grid-template-columns: 2fr 100px 110px 110px 40px;
   gap: 0.5rem; 
   align-items: center; 
   margin-bottom: 0.5rem; 
@@ -671,18 +686,8 @@ onMounted(() => {
   width: 100%;
 }
 
-.ingredient-unit-display {
-  width: 60px;
-  height: 40px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: #f3f4f6;
-  border: 1px solid #d1d5db;
-  border-radius: 6px;
-  font-size: 0.875rem;
-  font-weight: 600;
-  color: #4b5563;
+.ingredient-unit-select {
+  width: 100%;
 }
 
 .ingredient-cost {
