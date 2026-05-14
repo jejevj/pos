@@ -292,7 +292,11 @@ const toast = useToast()
 const { t } = useI18n()
 
 const outletId = route.params.outletId
-const userId = 1 // TODO: Get from auth
+// Attendance is always for the authenticated user — the backend resolves
+// the global user to an outlet_user row in this outlet. Use 'me' as the
+// path token for the today-status endpoint; clock-in/out endpoints derive
+// the outlet_user from the auth token and ignore any client-sent user_id.
+const userId = 'me'
 
 const videoElement = ref(null)
 const canvasElement = ref(null)
@@ -487,7 +491,6 @@ const handleClockIn = async () => {
   submitting.value = true
   try {
     await api.post(`/outlets/${outletId}/attendances/clock-in`, {
-      user_id: userId,
       photo: capturedImage.value,
       latitude: location.value.latitude,
       longitude: location.value.longitude,
@@ -522,7 +525,6 @@ const handleClockOut = async () => {
   submitting.value = true
   try {
     await api.post(`/outlets/${outletId}/attendances/clock-out`, {
-      user_id: userId,
       photo: capturedImage.value,
       latitude: location.value.latitude,
       longitude: location.value.longitude,
@@ -563,7 +565,7 @@ const fetchTodayStatus = async () => {
 const fetchAttendances = async () => {
   loading.value = true
   try {
-    const response = await api.get(`/outlets/${outletId}/attendances`, { params: { user_id: userId } })
+    const response = await api.get(`/outlets/${outletId}/attendances`, { params: { user_id: 'me' } })
     attendances.value = response.data || []
   } catch (error) {
     toast.add({ 
