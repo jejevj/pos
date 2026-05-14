@@ -10,13 +10,16 @@ const api = axios.create({
 })
 
 // Decode encoded outlet IDs in request URLs before sending to backend.
-// URLs like /outlets/MQ/... become /outlets/1/... transparently.
-const OUTLET_RE = /\/outlets\/([^/]+)\//g
+// Matches /outlets/{hash} with or without trailing path:
+//   /outlets/MQ        → /outlets/1
+//   /outlets/MQ/       → /outlets/1/
+//   /outlets/MQ/users  → /outlets/1/users
+const OUTLET_RE = /\/outlets\/([^/?#]+)(\/|$)/g
 function decodeOutletUrl(url) {
   if (!url || !url.includes('/outlets/')) return url
-  return url.replace(OUTLET_RE, (match, hash) => {
+  return url.replace(OUTLET_RE, (match, hash, trailing) => {
     const id = decodeOutletId(hash)
-    return id ? `/outlets/${id}/` : match
+    return id ? `/outlets/${id}${trailing}` : match
   })
 }
 
