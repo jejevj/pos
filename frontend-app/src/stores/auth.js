@@ -10,6 +10,14 @@ export const useAuthStore = defineStore('auth', () => {
   const menus = ref([])
   const permissions = ref([])
 
+  /**
+   * outletMemberships: array dari outlet-outlet di mana user ini terdaftar
+   * Format: [{ outlet_id, outlet_name, schema, roles: [{name, display_name}], permissions: ['view_pos', ...] }]
+   */
+  const outletMemberships = ref(
+    JSON.parse(localStorage.getItem('outlet_memberships') || '[]')
+  )
+
   const isAuthenticated = computed(() => !!token.value)
 
   const userRoles = computed(() => {
@@ -32,6 +40,44 @@ export const useAuthStore = defineStore('auth', () => {
     return hasAnyRole(['admin', 'superadmin'])
   })
 
+  /**
+   * True jika user ini adalah outlet user (terdaftar di setidaknya 1 outlet)
+   * dan BUKAN superadmin platform.
+   */
+  const isOutletUser = computed(() => {
+    return !isSuperAdmin.value && outletMemberships.value.length > 0
+  })
+
+  /**
+   * Kembalikan membership entry untuk outlet tertentu, atau null jika tidak terdaftar.
+   */
+  const getOutletMembership = (outletId) => {
+    const id = parseInt(outletId)
+    return outletMemberships.value.find(m => m.outlet_id === id) || null
+  }
+
+  /**
+   * Cek apakah user memiliki permission tertentu di outlet tertentu.
+   * Superadmin selalu true.
+   * Owner outlet (roles.includes('owner')) selalu true.
+   */
+  const hasOutletPermission = (outletId, permission) => {
+    if (isSuperAdmin.value) return true
+    const membership = getOutletMembership(outletId)
+    if (!membership) return false
+    // Owner punya akses penuh
+    if (membership.roles.some(r => r.name === 'owner')) return true
+    return membership.permissions.includes(permission)
+  }
+
+  /**
+   * Cek apakah user memiliki salah satu dari beberapa permissions di outlet.
+   */
+  const hasAnyOutletPermission = (outletId, perms) => {
+    if (isSuperAdmin.value) return true
+    return perms.some(p => hasOutletPermission(outletId, p))
+  }
+
   const hasPermission = (permission) => {
     if (isSuperAdmin.value) return true
     return permissions.value.includes(permission)
@@ -42,13 +88,13 @@ export const useAuthStore = defineStore('auth', () => {
     return perms.some(perm => permissions.value.includes(perm))
   }
 
-  const setAuth = (userData, authToken) => {
+  const setAuth = (userData, authToken, memberships = []) => {
     user.value = userData
     token.value = authToken
     localStorage.setItem('auth_token', authToken)
     localStorage.setItem('user', JSON.stringify(userData))
     
-    // Extract permissions from roles
+    // Extract permissions from global roles
     if (userData.roles) {
       const allPermissions = userData.roles.flatMap(role => 
         role.permissions?.map(p => p.name) || []
@@ -56,6 +102,10 @@ export const useAuthStore = defineStore('auth', () => {
       permissions.value = [...new Set(allPermissions)]
       localStorage.setItem('permissions', JSON.stringify(permissions.value))
     }
+
+    // Store outlet memberships
+    outletMemberships.value = memberships
+    localStorage.setItem('outlet_memberships', JSON.stringify(memberships))
   }
 
   const clearAuth = () => {
@@ -63,10 +113,12 @@ export const useAuthStore = defineStore('auth', () => {
     token.value = null
     menus.value = []
     permissions.value = []
+    outletMemberships.value = []
     localStorage.removeItem('auth_token')
     localStorage.removeItem('user')
     localStorage.removeItem('menus')
     localStorage.removeItem('permissions')
+    localStorage.removeItem('outlet_memberships')
   }
 
   const register = async (credentials) => {
@@ -74,7 +126,7 @@ export const useAuthStore = defineStore('auth', () => {
     error.value = null
     try {
       const response = await api.post('/auth/register', credentials)
-      setAuth(response.data.user, response.data.token)
+      setAuth(response.data.user, response.data.token, response.data.outlet_memberships || [])
       await fetchMenus()
       return response.data
     } catch (err) {
@@ -90,7 +142,7 @@ export const useAuthStore = defineStore('auth', () => {
     error.value = null
     try {
       const response = await api.post('/auth/login', credentials)
-      setAuth(response.data.user, response.data.token)
+      setAuth(response.data.user, response.data.token, response.data.outlet_memberships || [])
       await fetchMenus()
       return response.data
     } catch (err) {
@@ -130,6 +182,12 @@ export const useAuthStore = defineStore('auth', () => {
         permissions.value = [...new Set(allPermissions)]
         localStorage.setItem('permissions', JSON.stringify(permissions.value))
       }
+
+      // Refresh outlet memberships
+      if (response.data.outlet_memberships) {
+        outletMemberships.value = response.data.outlet_memberships
+        localStorage.setItem('outlet_memberships', JSON.stringify(response.data.outlet_memberships))
+      }
     } catch (err) {
       clearAuth()
       throw err
@@ -142,6 +200,13 @@ export const useAuthStore = defineStore('auth', () => {
     if (!token.value) return
     
     try {
+      // Superadmin: gunakan endpoint menu global (sidebar)
+      // Outlet user: tidak perlu fetch global menus (sidebar tidak ditampilkan)
+      if (!isSuperAdmin.value && outletMemberships.value.length > 0) {
+        menus.value = []
+        return
+      }
+
       const response = await api.get('/menus/user')
       menus.value = response.data
       localStorage.setItem('menus', JSON.stringify(response.data))
@@ -156,6 +221,7 @@ export const useAuthStore = defineStore('auth', () => {
     const storedUser = localStorage.getItem('user')
     const storedMenus = localStorage.getItem('menus')
     const storedPermissions = localStorage.getItem('permissions')
+    const storedMemberships = localStorage.getItem('outlet_memberships')
     
     if (storedUser && token.value) {
       try {
@@ -166,7 +232,10 @@ export const useAuthStore = defineStore('auth', () => {
         if (storedPermissions) {
           permissions.value = JSON.parse(storedPermissions)
         }
-        // Refresh user data and menus
+        if (storedMemberships) {
+          outletMemberships.value = JSON.parse(storedMemberships)
+        }
+        // Refresh user data and menus from server
         fetchUser()
         fetchMenus()
       } catch (err) {
@@ -182,14 +251,19 @@ export const useAuthStore = defineStore('auth', () => {
     error,
     menus,
     permissions,
+    outletMemberships,
     isAuthenticated,
     userRoles,
     isSuperAdmin,
     isAdmin,
+    isOutletUser,
     hasRole,
     hasAnyRole,
     hasPermission,
     hasAnyPermission,
+    hasOutletPermission,
+    hasAnyOutletPermission,
+    getOutletMembership,
     register,
     login,
     logout,
