@@ -1,8 +1,11 @@
 # Docker — one stack, one port
 
-This repo ships a Docker Compose stack that runs the Vue SPA, the Laravel API, Redis, and WAHA (WhatsApp gateway). Only **one** port is published to the host — an nginx reverse proxy that fronts every other service on the internal `app-net` network.
+This repo ships a Docker Compose stack that runs the Vue SPA, the Laravel API, and Redis. Only **one** port is published to the host — an nginx reverse proxy that fronts every other service on the internal `app-net` network.
 
-**Postgres is NOT bundled by default.** The stack expects you to point `DB_HOST` at an existing Postgres reachable from the Docker host (e.g. another container exposing `5432`, or a system service). See [Database options](#database-options) below for the two supported modes.
+**Postgres and WAHA are NOT bundled by default.**
+
+* Postgres → the stack expects you to point `DB_HOST` at an existing Postgres reachable from the Docker host. See [Database options](#database-options).
+* WAHA (WhatsApp gateway) → off by default; enable later via a profile or by pointing the backend at an external WAHA instance. See [WhatsApp / WAHA](#whatsapp--waha).
 
 ## TL;DR
 
@@ -14,14 +17,15 @@ existing host Postgres (`host.docker.internal:5432/pos_sc`,
 cp .env.docker.example .env.docker
 cp .env.docker.example .env          # compose reads this for ${VAR} expansion
 
-# The only values you still need to fill in:
-#   WAHA_API_KEY=<some-strong-random-string>
-#   APP_KEY=<output of the next command>
+# Generate APP_KEY once and paste the output into APP_KEY= in BOTH files.
+# (Works even before WAHA is configured; key generation has no required deps.)
 docker compose run --rm --no-deps backend php artisan key:generate --show
 
 docker compose up -d --build
 # → open http://localhost:9080
 ```
+
+WAHA stays off until you opt in (see [WhatsApp / WAHA](#whatsapp--waha)). Hitting `/waha/*` in the meantime returns a 502 from the proxy — the rest of the app is unaffected.
 
 ## Why one port?
 
@@ -30,10 +34,10 @@ The default `APP_PORT=9080` is the only port mapped to your host. The proxy rout
 | Path prefix | Goes to | Notes |
 | --- | --- | --- |
 | `/api/*`, `/sanctum/*`, `/storage/*`, `/up`, `/api/documentation` | `backend:8080` | Laravel + Swagger |
-| `/waha/*` | `waha:3000` | REST + WebSocket; prefix is stripped |
+| `/waha/*` | `waha:3000` (optional) | REST + WebSocket; prefix is stripped. 502 when WAHA isn't running. |
 | everything else | `frontend:80` | Vue SPA |
 
-Redis, WAHA, and the PHP-FPM backend are reachable only from inside the Docker network. Postgres lives outside the compose stack by default (see [Database options](#database-options)).
+Redis and the PHP-FPM backend are reachable only from inside the Docker network. Postgres lives outside the compose stack by default (see [Database options](#database-options)); WAHA is optional (see [WhatsApp / WAHA](#whatsapp--waha)).
 
 Need direct access during debugging? Add a `docker-compose.override.yml` that publishes extra ports. The base file stays clean.
 
@@ -142,7 +146,9 @@ docker compose down -v   # also drops postgres, redis, waha sessions
 | `DB_USERNAME` | `postgres` | Database user |
 | `DB_PASSWORD` | `qwert12345!` | Override in `.env.docker` for any other deployment |
 | `POSTGRES_PASSWORD` | required only with `--profile internal-db` | Password for the bundled Postgres |
-| `WAHA_API_KEY` | **required** | Used by both WAHA and the Laravel/Vue clients |
+| `WAHA_ENABLED` | `false` | Flip to `true` after WAHA is reachable |
+| `WAHA_API_KEY` | empty | Only required when `WAHA_ENABLED=true` |
+| `WAHA_BASE_URL` | `http://waha:3000` | Internal service name by default; override for an external WAHA |
 | `REDIS_PASSWORD` | empty | Optional; Redis only listens on the internal network |
 | `RUN_MIGRATIONS` | `true` | Run `artisan migrate --force` on boot |
 | `RUN_QUEUE_WORKER` | `true` | Start `queue:work` under supervisor inside the backend container |
@@ -154,7 +160,7 @@ docker compose down -v   # also drops postgres, redis, waha sessions
 * `backend` — `curl /up` (Laravel's built-in health endpoint)
 * `frontend` — `wget /` (returns the SPA shell)
 * `proxy` — `wget /` (proxied SPA)
-* `waha` — `wget /api/health` (tolerant; some WAHA versions don't expose it)
+* `waha` (only with `--profile whatsapp`) — `wget /api/health` (tolerant; some WAHA versions don't expose it)
 * `postgres` (only with `--profile internal-db`) — `pg_isready`
 
 `backend` waits for `redis: service_healthy` via `depends_on`. The external Postgres is *not* gated by Docker — the entrypoint script polls it with `pg_isready` before running migrations.
@@ -183,13 +189,49 @@ Docker is not available in the sandbox where this scaffolding was generated, so 
 
 ## Manual steps you still need to do
 
-1. `cp .env.docker.example .env.docker` and `cp .env.docker.example .env`. The DB defaults already match your existing host Postgres (`pos_sc` on `host.docker.internal:5432`) — no edits needed unless you want to change them.
+1. `cp .env.docker.example .env.docker` and `cp .env.docker.example .env`. The DB defaults already match your existing host Postgres (`pos_sc` on `host.docker.internal:5432`) — no edits needed unless you want to change them. WAHA is off by default; you can leave its values blank for now.
 2. Make sure the `pos_sc` database exists on that Postgres. If not: `psql -h 127.0.0.1 -U postgres -c 'CREATE DATABASE pos_sc;'`.
-3. Set `WAHA_API_KEY` in both files (any strong random string).
-4. Run `docker compose run --rm --no-deps backend php artisan key:generate --show`, copy the output into `APP_KEY=` in both files.
-5. `docker compose up -d --build`.
-6. (Linux only) Confirm `host.docker.internal` resolves inside the container: `docker compose exec backend getent hosts host.docker.internal`. If your Postgres listens only on `127.0.0.1`, change `listen_addresses` to `*` (or the docker bridge IP) and update `pg_hba.conf` to allow the Docker bridge subnet — otherwise the backend will get `connection refused`.
-7. (First-run only) Once the stack is up, browse to `http://localhost:9080`, log in, and pair WhatsApp from the WhatsApp settings page — WAHA persists the session under the `waha-sessions` volume.
+3. Run `docker compose run --rm --no-deps backend php artisan key:generate --show`, copy the output into `APP_KEY=` in both files.
+4. `docker compose up -d --build`.
+5. (Linux only) Confirm `host.docker.internal` resolves inside the container: `docker compose exec backend getent hosts host.docker.internal`. If your Postgres listens only on `127.0.0.1`, change `listen_addresses` to `*` (or the docker bridge IP) and update `pg_hba.conf` to allow the Docker bridge subnet — otherwise the backend will get `connection refused`.
+6. (Optional, later) Wire up WhatsApp — see [WhatsApp / WAHA](#whatsapp--waha).
+
+## WhatsApp / WAHA
+
+WAHA is **off by default**. The stack boots, key generation runs, and the app works fine without it. `/waha/*` returns 502 from the proxy until you turn WAHA on. Two options when you're ready:
+
+### Option A — bundled WAHA (profile: `whatsapp`)
+
+In `.env.docker` and `.env`:
+
+```env
+WAHA_ENABLED=true
+WAHA_API_KEY=<some-strong-random-string>
+WAHA_BASE_URL=http://waha:3000      # internal service name; this is the default
+```
+
+Then:
+
+```bash
+docker compose --profile whatsapp up -d
+# pair the device via the SPA's WhatsApp settings page
+```
+
+The bundled WAHA persists its session under the `waha-sessions` volume.
+
+### Option B — external WAHA
+
+Run WAHA wherever you like (another host, a managed service, the existing `waha/docker-compose.yml`, etc.) and point the backend at it:
+
+```env
+WAHA_ENABLED=true
+WAHA_API_KEY=<key-of-your-external-waha>
+WAHA_BASE_URL=http://your-waha-host:3000
+```
+
+`docker compose up -d` (no `--profile whatsapp`) — the bundled WAHA stays disabled.
+
+> Restart the backend after toggling WAHA env vars: `docker compose up -d backend`.
 
 ## Cloudflare Tunnel
 
