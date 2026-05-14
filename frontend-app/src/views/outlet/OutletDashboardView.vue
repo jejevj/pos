@@ -229,7 +229,7 @@
           <!-- Satuan -->
           <div v-if="canAccess('view_inventory')" class="menu-card" @click="navigateTo('outlet-satuan')">
             <div class="menu-icon" style="background:#0891b2">
-              <i class="pi pi-ruler" style="color:white"></i>
+              <i class="pi pi-arrows-h" style="color:white"></i>
             </div>
             <span class="menu-label">Satuan</span>
           </div>
