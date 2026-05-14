@@ -246,8 +246,7 @@ export const useAuthStore = defineStore('auth', () => {
           outletMemberships.value = JSON.parse(storedMemberships)
         }
         // Refresh user data and menus from server
-        fetchUser()
-        fetchMenus()
+        fetchUser().then(() => fetchMenus())
       } catch (err) {
         clearAuth()
       }
