@@ -121,7 +121,10 @@ class CreateTransactionTables extends Command
                     $this->warn("  - 'orders' table already exists");
                 }
 
-                // Create order_items table
+                // Create order_items table.
+                // Defer the FK to menu(id) so this command can be run before
+                // outlets:create-menu-tables. The FK is attached afterwards
+                // (idempotently) when the menu table exists.
                 if (!$this->tableExists('order_items')) {
                     DB::statement("
                         CREATE TABLE order_items (
@@ -135,14 +138,16 @@ class CreateTransactionTables extends Command
                             notes TEXT NULL,
                             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                            FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE,
-                            FOREIGN KEY (menu_id) REFERENCES menu(id) ON DELETE RESTRICT
+                            FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE
                         )
                     ");
                     $this->info("  ✓ Created 'order_items' table");
                 } else {
                     $this->warn("  - 'order_items' table already exists");
                 }
+
+                // Attach FK from order_items.menu_id -> menu(id) when menu exists.
+                $this->ensureMenuForeignKey($outlet->schema_name);
 
                 // Insert sample tables
                 if ($this->tableExists('tables') && DB::table('tables')->count() == 0) {
@@ -177,12 +182,56 @@ class CreateTransactionTables extends Command
     {
         $result = DB::select("
             SELECT EXISTS (
-                SELECT FROM information_schema.tables 
+                SELECT FROM information_schema.tables
                 WHERE table_schema = current_schema()
                 AND table_name = ?
             )
         ", [$tableName]);
 
         return $result[0]->exists;
+    }
+
+    private function tableExistsInSchema($schema, $table)
+    {
+        $row = DB::selectOne(
+            "SELECT EXISTS (
+                SELECT 1 FROM information_schema.tables
+                WHERE table_schema = ? AND table_name = ?
+            ) AS exists",
+            [$schema, $table]
+        );
+        return (bool) ($row->exists ?? false);
+    }
+
+    private function constraintExists($schema, $table, $constraint)
+    {
+        $row = DB::selectOne(
+            "SELECT EXISTS (
+                SELECT 1 FROM information_schema.table_constraints
+                WHERE table_schema = ? AND table_name = ? AND constraint_name = ?
+            ) AS exists",
+            [$schema, $table, $constraint]
+        );
+        return (bool) ($row->exists ?? false);
+    }
+
+    private function ensureMenuForeignKey($schema)
+    {
+        if (! $this->tableExistsInSchema($schema, 'order_items')) {
+            return;
+        }
+        if (! $this->tableExistsInSchema($schema, 'menu')) {
+            $this->warn("  - Skipping FK order_items -> menu: {$schema}.menu does not exist yet. Run outlets:create-menu-tables, then re-run this command.");
+            return;
+        }
+        $constraint = 'fk_order_items_menu';
+        if ($this->constraintExists($schema, 'order_items', $constraint)) {
+            return;
+        }
+        DB::statement(
+            "ALTER TABLE {$schema}.order_items ADD CONSTRAINT {$constraint} " .
+            "FOREIGN KEY (menu_id) REFERENCES {$schema}.menu(id) ON DELETE RESTRICT"
+        );
+        $this->info("  ✓ Added FK order_items.menu_id -> menu(id)");
     }
 }

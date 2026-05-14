@@ -24,20 +24,33 @@ check_status() {
     fi
 }
 
-# Step 1: Create menu tables
-echo "Step 1: Creating menu tables in outlet schemas..."
+# Step 1: Create bahan baku tables (must come before menu so menu_bahan_baku FKs resolve)
+echo "Step 1: Creating bahan baku tables in outlet schemas..."
+php artisan outlets:create-bahan-baku-tables
+check_status
+echo ""
+
+# Step 2: Create menu tables
+echo "Step 2: Creating menu tables in outlet schemas..."
 php artisan outlets:create-menu-tables
 check_status
 echo ""
 
-# Step 2: Seed bahan baku (if not already done)
-echo "Step 2: Seeding bahan baku data (includes coffee ingredients)..."
+# Step 3: (Optional) Create transaction tables. Safe to run before or after menu;
+# the order_items -> menu FK is attached when both tables exist.
+echo "Step 3: Creating transaction tables in outlet schemas..."
+php artisan outlets:create-transaction-tables
+check_status
+echo ""
+
+# Step 4: Seed bahan baku (if not already done)
+echo "Step 4: Seeding bahan baku data (includes coffee ingredients)..."
 php artisan db:seed --class=BahanBakuSeeder
 check_status
 echo ""
 
-# Step 3: Seed menu data
-echo "Step 3: Seeding menu data (categories and Americano menu)..."
+# Step 5: Seed menu data
+echo "Step 5: Seeding menu data (categories and Americano menu)..."
 php artisan db:seed --class=MenuSeeder
 check_status
 echo ""

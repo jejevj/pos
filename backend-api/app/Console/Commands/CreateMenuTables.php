@@ -74,12 +74,15 @@ class CreateMenuTables extends Command
         ");
 
         // 3. Menu Bahan Baku (resep - bahan baku yang digunakan per menu)
+        // Create the table without FKs to bahan_baku/satuan so this command
+        // can be run before outlets:create-bahan-baku-tables. The FKs are
+        // attached afterwards (idempotently) when the referenced tables exist.
         DB::statement("
             CREATE TABLE IF NOT EXISTS {$schema}.menu_bahan_baku (
                 id SERIAL PRIMARY KEY,
                 menu_id INTEGER REFERENCES {$schema}.menu(id) ON DELETE CASCADE,
-                bahan_baku_id INTEGER REFERENCES {$schema}.bahan_baku(id),
-                satuan_id INTEGER REFERENCES {$schema}.satuan(id),
+                bahan_baku_id INTEGER,
+                satuan_id INTEGER,
                 jumlah DECIMAL(10,4) NOT NULL,
                 keterangan TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -87,9 +90,52 @@ class CreateMenuTables extends Command
             )
         ");
 
+        // Attach FKs only if prerequisite tables already exist. Safe to rerun.
+        $this->ensureForeignKey($schema, 'menu_bahan_baku', 'fk_menu_bahan_baku_bahan', 'bahan_baku_id', 'bahan_baku', 'id');
+        $this->ensureForeignKey($schema, 'menu_bahan_baku', 'fk_menu_bahan_baku_satuan', 'satuan_id', 'satuan', 'id');
+
         // Indexes
         DB::statement("CREATE INDEX IF NOT EXISTS idx_menu_kategori ON {$schema}.menu(kategori_id)");
         DB::statement("CREATE INDEX IF NOT EXISTS idx_menu_bahan_menu ON {$schema}.menu_bahan_baku(menu_id)");
         DB::statement("CREATE INDEX IF NOT EXISTS idx_menu_bahan_baku ON {$schema}.menu_bahan_baku(bahan_baku_id)");
+    }
+
+    private function tableExists($schema, $table)
+    {
+        $row = DB::selectOne(
+            "SELECT EXISTS (
+                SELECT 1 FROM information_schema.tables
+                WHERE table_schema = ? AND table_name = ?
+            ) AS exists",
+            [$schema, $table]
+        );
+        return (bool) ($row->exists ?? false);
+    }
+
+    private function constraintExists($schema, $table, $constraint)
+    {
+        $row = DB::selectOne(
+            "SELECT EXISTS (
+                SELECT 1 FROM information_schema.table_constraints
+                WHERE table_schema = ? AND table_name = ? AND constraint_name = ?
+            ) AS exists",
+            [$schema, $table, $constraint]
+        );
+        return (bool) ($row->exists ?? false);
+    }
+
+    private function ensureForeignKey($schema, $table, $constraint, $column, $refTable, $refColumn)
+    {
+        if (! $this->tableExists($schema, $refTable)) {
+            $this->warn("  - Skipping FK {$constraint}: {$schema}.{$refTable} does not exist yet. Run outlets:create-bahan-baku-tables, then re-run this command.");
+            return;
+        }
+        if ($this->constraintExists($schema, $table, $constraint)) {
+            return;
+        }
+        DB::statement(
+            "ALTER TABLE {$schema}.{$table} ADD CONSTRAINT {$constraint} " .
+            "FOREIGN KEY ({$column}) REFERENCES {$schema}.{$refTable}({$refColumn})"
+        );
     }
 }

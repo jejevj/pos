@@ -113,13 +113,15 @@ class CreateBahanBakuTables extends Command
                 is_active BOOLEAN DEFAULT true,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                deleted_at TIMESTAMP,
-                COMMENT ON COLUMN satuan_id IS 'Satuan dasar untuk penggunaan (base unit)',
-                COMMENT ON COLUMN satuan_pembelian_id IS 'Satuan saat pembelian',
-                COMMENT ON COLUMN jumlah_per_unit_pembelian IS 'Jumlah satuan dasar per unit pembelian (contoh: 1 galon = 20 liter)',
-                COMMENT ON COLUMN harga_beli IS 'Harga per unit pembelian'
+                deleted_at TIMESTAMP
             )
         ");
+
+        // Column comments (must be separate statements in PostgreSQL)
+        DB::statement("COMMENT ON COLUMN {$schema}.bahan_baku.satuan_id IS 'Satuan dasar untuk penggunaan (base unit)'");
+        DB::statement("COMMENT ON COLUMN {$schema}.bahan_baku.satuan_pembelian_id IS 'Satuan saat pembelian'");
+        DB::statement("COMMENT ON COLUMN {$schema}.bahan_baku.jumlah_per_unit_pembelian IS 'Jumlah satuan dasar per unit pembelian (contoh: 1 galon = 20 liter)'");
+        DB::statement("COMMENT ON COLUMN {$schema}.bahan_baku.harga_beli IS 'Harga per unit pembelian'");
 
         // 5. Stock History (untuk tracking perubahan stock)
         DB::statement("
