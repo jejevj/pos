@@ -2,11 +2,17 @@ FROM node:22-alpine AS build
 
 WORKDIR /app
 
-# Build-time Vite vars (baked into the bundle)
+# Build-time Vite vars (baked into the bundle).
+# VITE_WAHA_ENABLED defaults to "false" so the bundled frontend does NOT try to
+# open a WAHA WebSocket / hit the WAHA REST API with a placeholder API key.
+# Set VITE_WAHA_ENABLED=true (and a real VITE_WAHA_API_KEY) at build time to
+# turn the WhatsApp UI on. See DOCKER.md.
 ARG VITE_API_URL=/api
+ARG VITE_WAHA_ENABLED=false
 ARG VITE_WAHA_URL=/waha
-ARG VITE_WAHA_API_KEY=change-me
+ARG VITE_WAHA_API_KEY=
 ENV VITE_API_URL=$VITE_API_URL \
+    VITE_WAHA_ENABLED=$VITE_WAHA_ENABLED \
     VITE_WAHA_URL=$VITE_WAHA_URL \
     VITE_WAHA_API_KEY=$VITE_WAHA_API_KEY
 

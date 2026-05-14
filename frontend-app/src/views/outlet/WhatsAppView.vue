@@ -1,5 +1,16 @@
 <template>
   <div class="wa-view">
+    <div v-if="!wahaEnabled" class="wa-disabled-banner">
+      <i class="pi pi-info-circle"></i>
+      <div>
+        <strong>WhatsApp gateway is not configured.</strong>
+        <div class="wa-disabled-hint">
+          Set <code>VITE_WAHA_ENABLED=true</code> and provide a real
+          <code>VITE_WAHA_API_KEY</code> (not <code>change-me</code>), then rebuild the frontend image.
+          See DOCKER.md for details.
+        </div>
+      </div>
+    </div>
     <div class="page-header">
       <div class="page-header-left">
         <h2><i class="pi pi-whatsapp" style="color:#25d366"></i> WhatsApp</h2>
@@ -451,7 +462,15 @@ const toast = useToast()
 
 // WAHA config — reads from Vite env or falls back to defaults
 const WAHA_URL = import.meta.env.VITE_WAHA_URL || 'http://localhost:3000'
-const WAHA_KEY = import.meta.env.VITE_WAHA_API_KEY || 'dbe9f1b6a3a54ef99d6f019fc5f3ef67'
+const WAHA_KEY = import.meta.env.VITE_WAHA_API_KEY || ''
+
+// WAHA is opt-in: only call the gateway when explicitly enabled and a real key
+// is configured. Avoids the noisy WS/HTTP errors against /waha when the user
+// has not yet provisioned WhatsApp.
+const RAW_WAHA_ENABLED = String(import.meta.env.VITE_WAHA_ENABLED ?? 'false').toLowerCase()
+const PLACEHOLDER_WAHA_KEYS = new Set(['', 'change-me', 'your-waha-api-key'])
+const wahaEnabled =
+  (RAW_WAHA_ENABLED === 'true' || RAW_WAHA_ENABLED === '1') && !PLACEHOLDER_WAHA_KEYS.has(WAHA_KEY)
 
 const waha = axios.create({
   baseURL: WAHA_URL,
@@ -890,6 +909,7 @@ const quickSendTo = (chatId) => {
 
 onMounted(() => {
   clearWahaUnread()
+  if (!wahaEnabled) return
   init()
   fetchChats()
 })
@@ -897,6 +917,7 @@ onMounted(() => {
 // Auto-update when incoming message arrives via WebSocket
 let unsubWaha = null
 onMounted(() => {
+  if (!wahaEnabled) return
   unsubWaha = onWahaMessage((payload) => {
     const incomingChatId = payload.from
 
@@ -935,6 +956,26 @@ onUnmounted(() => {
 
 <style scoped>
 .wa-view { padding: 1.5rem; }
+
+.wa-disabled-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.875rem 1rem;
+  margin-bottom: 1.25rem;
+  border: 1px solid var(--p-yellow-300, #fde68a);
+  background: var(--p-yellow-50, #fffbeb);
+  color: var(--p-yellow-900, #713f12);
+  border-radius: 6px;
+}
+.wa-disabled-banner i { font-size: 1.25rem; line-height: 1.5; }
+.wa-disabled-hint { font-size: 0.875rem; margin-top: 0.25rem; }
+.wa-disabled-banner code {
+  padding: 0 0.25rem;
+  background: rgba(0,0,0,0.06);
+  border-radius: 3px;
+  font-size: 0.85em;
+}
 
 .page-header {
   display: flex;

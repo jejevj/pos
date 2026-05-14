@@ -2,7 +2,14 @@ import { ref, onUnmounted } from 'vue'
 import { useToast } from 'primevue/usetoast'
 
 const WAHA_WS_URL = import.meta.env.VITE_WAHA_URL?.replace(/^http/, 'ws') || 'ws://localhost:3000'
-const WAHA_KEY    = import.meta.env.VITE_WAHA_API_KEY || 'dbe9f1b6a3a54ef99d6f019fc5f3ef67'
+const WAHA_KEY    = import.meta.env.VITE_WAHA_API_KEY || ''
+
+// WAHA is opt-in. The frontend must NOT auto-connect with a placeholder/default
+// API key, otherwise every browser session opens a failing WS to /waha/ws.
+const RAW_ENABLED = String(import.meta.env.VITE_WAHA_ENABLED ?? 'false').toLowerCase()
+const PLACEHOLDER_KEYS = new Set(['', 'change-me', 'your-waha-api-key'])
+export const wahaEnabled =
+  (RAW_ENABLED === 'true' || RAW_ENABLED === '1') && !PLACEHOLDER_KEYS.has(WAHA_KEY)
 
 // Singleton
 let socket = null
@@ -23,6 +30,7 @@ function buildWsUrl() {
 }
 
 function connect() {
+  if (!wahaEnabled) return
   if (socket && (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING)) return
   try {
     socket = new WebSocket(buildWsUrl())
@@ -86,15 +94,17 @@ export function useWahaSocket() {
     messageCallbacks.forEach(cb => cb(payload))
   }
 
-  listeners.add(handleMessage)
-  connect()
+  if (wahaEnabled) {
+    listeners.add(handleMessage)
+    connect()
+  }
 
   onUnmounted(() => {
     listeners.delete(handleMessage)
     if (listeners.size === 0) disconnect()
   })
 
-  return { connected, unreadCount }
+  return { connected, unreadCount, wahaEnabled }
 }
 
 /**
@@ -102,6 +112,7 @@ export function useWahaSocket() {
  * Returns an unsubscribe function — call it in onUnmounted.
  */
 export function onWahaMessage(callback) {
+  if (!wahaEnabled) return () => {}
   messageCallbacks.add(callback)
   return () => messageCallbacks.delete(callback)
 }

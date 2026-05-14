@@ -207,9 +207,11 @@ docker compose down -v   # also drops postgres, redis, waha sessions
 | `DB_USERNAME` | `postgres` | Database user |
 | `DB_PASSWORD` | `qwert12345!` | Override in `.env.docker` for any other deployment |
 | `POSTGRES_PASSWORD` | required only with `--profile internal-db` | Password for the bundled Postgres |
-| `WAHA_ENABLED` | `false` | Flip to `true` after WAHA is reachable |
+| `WAHA_ENABLED` | `false` | Flip to `true` after WAHA is reachable (backend side) |
 | `WAHA_API_KEY` | empty | Only required when `WAHA_ENABLED=true` |
 | `WAHA_BASE_URL` | `http://waha:3000` | Internal service name by default; override for an external WAHA |
+| `VITE_WAHA_ENABLED` | `false` | Frontend-side opt-in. When `false` or `VITE_WAHA_API_KEY` is empty/placeholder, the SPA does NOT open the WAHA WebSocket or call the WAHA REST API, and the WhatsApp view shows an "unconfigured" banner. Baked at build time — change requires `docker compose build frontend`. |
+| `VITE_WAHA_API_KEY` | empty | Must be a real, non-placeholder key (NOT `change-me`) for the frontend to talk to WAHA. Baked at build time. |
 | `REDIS_PASSWORD` | empty | Optional; Redis only listens on the internal network |
 | `RUN_MIGRATIONS` | `true` | Run `artisan migrate --force` on boot |
 | `RUN_QUEUE_WORKER` | `true` | Start `queue:work` under supervisor inside the backend container |
@@ -269,14 +271,23 @@ In `.env.docker` and `.env`:
 WAHA_ENABLED=true
 WAHA_API_KEY=<some-strong-random-string>
 WAHA_BASE_URL=http://waha:3000      # internal service name; this is the default
+
+# Frontend opt-in (baked at build time — rebuild the frontend after changing):
+VITE_WAHA_ENABLED=true
+VITE_WAHA_API_KEY=${WAHA_API_KEY}
 ```
 
 Then:
 
 ```bash
-docker compose --profile whatsapp up -d
+docker compose --profile whatsapp up -d --build frontend
 # pair the device via the SPA's WhatsApp settings page
 ```
+
+> The frontend bundle bakes in `VITE_WAHA_*` at build time. If you flip
+> `VITE_WAHA_ENABLED` from `false` → `true` (or change the key), you MUST
+> `docker compose build frontend` and redeploy, otherwise the running bundle
+> still has the old values and either no-ops or hits WAHA with the wrong key.
 
 The bundled WAHA persists its session under the `waha-sessions` volume.
 
@@ -288,9 +299,13 @@ Run WAHA wherever you like (another host, a managed service, the existing `waha/
 WAHA_ENABLED=true
 WAHA_API_KEY=<key-of-your-external-waha>
 WAHA_BASE_URL=http://your-waha-host:3000
+
+# Frontend opt-in (baked at build time — rebuild the frontend after changing):
+VITE_WAHA_ENABLED=true
+VITE_WAHA_API_KEY=${WAHA_API_KEY}
 ```
 
-`docker compose up -d` (no `--profile whatsapp`) — the bundled WAHA stays disabled.
+`docker compose build frontend && docker compose up -d` (no `--profile whatsapp`) — the bundled WAHA stays disabled, but the SPA now talks to your external WAHA.
 
 > Restart the backend after toggling WAHA env vars: `docker compose up -d backend`.
 

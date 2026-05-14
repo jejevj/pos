@@ -36,8 +36,13 @@ services:
       dockerfile: docker/frontend/Dockerfile
       args:
         VITE_API_URL: ${VITE_API_URL:-/api}
+        # WhatsApp UI is opt-in. Defaults below leave VITE_WAHA_ENABLED=false so
+        # the bundle does not auto-open a WAHA WebSocket with the placeholder key.
+        # To enable, set VITE_WAHA_ENABLED=true + a real VITE_WAHA_API_KEY in .env
+        # and rebuild the frontend image.
+        VITE_WAHA_ENABLED: ${VITE_WAHA_ENABLED:-false}
         VITE_WAHA_URL: ${VITE_WAHA_URL:-/waha}
-        VITE_WAHA_API_KEY: ${VITE_WAHA_API_KEY:-change-me}
+        VITE_WAHA_API_KEY: ${VITE_WAHA_API_KEY:-}
     restart: unless-stopped
     networks: [app-net]
 
