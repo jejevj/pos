@@ -3,7 +3,7 @@
     <!-- Mobile navbar -->
     <div class="mobile-navbar navbar-faded">
       <div class="navbar-brand">
-        <button class="menu-toggle" @click="isMobileOpen = !isMobileOpen">
+        <button v-if="showSidebar" class="menu-toggle" @click="isMobileOpen = !isMobileOpen">
           <i class="pi pi-bars"></i>
         </button>
         <slot name="logo">
@@ -20,10 +20,10 @@
       <div v-if="isMobileOpen" class="mobile-overlay" @click="isMobileOpen = false" />
     </Transition>
 
-    <!-- Sideblock (desktop + mobile) -->
+    <!-- Sideblock (desktop + mobile) — hanya tampil jika showSidebar true -->
     <Transition name="slide-x">
       <div
-        v-if="isMobileOpen || isDesktopOpen"
+        v-if="showSidebar && (isMobileOpen || isDesktopOpen)"
         class="sidebar-block"
         :class="[themeClass, isMobileOpen ? 'is-mobile' : '']"
       >
@@ -57,11 +57,11 @@
     <!-- Main content -->
     <div
       class="view-wrapper view-wrapper-full"
-      :class="{ 'is-pushed-block': isDesktopOpen }"
+      :class="{ 'is-pushed-block': showSidebar && isDesktopOpen }"
     >
       <!-- Page heading -->
       <div class="page-heading">
-        <button class="sidebar-toggle" @click="isDesktopOpen = !isDesktopOpen">
+        <button v-if="showSidebar" class="sidebar-toggle" @click="isDesktopOpen = !isDesktopOpen">
           <i class="pi pi-bars"></i>
         </button>
         <h1 class="page-title">{{ pageTitle }}</h1>
@@ -92,12 +92,13 @@ const props = defineProps({
   closeOnChange: { type: Boolean, default: false },
   pageTitle:     { type: String,  default: '' },
   isDark:        { type: Boolean, default: false },
+  showSidebar:   { type: Boolean, default: true },  // false = sembunyikan sidebar sepenuhnya
 })
 
 const route = useRoute()
 
 const isMobileOpen  = ref(false)
-const isDesktopOpen = ref(props.openOnMounted)
+const isDesktopOpen = ref(props.showSidebar && props.openOnMounted)
 
 const themeClass = computed(() => {
   const map = {
@@ -111,6 +112,14 @@ const themeClass = computed(() => {
 watch(() => route.fullPath, () => {
   isMobileOpen.value = false
   if (props.closeOnChange) isDesktopOpen.value = false
+})
+
+// Ketika showSidebar berubah (misalnya auth state baru resolve), tutup sidebar
+watch(() => props.showSidebar, (val) => {
+  if (!val) {
+    isMobileOpen.value = false
+    isDesktopOpen.value = false
+  }
 })
 
 provide('vuero-layout', { isDesktopOpen, isMobileOpen, links: computed(() => props.links) })
