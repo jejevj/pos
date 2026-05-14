@@ -1,4 +1,3 @@
-# syntax=docker/dockerfile:1.6
 FROM node:22-alpine AS build
 
 WORKDIR /app
@@ -25,12 +24,10 @@ ENV NPM_CONFIG_REGISTRY=https://registry.npmjs.org/ \
 
 COPY frontend-app/package.json frontend-app/package-lock.json* ./
 
-# BuildKit cache mount keeps the npm cache across builds, so a retry after
-# a transient registry failure is mostly served from cache. Safe to ignore
-# if the builder doesn't support cache mounts — the build just won't reuse
-# the cache.
-RUN --mount=type=cache,target=/root/.npm,sharing=locked \
-    npm ci --prefer-offline --no-audit --no-fund
+# Plain `npm ci` — no BuildKit cache mount, so this works on the classic
+# builder too. The retry/timeout knobs above already cushion transient
+# registry hiccups; the tradeoff is a slightly slower first build.
+RUN npm ci --prefer-offline --no-audit --no-fund
 
 COPY frontend-app/ ./
 RUN npm run build

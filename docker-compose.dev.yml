@@ -1,0 +1,54 @@
+# Hotfix / dev override: bind-mount the Laravel PHP source from the host
+# into the running backend container so you can edit `.php` files and see
+# the change immediately, without rebuilding the image.
+#
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+#
+#   # after editing any file under backend-api/{app,routes,config,database,resources}:
+#   docker compose exec backend php artisan optimize:clear
+#   docker compose restart backend       # only needed if opcache is hot
+#
+# Stop using it (back to baked-image production behaviour):
+#   docker compose -f docker-compose.yml up -d --force-recreate backend
+#
+# Why not mount the whole `backend-api/` directory?
+#   The image runs `composer install` at build time and ships `vendor/` baked
+#   in. Mounting `./backend-api` over `/var/www/html` would hide that vendor
+#   tree and break autoload. Instead we mount only the source dirs Laravel
+#   reads at request time. `bootstrap/cache` and `public` are also mounted
+#   so route/config caches and asset edits are picked up.
+#
+# Notes:
+#   * `storage/` is intentionally NOT mounted — the base compose keeps it on
+#     the `backend-storage` named volume so logs, sessions, and uploaded
+#     files survive container recreation.
+#   * `vendor/` is intentionally NOT mounted — `composer install` runs in
+#     the image build. If you change composer.json/composer.lock you DO
+#     need a real rebuild (`docker compose build backend`).
+#   * APP_DEBUG=true + APP_ENV=local disable Laravel's cached config/route
+#     files so edits to config/*.php and routes/*.php take effect on the
+#     next request without an `artisan config:clear`.
+#   * opcache is on in the base image (good for prod). For development the
+#     override turns `opcache.validate_timestamps=1` so PHP re-reads files
+#     when their mtime changes. If you'd rather keep opcache strict, drop
+#     that env var and run `docker compose restart backend` after edits.
+
+services:
+  backend:
+    environment:
+      APP_ENV: local
+      APP_DEBUG: "true"
+      # Re-check file mtimes on every request so edits are visible without
+      # a restart. Slight perf cost — fine for dev, not for prod.
+      PHP_OPCACHE_VALIDATE_TIMESTAMPS: "1"
+      PHP_OPCACHE_REVALIDATE_FREQ: "0"
+    volumes:
+      - ./backend-api/app:/var/www/html/app
+      - ./backend-api/routes:/var/www/html/routes
+      - ./backend-api/config:/var/www/html/config
+      - ./backend-api/database:/var/www/html/database
+      - ./backend-api/resources:/var/www/html/resources
+      - ./backend-api/bootstrap/app.php:/var/www/html/bootstrap/app.php
+      - ./backend-api/bootstrap/providers.php:/var/www/html/bootstrap/providers.php
+      - ./backend-api/public:/var/www/html/public

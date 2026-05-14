@@ -108,6 +108,67 @@ docker/
 
 Existing files (`backend-api/`, `frontend-app/`, `waha/docker-compose.yml`) are untouched, so the local dev workflow described in `README.md` keeps working.
 
+## Two workflows: production rebuild vs. fast PHP hotfix
+
+The stack supports two day-to-day workflows. Pick based on **what you changed**, not personal preference.
+
+### A. Production rebuild — Dockerfile, composer, or npm changes
+
+Any change to `docker/`, `backend-api/composer.json`, `backend-api/composer.lock`, `frontend-app/package.json`, `frontend-app/package-lock.json`, or the underlying base images requires a real image rebuild. The image is what ships to prod, so this is the default.
+
+```bash
+docker compose up -d --build
+```
+
+This is also what you run after pulling new code that touches the dependency manifests, or the first time you bring the stack up. No override files involved — the baked-in image is exactly what runs.
+
+### B. Fast hotfix — PHP-only code changes (no dep changes)
+
+For day-to-day Laravel work where you're only touching `.php` / `.blade.php` / route / config / migration files, a full rebuild is overkill. The repo ships `docker-compose.dev.yml`, an **opt-in** override that bind-mounts the Laravel source directories from the host into the running backend container. Edits become visible without rebuilding the image.
+
+```bash
+# Bring the stack up with the dev override layered on top of the base file
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+
+# ...edit anything under backend-api/{app,routes,config,database,resources,public,bootstrap/{app,providers}.php}...
+
+# Most edits are picked up immediately (opcache is set to revalidate
+# timestamps under the override). When in doubt, clear Laravel's caches:
+docker compose exec backend php artisan optimize:clear
+
+# Or force a clean restart of just the backend container:
+docker compose restart backend
+```
+
+What the override does:
+
+* Mounts `backend-api/{app,routes,config,database,resources,public}` and the two `bootstrap/*.php` entry files over the corresponding paths inside the container.
+* Sets `APP_ENV=local`, `APP_DEBUG=true` so cached config/route files are skipped and stack traces show up in responses.
+* Flips `opcache.validate_timestamps=1` so PHP re-reads files when their mtime changes — no restart needed for most edits.
+
+What the override deliberately does **not** do:
+
+* It does **not** mount the full `backend-api/` directory. Doing so would hide the `vendor/` tree baked into the image at build time and break Composer's autoloader. If you change `composer.json`/`composer.lock`, you must do a real rebuild (workflow A).
+* It does **not** mount `storage/` — that stays on the `backend-storage` named volume so logs, sessions, and uploaded files persist.
+* It does **not** change the base `docker-compose.yml`. Production behaviour is unchanged when the override isn't passed on the command line.
+
+To go back to running the baked image (e.g. before a deploy):
+
+```bash
+docker compose -f docker-compose.yml up -d --force-recreate backend
+```
+
+### When to use which
+
+| You changed... | Workflow |
+| --- | --- |
+| `backend-api/app/**`, `routes/**`, `config/**`, `database/**`, `resources/**` | B (hotfix) |
+| `docker/backend/Dockerfile`, `php.ini`, `nginx.conf`, `supervisord.conf`, `entrypoint.sh` | A (rebuild) |
+| `composer.json` / `composer.lock` (added/removed package) | A (rebuild) |
+| `frontend-app/**` source | A (rebuild) — the frontend ships built static assets, there's nothing to bind-mount |
+| `package.json` / `package-lock.json` | A (rebuild) |
+| `.env.docker` / `.env` | Neither — just `docker compose up -d` to pick up env changes |
+
 ## Common operations
 
 ```bash
@@ -257,6 +318,24 @@ SANCTUM_STATEFUL_DOMAINS=pos.your-domain.tld
 Frontend `VITE_API_URL` / `VITE_WAHA_URL` stay as relative paths (`/api`, `/waha`) — same-origin, no CORS gymnastics, no rebuild needed if the domain changes.
 
 ## Troubleshooting
+
+### `failed to resolve source metadata for docker.io/docker/dockerfile:1.6` (or similar)
+
+Older versions of this repo's Dockerfiles started with `# syntax=docker/dockerfile:1.6`, which tells BuildKit to fetch the `docker/dockerfile:1.6` frontend image from Docker Hub before doing anything else. On a build host without internet access to `docker.io`, the whole build fails before a single layer runs:
+
+```
+ERROR: failed to resolve source metadata for docker.io/docker/dockerfile:1.6:
+  failed to do request: ... dial tcp: network is unreachable
+```
+
+Both Dockerfiles now drop that directive and avoid BuildKit-only syntax (`RUN --mount=type=cache`), so they build on the classic builder too — no frontend image pull required. If you still see the error, you're on an older checkout:
+
+```bash
+git pull origin ai
+docker compose build --no-cache
+```
+
+If you absolutely need to use BuildKit on an internet-isolated host, pre-pull the frontend once on a connected machine and `docker save`/`docker load` it onto the target — but you shouldn't need to with the current Dockerfiles.
 
 ### `npm error EAI_AGAIN getaddrinfo registry.npmjs.org`
 

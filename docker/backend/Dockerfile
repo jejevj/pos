@@ -1,4 +1,3 @@
-# syntax=docker/dockerfile:1.6
 FROM php:8.3-fpm-alpine AS base
 
 # phpredis pinned to a known-good release compatible with PHP 8.3.
