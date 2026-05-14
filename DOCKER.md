@@ -6,21 +6,26 @@ This repo ships a Docker Compose stack that runs the Vue SPA, the Laravel API, R
 
 ## TL;DR
 
+The shipped `.env.docker.example` already has working defaults for the
+existing host Postgres (`host.docker.internal:5432/pos_sc`,
+`postgres / qwert12345!`) — just copy it and you're done with the DB.
+
 ```bash
 cp .env.docker.example .env.docker
 cp .env.docker.example .env          # compose reads this for ${VAR} expansion
 
-# Fill in DB_PASSWORD, WAHA_API_KEY, APP_KEY (see below)
-# Generate APP_KEY once and paste it into both files:
+# The only values you still need to fill in:
+#   WAHA_API_KEY=<some-strong-random-string>
+#   APP_KEY=<output of the next command>
 docker compose run --rm --no-deps backend php artisan key:generate --show
 
 docker compose up -d --build
-# → open http://localhost:8080
+# → open http://localhost:9080
 ```
 
 ## Why one port?
 
-The default `APP_PORT=8080` is the only port mapped to your host. The proxy routes:
+The default `APP_PORT=9080` is the only port mapped to your host. The proxy routes:
 
 | Path prefix | Goes to | Notes |
 | --- | --- | --- |
@@ -42,12 +47,12 @@ The backend container is configured to dial whatever you put in `DB_HOST` / `DB_
 DB_CONNECTION=pgsql
 DB_HOST=host.docker.internal
 DB_PORT=5432
-DB_DATABASE=cpns_prod
+DB_DATABASE=pos_sc
 DB_USERNAME=postgres
-DB_PASSWORD=            # required — fill this in
+DB_PASSWORD=qwert12345!
 ```
 
-`host.docker.internal` works thanks to `extra_hosts: host.docker.internal:host-gateway` on the `backend` service — required on Linux, no-op on Docker Desktop. If your existing Postgres container is on a named Docker network you can also attach the stack to that network instead, but `host.docker.internal` is the path of least surprise.
+`host.docker.internal` (not `127.0.0.1` — the loopback inside the container is the container itself, not the host) works thanks to `extra_hosts: host.docker.internal:host-gateway` on the `backend` service. That mapping is required on Linux and is a no-op on Docker Desktop. If your existing Postgres container is on a named Docker network you can also attach the stack to that network instead, but `host.docker.internal` is the path of least surprise.
 
 Boot the stack normally:
 
@@ -66,9 +71,9 @@ DB_DATABASE=${POSTGRES_DB}     # keep these aligned
 DB_USERNAME=${POSTGRES_USER}
 DB_PASSWORD=${POSTGRES_PASSWORD}
 
-POSTGRES_DB=cpns_prod
+POSTGRES_DB=pos_sc
 POSTGRES_USER=postgres
-POSTGRES_PASSWORD=             # required when using this profile
+POSTGRES_PASSWORD=qwert12345!  # required when using this profile
 ```
 
 ```bash
@@ -115,7 +120,7 @@ docker compose exec backend php artisan migrate:status
 docker compose exec backend php artisan db:seed
 
 # psql shell (only when the internal-db profile is active)
-docker compose --profile internal-db exec postgres psql -U postgres cpns_prod
+docker compose --profile internal-db exec postgres psql -U postgres pos_sc
 
 # Rebuild after pulling code
 docker compose up -d --build
@@ -129,13 +134,13 @@ docker compose down -v   # also drops postgres, redis, waha sessions
 
 | Var | Default | Meaning |
 | --- | --- | --- |
-| `APP_PORT` | `8080` | Host port the proxy listens on |
+| `APP_PORT` | `9080` | Host port the proxy listens on |
 | `APP_KEY` | *(empty)* | Laravel key — generate once, paste in. Empty means an ephemeral key on each boot. |
 | `DB_HOST` | `host.docker.internal` | Where the backend dials Postgres |
 | `DB_PORT` | `5432` | Postgres port on `DB_HOST` |
-| `DB_DATABASE` | `cpns_prod` | Database name |
+| `DB_DATABASE` | `pos_sc` | Database name |
 | `DB_USERNAME` | `postgres` | Database user |
-| `DB_PASSWORD` | **required** | Compose refuses to start without it |
+| `DB_PASSWORD` | `qwert12345!` | Override in `.env.docker` for any other deployment |
 | `POSTGRES_PASSWORD` | required only with `--profile internal-db` | Password for the bundled Postgres |
 | `WAHA_API_KEY` | **required** | Used by both WAHA and the Laravel/Vue clients |
 | `REDIS_PASSWORD` | empty | Optional; Redis only listens on the internal network |
@@ -158,7 +163,7 @@ docker compose down -v   # also drops postgres, redis, waha sessions
 
 You asked whether all the internal services need their own host ports. They don't. The stack uses:
 
-- **1 external port** (`APP_PORT`, default 8080) → nginx proxy
+- **1 external port** (`APP_PORT`, default 9080) → nginx proxy
 - **0 external ports** for backend / postgres / redis / waha / frontend (Docker DNS resolves them by service name on `app-net`)
 
 Tradeoffs:
@@ -178,12 +183,36 @@ Docker is not available in the sandbox where this scaffolding was generated, so 
 
 ## Manual steps you still need to do
 
-1. `cp .env.docker.example .env.docker` and `cp .env.docker.example .env`.
-2. Make sure your existing Postgres is reachable on the host at `localhost:5432`, with database `cpns_prod` already created. Fill in `DB_PASSWORD` and `WAHA_API_KEY`.
-3. Run `docker compose run --rm --no-deps backend php artisan key:generate --show`, copy the output into `APP_KEY=` in both files.
-4. `docker compose up -d --build`.
-5. (Linux only) Confirm `host.docker.internal` resolves inside the container: `docker compose exec backend getent hosts host.docker.internal`. If your Postgres listens only on `127.0.0.1`, change `listen_addresses` to `*` (or the docker bridge IP) and update `pg_hba.conf` to allow the Docker bridge subnet — otherwise the backend will get `connection refused`.
-6. (First-run only) Once the stack is up, browse to `http://localhost:8080`, log in, and pair WhatsApp from the WhatsApp settings page — WAHA persists the session under the `waha-sessions` volume.
+1. `cp .env.docker.example .env.docker` and `cp .env.docker.example .env`. The DB defaults already match your existing host Postgres (`pos_sc` on `host.docker.internal:5432`) — no edits needed unless you want to change them.
+2. Make sure the `pos_sc` database exists on that Postgres. If not: `psql -h 127.0.0.1 -U postgres -c 'CREATE DATABASE pos_sc;'`.
+3. Set `WAHA_API_KEY` in both files (any strong random string).
+4. Run `docker compose run --rm --no-deps backend php artisan key:generate --show`, copy the output into `APP_KEY=` in both files.
+5. `docker compose up -d --build`.
+6. (Linux only) Confirm `host.docker.internal` resolves inside the container: `docker compose exec backend getent hosts host.docker.internal`. If your Postgres listens only on `127.0.0.1`, change `listen_addresses` to `*` (or the docker bridge IP) and update `pg_hba.conf` to allow the Docker bridge subnet — otherwise the backend will get `connection refused`.
+7. (First-run only) Once the stack is up, browse to `http://localhost:9080`, log in, and pair WhatsApp from the WhatsApp settings page — WAHA persists the session under the `waha-sessions` volume.
+
+## Cloudflare Tunnel
+
+The proxy publishes a single port, so the tunnel needs **one** hostname pointed at `http://localhost:9080`. Path routing (`/api`, `/sanctum`, `/storage`, `/waha`, `/`) is already handled by the in-stack nginx — no separate `frontend.*` / `api.*` / `waha.*` hostnames required.
+
+`config.yml` example for `cloudflared`:
+
+```yaml
+ingress:
+  - hostname: pos.your-domain.tld
+    service: http://localhost:9080
+  - service: http_status:404
+```
+
+Then update **both** `.env.docker` and `.env` so Laravel and Sanctum trust the public hostname:
+
+```env
+APP_URL=https://pos.your-domain.tld
+FRONTEND_URL=https://pos.your-domain.tld
+SANCTUM_STATEFUL_DOMAINS=pos.your-domain.tld
+```
+
+Frontend `VITE_API_URL` / `VITE_WAHA_URL` stay as relative paths (`/api`, `/waha`) — same-origin, no CORS gymnastics, no rebuild needed if the domain changes.
 
 ## Keeping local (non-Docker) dev intact
 

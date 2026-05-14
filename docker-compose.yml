@@ -17,7 +17,7 @@ services:
       waha:
         condition: service_started
     ports:
-      - "${APP_PORT:-8080}:80"
+      - "${APP_PORT:-9080}:80"
     volumes:
       - ./docker/proxy/nginx.conf:/etc/nginx/nginx.conf:ro
     networks: [app-net]
@@ -56,13 +56,13 @@ services:
     environment:
       APP_ENV: ${APP_ENV:-production}
       APP_DEBUG: ${APP_DEBUG:-false}
-      APP_URL: ${APP_URL:-http://localhost:8080}
+      APP_URL: ${APP_URL:-http://localhost:9080}
       APP_KEY: ${APP_KEY:-}
       LOG_CHANNEL: stack
       DB_CONNECTION: ${DB_CONNECTION:-pgsql}
       DB_HOST: ${DB_HOST:-host.docker.internal}
       DB_PORT: ${DB_PORT:-5432}
-      DB_DATABASE: ${DB_DATABASE:-cpns_prod}
+      DB_DATABASE: ${DB_DATABASE:-pos_sc}
       DB_USERNAME: ${DB_USERNAME:-postgres}
       DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
       REDIS_CLIENT: phpredis
@@ -73,8 +73,8 @@ services:
       SESSION_DRIVER: ${SESSION_DRIVER:-redis}
       QUEUE_CONNECTION: ${QUEUE_CONNECTION:-redis}
       BROADCAST_CONNECTION: log
-      SANCTUM_STATEFUL_DOMAINS: ${SANCTUM_STATEFUL_DOMAINS:-localhost,localhost:8080,127.0.0.1,127.0.0.1:8080}
-      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:8080}
+      SANCTUM_STATEFUL_DOMAINS: ${SANCTUM_STATEFUL_DOMAINS:-localhost,localhost:9080,127.0.0.1,127.0.0.1:9080}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:9080}
       WAHA_ENABLED: ${WAHA_ENABLED:-true}
       WAHA_BASE_URL: http://waha:3000
       WAHA_API_KEY: ${WAHA_API_KEY:?WAHA_API_KEY is required}
@@ -101,14 +101,14 @@ services:
     profiles: ["internal-db"]
     restart: unless-stopped
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-cpns_prod}
+      POSTGRES_DB: ${POSTGRES_DB:-pos_sc}
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required when using the internal-db profile}
     volumes:
       - postgres-data:/var/lib/postgresql/data
     networks: [app-net]
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-cpns_prod}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-pos_sc}"]
       interval: 10s
       timeout: 5s
       retries: 10
