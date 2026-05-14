@@ -68,14 +68,20 @@
 
     <!-- Filters -->
     <div class="filter-bar">
-      <IconField>
-        <InputIcon><i class="pi pi-search" /></InputIcon>
-        <InputText v-model="searchQuery" :placeholder="$t('users.searchUser')" />
-      </IconField>
-      <Select v-model="filterRole" :options="roleOptions" optionLabel="label" optionValue="value" 
-              :placeholder="$t('users.allRoles')" showClear />
-      <Select v-model="filterActive" :options="activeOptions" optionLabel="label" optionValue="value" 
-              :placeholder="$t('common.allStatuses')" showClear />
+      <div class="filter-group">
+        <label class="filter-label"><i class="pi pi-search" /> {{ $t('common.search') }}</label>
+        <InputText v-model="searchQuery" :placeholder="$t('users.searchUser')" class="filter-input" />
+      </div>
+      <div class="filter-group">
+        <label class="filter-label"><i class="pi pi-shield" /> {{ $t('users.role') }}</label>
+        <Select v-model="filterRole" :options="roleOptions" optionLabel="label" optionValue="value" 
+                :placeholder="$t('users.allRoles')" showClear style="width:180px" />
+      </div>
+      <div class="filter-group">
+        <label class="filter-label"><i class="pi pi-circle" /> {{ $t('common.status') }}</label>
+        <Select v-model="filterActive" :options="activeOptions" optionLabel="label" optionValue="value" 
+                :placeholder="$t('common.allStatuses')" showClear style="width:160px" />
+      </div>
     </div>
 
     <!-- Table -->
@@ -330,8 +336,6 @@ import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
 import InputNumber from 'primevue/inputnumber'
 import Password from 'primevue/password'
-import IconField from 'primevue/iconfield'
-import InputIcon from 'primevue/inputicon'
 import Select from 'primevue/select'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
@@ -789,12 +793,10 @@ onMounted(() => {
 .stat-value { font-size: 1.5rem; font-weight: 700; }
 .stat-label { font-size: 0.75rem; color: #6b7280; }
 
-.filter-bar {
-  display: flex;
-  gap: 1rem;
-  margin-bottom: 1rem;
-  flex-wrap: wrap;
-}
+.filter-bar { display: flex; align-items: flex-end; gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem; }
+.filter-group { display: flex; flex-direction: column; gap: 0.35rem; }
+.filter-label { font-size: 0.75rem; font-weight: 600; color: #6b7280; text-transform: uppercase; letter-spacing: 0.04em; display: flex; align-items: center; gap: 0.3rem; }
+.filter-input { width: 220px; }
 
 .action-buttons { display: flex; gap: 0.25rem; }
 
