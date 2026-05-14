@@ -50,6 +50,7 @@ const router = createRouter({
             requiresAuth: true,
             title: 'Dashboard',
             defaultOutletId: 1,
+            superadminOnly: true,
           }
         },
         {
@@ -59,7 +60,8 @@ const router = createRouter({
           component: () => import('@/views/DashboardView.vue'),
           meta: {
             requiresAuth: true,
-            title: 'Admin Dashboard'
+            title: 'Admin Dashboard',
+            superadminOnly: true,
           }
         },
         {
@@ -411,7 +413,21 @@ router.beforeEach((to, _from) => {
   
   // Redirect authenticated users away from guest pages
   if (to.meta.guest && authStore.isAuthenticated) {
+    // Outlet user: redirect ke outlet dashboard mereka
+    if (authStore.isOutletUser && authStore.outletMemberships.length > 0) {
+      const firstOutlet = authStore.outletMemberships[0]
+      return { path: `/outlets/${firstOutlet.outlet_id}/dashboard` }
+    }
     return { name: 'dashboard' }
+  }
+
+  // Blokir outlet user dari halaman superadmin-only (mencegah akses /dashboard global)
+  if (to.meta.superadminOnly && authStore.isAuthenticated && authStore.isOutletUser) {
+    if (authStore.outletMemberships.length > 0) {
+      const firstOutlet = authStore.outletMemberships[0]
+      return { path: `/outlets/${firstOutlet.outlet_id}/dashboard` }
+    }
+    return { name: 'forbidden' }
   }
   
   // Check permissions (skip for dashboard and error pages to prevent infinite loop)
