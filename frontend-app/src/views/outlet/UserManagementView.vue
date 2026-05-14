@@ -262,7 +262,7 @@
             modal :style="{ width: '900px', maxHeight: '90vh' }" class="role-form-dialog">
       <div class="role-form-content">
         <!-- Basic Info -->
-        <div class="form-section">
+        <div class="form-section" v-if="!isCurrentRoleSystem">
           <h4>{{ $t('users.basicInfo') }}</h4>
           <div class="form-grid">
             <div class="form-field" v-if="!editingRole">
@@ -283,6 +283,11 @@
               <Textarea v-model="roleForm.description" rows="2" fluid />
             </div>
           </div>
+        </div>
+
+        <div v-if="isCurrentRoleSystem" class="system-role-note">
+          <i class="pi pi-info-circle"></i>
+          <span>Informasi role sistem tidak dapat diubah</span>
         </div>
 
         <!-- Permissions -->
@@ -381,6 +386,11 @@ const roleForm = ref({
 
 const roleOptions = computed(() => {
   return roles.value.map(r => ({ label: r.display_name, value: r.id }))
+})
+
+const isCurrentRoleSystem = computed(() => {
+  const SYSTEM_ROLES = ['owner', 'admin', 'manager', 'kasir', 'staff', 'kitchen', 'production']
+  return editingRole.value ? SYSTEM_ROLES.includes(editingRole.value.name) : false
 })
 
 const activeOptions = computed(() => [
@@ -624,13 +634,19 @@ const saveRole = async () => {
     const payload = { ...roleForm.value, permissions: selectedPermissions.value }
 
     if (editingRole.value) {
-      await api.put(`/outlets/${outletId}/roles/${editingRole.value.id}`, payload)
-      
-      // Update permissions separately
+      const SYSTEM_ROLES = ['owner', 'admin', 'manager', 'kasir', 'staff', 'kitchen', 'production']
+      const isSystemRole = SYSTEM_ROLES.includes(editingRole.value.name)
+
+      // Only update role info for custom roles — system roles are protected on backend
+      if (!isSystemRole) {
+        await api.put(`/outlets/${outletId}/roles/${editingRole.value.id}`, payload)
+      }
+
+      // Always update permissions
       await api.put(`/outlets/${outletId}/roles/${editingRole.value.id}/permissions`, {
         permissions: selectedPermissions.value
       })
-      
+
       toast.add({ severity: 'success', summary: t('messages.success'), detail: t('users.roleUpdated'), life: 3000 })
     } else {
       await api.post(`/outlets/${outletId}/roles`, payload)
@@ -999,6 +1015,18 @@ onMounted(() => {
   margin: 0 0 1rem 0;
   font-size: 1rem;
   color: #1f2937;
+}
+
+.system-role-note {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  background-color: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 6px;
+  color: #1e40af;
+  font-size: 0.875rem;
 }
 
 .field-hint {
