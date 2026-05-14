@@ -1,6 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
-import { useThemeStore } from '@/stores/theme'
 import DashboardLayout from '@/layouts/DashboardLayout.vue'
 
 const router = createRouter({
@@ -9,14 +8,7 @@ const router = createRouter({
     {
       path: '/login',
       name: 'login',
-      component: () => {
-        // Dynamically pick login page based on active theme
-        const themeStore = useThemeStore()
-        if (themeStore.activeTheme === 'vuero') {
-          return import('@/themes/vuero/VueroLoginView.vue')
-        }
-        return import('@/views/auth/LoginView.vue')
-      },
+      component: () => import('@/themes/vuero/VueroLoginView.vue'),
       meta: { guest: true }
     },
     // Public order tracking — no auth, no layout
