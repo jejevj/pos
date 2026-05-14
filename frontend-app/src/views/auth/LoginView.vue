@@ -107,6 +107,7 @@
 import { ref, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { encodeOutletId } from '@/utils/outletId'
 import Card from 'primevue/card'
 import InputText from 'primevue/inputtext'
 import Password from 'primevue/password'
@@ -159,9 +160,10 @@ const handleLogin = async () => {
     // Setelah login berhasil, outletMemberships sudah di-populate via setAuth()
     // Cek apakah user ini adalah outlet user (bukan superadmin, punya membership)
     if (authStore.isOutletUser && authStore.outletMemberships.length > 0) {
-      // Redirect ke dashboard outlet pertama yang dimiliki user
+      // Redirect ke dashboard outlet pertama yang dimiliki user (encoded ID)
       const firstOutlet = authStore.outletMemberships[0]
-      router.push(`/outlets/${firstOutlet.outlet_id}/dashboard`)
+      const encoded = firstOutlet.encoded_outlet_id || encodeOutletId(firstOutlet.outlet_id)
+      router.push(`/outlets/${encoded}/dashboard`)
     } else {
       // Superadmin atau user biasa — redirect ke dashboard global atau halaman asal
       const redirectPath = route.query.redirect || '/dashboard'
