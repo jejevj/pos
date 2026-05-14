@@ -288,6 +288,21 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('outlets/{outlet}/locations/{id}', [\App\Http\Controllers\Api\Outlet\LocationController::class, 'destroy']);
     Route::get('outlets/{outlet}/locations/{id}/stock', [\App\Http\Controllers\Api\Outlet\LocationController::class, 'getStock']);
 
+    // Production Units
+    Route::get('outlets/{outlet}/production/units', [\App\Http\Controllers\Api\Outlet\ProductionController::class, 'indexUnits']);
+    Route::post('outlets/{outlet}/production/units', [\App\Http\Controllers\Api\Outlet\ProductionController::class, 'storeUnit']);
+    Route::put('outlets/{outlet}/production/units/{unitId}', [\App\Http\Controllers\Api\Outlet\ProductionController::class, 'updateUnit']);
+    Route::delete('outlets/{outlet}/production/units/{unitId}', [\App\Http\Controllers\Api\Outlet\ProductionController::class, 'destroyUnit']);
+
+    // Production Orders
+    Route::get('outlets/{outlet}/production/orders', [\App\Http\Controllers\Api\Outlet\ProductionController::class, 'indexOrders']);
+    Route::post('outlets/{outlet}/production/orders', [\App\Http\Controllers\Api\Outlet\ProductionController::class, 'storeOrder']);
+    Route::put('outlets/{outlet}/production/orders/{orderId}/status', [\App\Http\Controllers\Api\Outlet\ProductionController::class, 'updateOrderStatus']);
+    Route::post('outlets/{outlet}/production/orders/{orderId}/complete', [\App\Http\Controllers\Api\Outlet\ProductionController::class, 'completeOrder']);
+
+    // Production Stock History Report
+    Route::get('outlets/{outlet}/production/stock-history', [\App\Http\Controllers\Api\Outlet\ProductionController::class, 'stockHistory']);
+
     // Stock Movements
     Route::get('outlets/{outlet}/stock-movements', [\App\Http\Controllers\Api\Outlet\StockMovementController::class, 'index']);
     Route::get('outlets/{outlet}/stock-movements/summary', [\App\Http\Controllers\Api\Outlet\StockMovementController::class, 'summary']);

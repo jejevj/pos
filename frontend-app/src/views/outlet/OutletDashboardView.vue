@@ -290,6 +290,14 @@
             <span class="menu-label">Kitchen Order</span>
           </div>
 
+          <!-- Unit Produksi -->
+          <div v-if="canAccess('view_production')" class="menu-card" @click="navigateTo('outlet-production')">
+            <div class="menu-icon" style="background:#9333ea">
+              <i class="pi pi-cog" style="color:white"></i>
+            </div>
+            <span class="menu-label">Unit Produksi</span>
+          </div>
+
         </div>
       </div>
 

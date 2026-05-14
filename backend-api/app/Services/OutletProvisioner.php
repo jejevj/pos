@@ -62,6 +62,7 @@ class OutletProvisioner
             $this->ensureKasbonTables($outlet);
             $this->ensurePurchaseExpenseTables($outlet);
             $this->ensureEmployeeBeverageTables($outlet);
+            $this->ensureProductionTables($outlet);
             $this->ensureCrossTableFks($outlet);
 
             // Seed default master data (satuan, kategori, bahan baku, menu)
@@ -267,6 +268,8 @@ class OutletProvisioner
             ['create_stock_opname', 'Create Stock Opname', 'Inventory'],
             ['manage_tables', 'Manage Tables', 'Settings'],
             ['access_kitchen_display', 'Access Kitchen Display', 'Kitchen'],
+            ['view_production', 'Lihat Unit Produksi', 'production'],
+            ['manage_production', 'Kelola Unit Produksi', 'production'],
         ];
         foreach ($permissions as [$name, $display, $group]) {
             DB::table('permissions')->updateOrInsert(
@@ -304,6 +307,10 @@ class OutletProvisioner
                 'view_purchases', 'create_purchase', 'view_expenses', 'create_expense',
                 'view_members', 'create_member', 'view_promos', 'view_stock_opname',
                 'create_stock_opname',
+                'view_production', 'manage_production',
+            ])],
+            ['production', 'Unit Produksi', 'Operator unit produksi', 45, $byName([
+                'view_production', 'manage_production', 'view_inventory', 'view_dashboard',
             ])],
             ['cashier', 'Cashier', 'Handle POS and transactions', 50, $byName([
                 'view_dashboard', 'access_pos', 'create_order', 'view_transactions',
@@ -1176,6 +1183,57 @@ class OutletProvisioner
             )
         ");
         DB::statement("CREATE INDEX IF NOT EXISTS idx_beverage_claims_user_date ON {$schema}.employee_beverage_claims(user_id, claimed_date)");
+    }
+
+    /**
+     * Production Unit tables — units, orders, order items.
+     */
+    private function ensureProductionTables(Outlet $outlet): void
+    {
+        $schema = $outlet->schema_name;
+
+        DB::statement("
+            CREATE TABLE IF NOT EXISTS {$schema}.production_units (
+                id BIGSERIAL PRIMARY KEY,
+                nama VARCHAR(150) NOT NULL,
+                deskripsi TEXT,
+                is_active BOOLEAN DEFAULT TRUE,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ");
+
+        DB::statement("
+            CREATE TABLE IF NOT EXISTS {$schema}.production_orders (
+                id BIGSERIAL PRIMARY KEY,
+                unit_id BIGINT NOT NULL REFERENCES {$schema}.production_units(id),
+                status VARCHAR(20) NOT NULL DEFAULT 'draft',
+                notes TEXT,
+                created_by BIGINT,
+                completed_by BIGINT,
+                completed_at TIMESTAMP NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ");
+
+        DB::statement("
+            CREATE TABLE IF NOT EXISTS {$schema}.production_order_items (
+                id BIGSERIAL PRIMARY KEY,
+                order_id BIGINT NOT NULL REFERENCES {$schema}.production_orders(id) ON DELETE CASCADE,
+                bahan_baku_id BIGINT NOT NULL,
+                quantity_planned DECIMAL(10,3) NOT NULL,
+                quantity_actual DECIMAL(10,3),
+                satuan_id BIGINT,
+                location_id BIGINT,
+                notes TEXT
+            )
+        ");
+
+        DB::statement("CREATE INDEX IF NOT EXISTS idx_production_orders_unit ON {$schema}.production_orders(unit_id)");
+        DB::statement("CREATE INDEX IF NOT EXISTS idx_production_orders_status ON {$schema}.production_orders(status)");
+        DB::statement("CREATE INDEX IF NOT EXISTS idx_production_order_items_order ON {$schema}.production_order_items(order_id)");
+        DB::statement("CREATE INDEX IF NOT EXISTS idx_production_order_items_bahan ON {$schema}.production_order_items(bahan_baku_id)");
     }
 
     /**

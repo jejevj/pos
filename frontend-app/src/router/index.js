@@ -352,6 +352,12 @@ const router = createRouter({
           name: 'outlet-stock-locations',
           component: () => import('@/views/outlet/StockLocationView.vue'),
           meta: { requiresAuth: true, title: 'Stock Locations' }
+        },
+        {
+          path: 'outlets/:outletId/production',
+          name: 'outlet-production',
+          component: () => import('@/views/outlet/ProductionView.vue'),
+          meta: { requiresAuth: true, title: 'Production' }
         }
       ]
     },
