@@ -258,7 +258,7 @@ class AuthController extends Controller
                     DB::statement("SET search_path TO {$outlet->schema_name}, public");
 
                     $outletUser = DB::table('outlet_users')
-                        ->where('email', strtolower($user->email))
+                        ->whereRaw('LOWER(email) = ?', [strtolower($user->email)])
                         ->where('is_active', true)
                         ->whereNull('deleted_at')
                         ->first();
