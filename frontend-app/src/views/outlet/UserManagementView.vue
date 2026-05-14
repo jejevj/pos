@@ -587,7 +587,7 @@ const viewRolePermissions = async (role) => {
   selectedRole.value = role
   try {
     const response = await api.get(`/outlets/${outletId}/roles/${role.id}/permissions`)
-    rolePermissions.value = response.data.permissions || []
+    rolePermissions.value = Array.isArray(response.data) ? response.data : (response.data.permissions || [])
     permissionsDialogVisible.value = true
   } catch (error) {
     toast.add({ severity: 'error', summary: t('messages.error'), detail: error.response?.data?.message, life: 3000 })
@@ -608,7 +608,7 @@ const openEditRoleDialog = async (role) => {
   // Fetch role permissions
   try {
     const response = await api.get(`/outlets/${outletId}/roles/${role.id}/permissions`)
-    const permissions = response.data.permissions || []
+    const permissions = Array.isArray(response.data) ? response.data : (response.data.permissions || [])
     selectedPermissions.value = permissions.map(p => p.id)
   } catch (error) {
     console.error('Failed to fetch role permissions:', error)
