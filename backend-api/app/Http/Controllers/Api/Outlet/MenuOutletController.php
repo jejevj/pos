@@ -74,6 +74,14 @@ class MenuOutletController extends Controller
             $data['kode'] = MenuOutlet::generateKode($data['kategori_id']);
             $data['harga_modal'] = $this->calculateHargaModal($bahanBakuItems, $outletId, $data['apply_fixed_cost'] ?? true);
 
+            // Inherit station_id dari kategori jika tidak diisi manual
+            if (empty($data['station_id']) && !empty($data['kategori_id'])) {
+                $kategori = DB::table('kategori_menu')->find($data['kategori_id']);
+                if ($kategori && $kategori->station_id) {
+                    $data['station_id'] = $kategori->station_id;
+                }
+            }
+
             $menu = MenuOutlet::create($data);
 
             foreach ($bahanBakuItems as $item) {
