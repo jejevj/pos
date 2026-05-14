@@ -102,21 +102,85 @@ class AuthController extends Controller
             'password' => 'required',
         ]);
 
-        $user = User::with(['roles.permissions'])->where('email', $request->email)->first();
+        $email = strtolower(trim($request->email));
 
-        if (!$user || !Hash::check($request->password, $user->password)) {
-            throw ValidationException::withMessages([
-                'email' => ['The provided credentials are incorrect.'],
+        // ── 1. Coba login sebagai global user (superadmin / owner) ──────────
+        $user = User::with(['roles.permissions'])->whereRaw('LOWER(email) = ?', [$email])->first();
+
+        if ($user && Hash::check($request->password, $user->password)) {
+            $token = $user->createToken('auth_token')->plainTextToken;
+            return response()->json([
+                'user'               => $user,
+                'token'              => $token,
+                'outlet_memberships' => $this->resolveOutletMemberships($user),
             ]);
         }
 
-        $token = $user->createToken('auth_token')->plainTextToken;
+        // ── 2. Fallback: cari di outlet_users semua schema ──────────────────
+        // Outlet user tidak punya akun di tabel users public.
+        // Kita temukan schema-nya, verifikasi password, lalu buat/sync
+        // akun proxy di tabel users public agar Sanctum bisa issue token.
+        $outletUserData = $this->findOutletUser($email, $request->password);
 
-        return response()->json([
-            'user' => $user,
-            'token' => $token,
-            'outlet_memberships' => $this->resolveOutletMemberships($user),
+        if ($outletUserData) {
+            // Sync ke users public (upsert berdasarkan email)
+            $user = User::firstOrCreate(
+                ['email' => $email],
+                [
+                    'name'     => $outletUserData['outlet_user']->name,
+                    'password' => $outletUserData['outlet_user']->password, // sudah di-hash
+                ]
+            );
+
+            // Selalu update password agar sinkron jika diubah di outlet
+            $user->update(['password' => $outletUserData['outlet_user']->password]);
+
+            $token = $user->createToken('auth_token')->plainTextToken;
+
+            return response()->json([
+                'user'               => $user->load(['roles.permissions']),
+                'token'              => $token,
+                'outlet_memberships' => $this->resolveOutletMemberships($user),
+            ]);
+        }
+
+        // ── 3. Credentials salah ──────────────────────────────────────────────
+        throw ValidationException::withMessages([
+            'email' => ['The provided credentials are incorrect.'],
         ]);
+    }
+
+    /**
+     * Cari outlet_user di semua schema outlet yang aktif berdasarkan email.
+     * Kembalikan ['outlet' => Outlet, 'outlet_user' => object] atau null.
+     */
+    private function findOutletUser(string $email, string $password): ?array
+    {
+        try {
+            $outlets = Outlet::where('is_active', true)->get();
+
+            foreach ($outlets as $outlet) {
+                try {
+                    DB::statement("SET search_path TO {$outlet->schema_name}, public");
+
+                    $outletUser = DB::table('outlet_users')
+                        ->whereRaw('LOWER(email) = ?', [$email])
+                        ->where('is_active', true)
+                        ->whereNull('deleted_at')
+                        ->first();
+
+                    if ($outletUser && Hash::check($password, $outletUser->password)) {
+                        return ['outlet' => $outlet, 'outlet_user' => $outletUser];
+                    }
+                } catch (\Throwable $e) {
+                    continue;
+                }
+            }
+        } finally {
+            DB::statement('SET search_path TO public');
+        }
+
+        return null;
     }
 
     #[OA\Post(
@@ -204,7 +268,7 @@ class AuthController extends Controller
                     // Get role(s) for this outlet_user
                     $roles = DB::table('user_roles')
                         ->join('roles', 'user_roles.role_id', '=', 'roles.id')
-                        ->where('user_roles.outlet_user_id', $outletUser->id)
+                        ->where('user_roles.user_id', $outletUser->id)
                         ->select('roles.id as role_id', 'roles.name', 'roles.display_name')
                         ->get();
 
