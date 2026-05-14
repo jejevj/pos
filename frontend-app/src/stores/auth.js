@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import api from '@/services/api'
+import { encodeOutletId, decodeOutletId } from '@/utils/outletId'
 
 export const useAuthStore = defineStore('auth', () => {
   const user = ref(null)
@@ -52,7 +53,10 @@ export const useAuthStore = defineStore('auth', () => {
    * Kembalikan membership entry untuk outlet tertentu, atau null jika tidak terdaftar.
    */
   const getOutletMembership = (outletId) => {
-    const id = parseInt(outletId)
+    // Accept both encoded hash and raw numeric ID
+    const id = typeof outletId === 'string' && isNaN(parseInt(outletId))
+      ? decodeOutletId(outletId)
+      : parseInt(outletId)
     return outletMemberships.value.find(m => m.outlet_id === id) || null
   }
 
@@ -66,8 +70,8 @@ export const useAuthStore = defineStore('auth', () => {
     const membership = getOutletMembership(outletId)
     if (!membership) return false
     // Owner punya akses penuh
-    if (membership.roles.some(r => r.name === 'owner')) return true
-    return membership.permissions.includes(permission)
+    if (membership.roles?.some(r => (r.name || r) === 'owner')) return true
+    return membership.permissions?.includes(permission) || false
   }
 
   /**
@@ -144,6 +148,12 @@ export const useAuthStore = defineStore('auth', () => {
       const response = await api.post('/auth/login', credentials)
       setAuth(response.data.user, response.data.token, response.data.outlet_memberships || [])
       await fetchMenus()
+      // Attach encoded_outlet_id to each membership for convenience
+      outletMemberships.value = outletMemberships.value.map(m => ({
+        ...m,
+        encoded_outlet_id: encodeOutletId(m.outlet_id)
+      }))
+      localStorage.setItem('outlet_memberships', JSON.stringify(outletMemberships.value))
       return response.data
     } catch (err) {
       error.value = err.response?.data?.message || 'Login failed'
