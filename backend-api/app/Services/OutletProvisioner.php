@@ -464,6 +464,7 @@ class OutletProvisioner
                 nama VARCHAR(100) NOT NULL,
                 deskripsi TEXT,
                 urutan INTEGER DEFAULT 0,
+                station_id INTEGER,
                 is_active BOOLEAN DEFAULT true,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -624,6 +625,8 @@ class OutletProvisioner
         if (!$this->columnExists($schema, 'menu', 'station_id')) {
             DB::statement("ALTER TABLE {$schema}.menu ADD COLUMN station_id INTEGER REFERENCES {$schema}.stations(id) ON DELETE SET NULL");
         }
+        // station_id on kategori_menu — menus inherit station from their category
+        DB::statement("ALTER TABLE {$schema}.kategori_menu ADD COLUMN IF NOT EXISTS station_id INTEGER REFERENCES {$schema}.stations(id) ON DELETE SET NULL");
         if (!$this->columnExists($schema, 'order_items', 'status')) {
             DB::statement("ALTER TABLE {$schema}.order_items ADD COLUMN status VARCHAR(20) DEFAULT 'pending'");
             DB::statement("ALTER TABLE {$schema}.order_items ADD COLUMN confirmed_at TIMESTAMP NULL");
