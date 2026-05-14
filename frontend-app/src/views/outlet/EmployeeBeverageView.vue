@@ -146,17 +146,26 @@
     <!-- History Tab -->
     <div v-show="activeTab === 'history'" class="tab-content">
       <div class="filter-bar">
-        <DatePicker v-model="filterDate" dateFormat="yy-mm-dd" :placeholder="$t('common.selectDate')" showIcon />
-        <Select 
-          v-model="filterEmployeeId" 
-          :options="employees" 
-          optionLabel="nama" 
-          optionValue="id"
-          :placeholder="$t('employeeBeverage.allEmployees')"
-          showClear
-          filter
-        />
-        <Button :label="$t('common.filter')" icon="pi pi-filter" @click="fetchClaims" />
+        <div class="filter-group">
+          <label class="filter-label"><i class="pi pi-calendar" /> {{ $t('common.date') }}</label>
+          <DatePicker v-model="filterDate" dateFormat="yy-mm-dd" :placeholder="$t('common.selectDate')" showIcon style="width:180px" />
+        </div>
+        <div class="filter-group">
+          <label class="filter-label"><i class="pi pi-user" /> {{ $t('employeeBeverage.employee') }}</label>
+          <Select 
+            v-model="filterEmployeeId" 
+            :options="employees" 
+            optionLabel="nama" 
+            optionValue="id"
+            :placeholder="$t('employeeBeverage.allEmployees')"
+            showClear
+            filter
+            style="width:200px"
+          />
+        </div>
+        <div class="filter-group" style="justify-content:flex-end">
+          <Button :label="$t('common.filter')" icon="pi pi-filter" @click="fetchClaims" />
+        </div>
       </div>
 
       <DataTable :value="claims" :loading="loading" paginator :rows="15" stripedRows>
@@ -753,12 +762,9 @@ onMounted(() => {
   margin-bottom: 1rem;
 }
 
-.filter-bar {
-  display: flex;
-  gap: 1rem;
-  margin-bottom: 1rem;
-  flex-wrap: wrap;
-}
+.filter-bar { display: flex; align-items: flex-end; gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem; }
+.filter-group { display: flex; flex-direction: column; gap: 0.35rem; }
+.filter-label { font-size: 0.75rem; font-weight: 600; color: #6b7280; text-transform: uppercase; letter-spacing: 0.04em; display: flex; align-items: center; gap: 0.3rem; }
 
 .employee-cell, .menu-cell {
   display: flex;
