@@ -1,0 +1,19 @@
+# Dependencies
+/vendor/
+/node_modules/
+
+# Laravel paths
+/storage/
+/bootstrap/cache/
+/public/storage/
+/public/build/
+
+# Git & IDE
+/.git/
+/.idea/
+/.vscode/
+
+# Logs & Env
+*.log
+.env
+/waha/.sessions/

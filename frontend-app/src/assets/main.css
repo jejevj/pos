@@ -1,0 +1,20 @@
+/* Minimal global styles - let PrimeVue handle the rest */
+
+/* Sage Green Color Palette - Lighter Version */
+:root {
+  --sage-primary: #8fbc8f;      /* Main sage green - lighter */
+  --sage-hover: #7aa87a;         /* Darker for hover */
+  --sage-light: #a8d5a8;         /* Lighter variant */
+  --sage-bg: rgba(143, 188, 143, 0.1);  /* Background with opacity */
+  --sage-shadow: rgba(143, 188, 143, 0.2); /* Shadow/focus ring */
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#app {
+  min-height: 100vh;
+}
