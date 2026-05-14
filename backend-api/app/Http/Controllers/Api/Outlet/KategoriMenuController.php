@@ -4,10 +4,8 @@ namespace App\Http\Controllers\Api\Outlet;
 
 use App\Http\Controllers\Concerns\AuthorizesOutletAccess;
 use App\Http\Controllers\Controller;
-use App\Models\Outlet;
 use App\Models\KategoriMenu;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 
@@ -15,13 +13,13 @@ class KategoriMenuController extends Controller
 {
     use AuthorizesOutletAccess;
 
-
     public function index($outletId)
     {
         $outlet = $this->authorizeOutlet($outletId);
         try {
             DB::statement("SET search_path TO {$outlet->schema_name}, public");
-            $data = KategoriMenu::withCount('menu')->orderBy('urutan')->orderBy('nama')->get();
+            $data = KategoriMenu::with('station')->withCount('menu')
+                ->orderBy('urutan')->orderBy('nama')->get();
             DB::statement("SET search_path TO public");
             return response()->json($data);
         } catch (\Exception $e) {
@@ -34,16 +32,20 @@ class KategoriMenuController extends Controller
     {
         $outlet = $this->authorizeOutlet($outletId);
         $validator = Validator::make($request->all(), [
-            'nama'     => 'required|string|max:100',
-            'deskripsi'=> 'nullable|string',
-            'urutan'   => 'nullable|integer',
-            'is_active'=> 'boolean',
+            'nama'       => 'required|string|max:100',
+            'deskripsi'  => 'nullable|string',
+            'urutan'     => 'nullable|integer',
+            'station_id' => 'nullable|integer',
+            'is_active'  => 'boolean',
         ]);
-        if ($validator->fails()) return response()->json(['message' => 'Validation failed', 'errors' => $validator->errors()], 422);
+        if ($validator->fails()) {
+            return response()->json(['message' => 'Validation failed', 'errors' => $validator->errors()], 422);
+        }
 
         try {
             DB::statement("SET search_path TO {$outlet->schema_name}, public");
             $data = KategoriMenu::create($validator->validated());
+            $data->load('station');
             DB::statement("SET search_path TO public");
             return response()->json(['message' => 'Created successfully', 'data' => $data], 201);
         } catch (\Exception $e) {
@@ -57,7 +59,7 @@ class KategoriMenuController extends Controller
         $outlet = $this->authorizeOutlet($outletId);
         try {
             DB::statement("SET search_path TO {$outlet->schema_name}, public");
-            $data = KategoriMenu::withCount('menu')->findOrFail($id);
+            $data = KategoriMenu::with('station')->withCount('menu')->findOrFail($id);
             DB::statement("SET search_path TO public");
             return response()->json($data);
         } catch (\Exception $e) {
@@ -70,17 +72,30 @@ class KategoriMenuController extends Controller
     {
         $outlet = $this->authorizeOutlet($outletId);
         $validator = Validator::make($request->all(), [
-            'nama'     => 'string|max:100',
-            'deskripsi'=> 'nullable|string',
-            'urutan'   => 'nullable|integer',
-            'is_active'=> 'boolean',
+            'nama'       => 'string|max:100',
+            'deskripsi'  => 'nullable|string',
+            'urutan'     => 'nullable|integer',
+            'station_id' => 'nullable|integer',
+            'is_active'  => 'boolean',
         ]);
-        if ($validator->fails()) return response()->json(['message' => 'Validation failed', 'errors' => $validator->errors()], 422);
+        if ($validator->fails()) {
+            return response()->json(['message' => 'Validation failed', 'errors' => $validator->errors()], 422);
+        }
 
         try {
             DB::statement("SET search_path TO {$outlet->schema_name}, public");
             $data = KategoriMenu::findOrFail($id);
             $data->update($validator->validated());
+
+            // Propagate station_id ke semua menu dalam kategori ini
+            if ($request->has('station_id')) {
+                DB::table('menu')
+                    ->where('kategori_id', $id)
+                    ->whereNull('deleted_at')
+                    ->update(['station_id' => $request->station_id]);
+            }
+
+            $data->load('station');
             DB::statement("SET search_path TO public");
             return response()->json(['message' => 'Updated successfully', 'data' => $data]);
         } catch (\Exception $e) {
@@ -97,7 +112,7 @@ class KategoriMenuController extends Controller
             $data = KategoriMenu::findOrFail($id);
             if ($data->menu()->count() > 0) {
                 DB::statement("SET search_path TO public");
-                return response()->json(['message' => 'Cannot delete category with existing menus'], 400);
+                return response()->json(['message' => 'Tidak bisa menghapus kategori yang masih memiliki menu'], 400);
             }
             $data->delete();
             DB::statement("SET search_path TO public");
