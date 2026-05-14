@@ -599,7 +599,16 @@
     "pointsEarned": "poin diperoleh",
     "pointsRedeemedLabel": "poin ditukar",
     "pointsRedeemed": "Tukar Poin",
-    "pointsAfter": "Saldo poin"
+    "pointsAfter": "Saldo poin",
+    "noOrders": "Tidak ada transaksi ditemukan",
+    "status": "Status",
+    "qrTracking": "QR Tracking Pesanan",
+    "scanQrHint": "Scan QR code ini untuk melacak status pesanan secara real-time",
+    "trackingUrl": "URL Tracking",
+    "openTracking": "Buka Halaman Tracking",
+    "moreItems": "menu lainnya",
+    "bon": "Bon",
+    "statusBon": "Bon"
   },
   "member": {
     "title": "Membership",
@@ -1269,7 +1278,6 @@
     "inventoryReport": "Laporan Inventori",
     "expenseReport": "Laporan Pengeluaran",
     "salesTrend": "Tren Penjualan",
-    "salesByHour": "Penjualan per Jam",
     "paymentMethods": "Metode Pembayaran",
     "topSellingMenu": "Menu Terlaris",
     "menuPerformance": "Performa Menu",
@@ -1285,7 +1293,6 @@
     "category": "Kategori",
     "quantitySold": "Jumlah Terjual",
     "revenue": "Pendapatan",
-    "condition": "Kondisi",
     "avgTemp": "Suhu Rata-rata",
     "orders": "Pesanan",
     "temperature": "Suhu (°C)",
