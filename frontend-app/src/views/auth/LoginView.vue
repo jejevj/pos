@@ -156,9 +156,17 @@ const handleLogin = async () => {
   try {
     await authStore.login(form.value)
     
-    // Redirect to the original page or dashboard
-    const redirectPath = route.query.redirect || '/dashboard'
-    router.push(redirectPath)
+    // Setelah login berhasil, outletMemberships sudah di-populate via setAuth()
+    // Cek apakah user ini adalah outlet user (bukan superadmin, punya membership)
+    if (authStore.isOutletUser && authStore.outletMemberships.length > 0) {
+      // Redirect ke dashboard outlet pertama yang dimiliki user
+      const firstOutlet = authStore.outletMemberships[0]
+      router.push(`/outlets/${firstOutlet.outlet_id}/dashboard`)
+    } else {
+      // Superadmin atau user biasa — redirect ke dashboard global atau halaman asal
+      const redirectPath = route.query.redirect || '/dashboard'
+      router.push(redirectPath)
+    }
   } catch (error) {
     console.error('Login failed:', error)
   }
