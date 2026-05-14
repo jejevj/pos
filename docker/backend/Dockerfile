@@ -90,6 +90,23 @@ COPY docker/backend/supervisord.conf /etc/supervisor/supervisord.conf
 COPY docker/backend/entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh
 
+# Nginx is configured to run as www-data, but the Alpine package
+# ships its runtime dirs owned by the nginx user. Recreate the temp
+# tree (including all subdirs nginx uses to buffer request bodies,
+# FastCGI responses, etc.) and hand it to www-data, plus /run/nginx
+# and /var/log/nginx, so the master and workers can write.
+RUN set -eux; \
+    mkdir -p \
+        /var/lib/nginx/tmp/client_body \
+        /var/lib/nginx/tmp/proxy \
+        /var/lib/nginx/tmp/fastcgi \
+        /var/lib/nginx/tmp/uwsgi \
+        /var/lib/nginx/tmp/scgi \
+        /var/log/nginx \
+        /run/nginx; \
+    chown -R www-data:www-data /var/lib/nginx /var/log/nginx /run/nginx; \
+    chmod -R u+rwX,g+rX /var/lib/nginx
+
 EXPOSE 8080
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \

@@ -14,6 +14,21 @@ mkdir -p \
     bootstrap/cache
 chown -R www-data:www-data storage bootstrap/cache || true
 
+# Ensure nginx runtime dirs are writable by the www-data user that
+# nginx runs as. Without this, request bodies larger than the in-memory
+# buffer (e.g. base64 photo uploads on clock-in) fail with:
+#   open() ".../client_body/0000000003" failed (13: Permission denied)
+mkdir -p \
+    /var/lib/nginx/tmp/client_body \
+    /var/lib/nginx/tmp/proxy \
+    /var/lib/nginx/tmp/fastcgi \
+    /var/lib/nginx/tmp/uwsgi \
+    /var/lib/nginx/tmp/scgi \
+    /var/log/nginx \
+    /run/nginx
+chown -R www-data:www-data /var/lib/nginx /var/log/nginx /run/nginx || true
+chmod -R u+rwX,g+rX /var/lib/nginx || true
+
 # Generate APP_KEY only if missing
 if [ -z "${APP_KEY:-}" ] || [ "${APP_KEY:-}" = "base64:" ]; then
     echo "[entrypoint] APP_KEY not set — generating one (ephemeral). Set APP_KEY in .env to make it stable."
