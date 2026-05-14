@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\Outlet;
 
 use App\Http\Controllers\Concerns\AuthorizesOutletAccess;
 use App\Http\Controllers\Controller;
+use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
@@ -23,7 +24,7 @@ class EmployeeBeverageController extends Controller
         $outlet = $this->authorizeOutlet($outletId);
         if ($requireAdmin && !$this->isOutletAdmin()) {
             DB::statement("SET search_path TO public");
-            abort(response()->json([
+            throw new HttpResponseException(response()->json([
                 'message' => 'Hanya admin/owner outlet yang boleh mengubah pengaturan ini.',
                 'code' => 'OUTLET_ADMIN_REQUIRED',
             ], 403));
@@ -105,6 +106,8 @@ class EmployeeBeverageController extends Controller
 
             DB::statement("SET search_path TO public");
             return response()->json(['message' => 'Settings updated successfully']);
+        } catch (HttpResponseException $e) {
+            throw $e;
         } catch (\Exception $e) {
             DB::statement("SET search_path TO public");
             return response()->json(['message' => 'Failed to update settings', 'error' => $e->getMessage()], 500);
@@ -179,6 +182,8 @@ class EmployeeBeverageController extends Controller
 
             DB::statement("SET search_path TO public");
             return response()->json(['message' => 'Beverage added successfully'], 201);
+        } catch (HttpResponseException $e) {
+            throw $e;
         } catch (\Exception $e) {
             DB::statement("SET search_path TO public");
             return response()->json(['message' => 'Failed to add beverage', 'error' => $e->getMessage()], 500);
@@ -197,6 +202,8 @@ class EmployeeBeverageController extends Controller
 
             DB::statement("SET search_path TO public");
             return response()->json(['message' => 'Beverage removed successfully']);
+        } catch (HttpResponseException $e) {
+            throw $e;
         } catch (\Exception $e) {
             DB::statement("SET search_path TO public");
             return response()->json(['message' => 'Failed to remove beverage', 'error' => $e->getMessage()], 500);
@@ -429,6 +436,8 @@ class EmployeeBeverageController extends Controller
 
             DB::statement("SET search_path TO public");
             return response()->json($stats);
+        } catch (HttpResponseException $e) {
+            throw $e;
         } catch (\Exception $e) {
             DB::statement("SET search_path TO public");
             return response()->json(['message' => 'Failed to fetch statistics', 'error' => $e->getMessage()], 500);
