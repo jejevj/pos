@@ -74,189 +74,216 @@
         </div>
         <div class="menu-grid">
 
-          <div class="menu-card" @click="navigateTo('outlet-pos')">
+          <!-- POS / Kasir -->
+          <div v-if="canAccess('access_pos')" class="menu-card" @click="navigateTo('outlet-pos')">
             <div class="menu-icon" style="background:#5D87FF">
               <i class="pi pi-shopping-cart" style="color:white"></i>
             </div>
             <span class="menu-label">POS / Kasir</span>
           </div>
 
-          <div class="menu-card" @click="navigateTo('outlet-transactions')">
+          <!-- Transaksi -->
+          <div v-if="canAccess('view_transactions')" class="menu-card" @click="navigateTo('outlet-transactions')">
             <div class="menu-icon" style="background:#49BEFF">
               <i class="pi pi-receipt" style="color:white"></i>
             </div>
             <span class="menu-label">Transaksi</span>
           </div>
 
-          <div class="menu-card" @click="navigateTo('outlet-bahan-baku')">
+          <!-- Bahan Baku -->
+          <div v-if="canAccess('view_inventory')" class="menu-card" @click="navigateTo('outlet-bahan-baku')">
             <div class="menu-icon" style="background:#13DEB9">
               <i class="pi pi-box" style="color:white"></i>
             </div>
             <span class="menu-label">Bahan Baku</span>
           </div>
 
-          <div class="menu-card" @click="navigateTo('outlet-stock-opname')">
+          <!-- Stock Opname -->
+          <div v-if="canAccess('view_stock_opname')" class="menu-card" @click="navigateTo('outlet-stock-opname')">
             <div class="menu-icon" style="background:#0A7EA4">
               <i class="pi pi-clipboard" style="color:white"></i>
             </div>
             <span class="menu-label">Stock Opname</span>
           </div>
 
-          <div class="menu-card" @click="navigateTo('outlet-purchases')">
+          <!-- Barang Masuk -->
+          <div v-if="canAccess('view_purchases')" class="menu-card" @click="navigateTo('outlet-purchases')">
             <div class="menu-icon" style="background:#FFAE1F">
               <i class="pi pi-truck" style="color:white"></i>
             </div>
             <span class="menu-label">Barang Masuk</span>
           </div>
 
-          <div class="menu-card" @click="navigateTo('outlet-menu')">
+          <!-- Menu -->
+          <div v-if="canAccess('view_menu')" class="menu-card" @click="navigateTo('outlet-menu')">
             <div class="menu-icon" style="background:#FA896B">
               <i class="pi pi-book" style="color:white"></i>
             </div>
             <span class="menu-label">Menu</span>
           </div>
 
-          <div class="menu-card" @click="navigateTo('outlet-promos')">
+          <!-- Promo -->
+          <div v-if="canAccess('view_promos')" class="menu-card" @click="navigateTo('outlet-promos')">
             <div class="menu-icon" style="background:#763EBD">
               <i class="pi pi-tag" style="color:white"></i>
             </div>
             <span class="menu-label">Promo</span>
           </div>
 
-          <div class="menu-card" @click="navigateTo('outlet-members')">
+          <!-- Member -->
+          <div v-if="canAccess('view_members')" class="menu-card" @click="navigateTo('outlet-members')">
             <div class="menu-icon" style="background:#01C0C8">
               <i class="pi pi-id-card" style="color:white"></i>
             </div>
             <span class="menu-label">Member</span>
           </div>
 
-          <div class="menu-card" @click="navigateTo('outlet-hr')">
+          <!-- HR / Karyawan -->
+          <div v-if="canAccess('view_employees')" class="menu-card" @click="navigateTo('outlet-hr')">
             <div class="menu-icon" style="background:#5D87FF">
               <i class="pi pi-users" style="color:white"></i>
             </div>
             <span class="menu-label">HR / Karyawan</span>
           </div>
 
-          <div class="menu-card" @click="navigateTo('outlet-shifts')">
+          <!-- Shift -->
+          <div v-if="canAccess('view_employees')" class="menu-card" @click="navigateTo('outlet-shifts')">
             <div class="menu-icon" style="background:#49BEFF">
               <i class="pi pi-calendar" style="color:white"></i>
             </div>
             <span class="menu-label">Shift</span>
           </div>
 
-          <div class="menu-card" @click="navigateTo('outlet-attendance')">
+          <!-- Absensi -->
+          <div v-if="canAccess('view_attendance')" class="menu-card" @click="navigateTo('outlet-attendance')">
             <div class="menu-icon" style="background:#13DEB9">
               <i class="pi pi-clock" style="color:white"></i>
             </div>
             <span class="menu-label">Absensi</span>
           </div>
 
-          <div class="menu-card" @click="navigateTo('outlet-expenses')">
+          <!-- Pengeluaran -->
+          <div v-if="canAccess('view_expenses')" class="menu-card" @click="navigateTo('outlet-expenses')">
             <div class="menu-icon" style="background:#FA896B">
               <i class="pi pi-wallet" style="color:white"></i>
             </div>
             <span class="menu-label">Pengeluaran</span>
           </div>
 
-          <div class="menu-card" @click="navigateTo('outlet-reports')">
+          <!-- Laporan -->
+          <div v-if="canAccess('view_reports')" class="menu-card" @click="navigateTo('outlet-reports')">
             <div class="menu-icon" style="background:#FFAE1F">
               <i class="pi pi-chart-bar" style="color:white"></i>
             </div>
             <span class="menu-label">Laporan</span>
           </div>
 
-          <div class="menu-card" @click="navigateTo('outlet-payment-methods')">
+          <!-- Metode Pembayaran -->
+          <div v-if="isOutletAdmin" class="menu-card" @click="navigateTo('outlet-payment-methods')">
             <div class="menu-icon" style="background:#6366f1">
               <i class="pi pi-credit-card" style="color:white"></i>
             </div>
             <span class="menu-label">Metode Pembayaran</span>
           </div>
 
-          <div class="menu-card" @click="navigateTo('outlet-stock-locations')">
+          <!-- Lokasi Stok -->
+          <div v-if="canAccess('view_inventory')" class="menu-card" @click="navigateTo('outlet-stock-locations')">
             <div class="menu-icon" style="background:#0891b2">
               <i class="pi pi-building" style="color:white"></i>
             </div>
             <span class="menu-label">Lokasi Stok</span>
           </div>
 
-          <div class="menu-card" @click="navigateTo('outlet-whatsapp')">
+          <!-- WhatsApp -->
+          <div v-if="isOutletAdmin" class="menu-card" @click="navigateTo('outlet-whatsapp')">
             <div class="menu-icon" style="background:#25d366">
               <i class="pi pi-whatsapp" style="color:white"></i>
             </div>
             <span class="menu-label">WhatsApp</span>
           </div>
 
-          <div class="menu-card" @click="navigateTo('outlet-utilities')">
+          <!-- Utilitas -->
+          <div v-if="canAccess('edit_settings')" class="menu-card" @click="navigateTo('outlet-utilities')">
             <div class="menu-icon" style="background:#7C8FAC">
               <i class="pi pi-wrench" style="color:white"></i>
             </div>
             <span class="menu-label">Utilitas</span>
           </div>
 
-          <div class="menu-card" @click="navigateTo('outlet-rbac')">
+          <!-- RBAC -->
+          <div v-if="canAccess('manage_roles')" class="menu-card" @click="navigateTo('outlet-rbac')">
             <div class="menu-icon" style="background:#763EBD">
               <i class="pi pi-shield" style="color:white"></i>
             </div>
             <span class="menu-label">Pengaturan RBAC</span>
           </div>
 
-          <div class="menu-card" @click="navigateTo('outlet-kategori-bahan-baku')">
+          <!-- Kategori Bahan Baku -->
+          <div v-if="canAccess('view_inventory')" class="menu-card" @click="navigateTo('outlet-kategori-bahan-baku')">
             <div class="menu-icon" style="background:#6366f1">
               <i class="pi pi-list" style="color:white"></i>
             </div>
             <span class="menu-label">Kategori Bahan Baku</span>
           </div>
 
-          <div class="menu-card" @click="navigateTo('outlet-satuan')">
+          <!-- Satuan -->
+          <div v-if="canAccess('view_inventory')" class="menu-card" @click="navigateTo('outlet-satuan')">
             <div class="menu-icon" style="background:#0891b2">
               <i class="pi pi-ruler" style="color:white"></i>
             </div>
             <span class="menu-label">Satuan</span>
           </div>
 
-          <div class="menu-card" @click="navigateTo('outlet-supplier')">
+          <!-- Supplier -->
+          <div v-if="canAccess('view_inventory')" class="menu-card" @click="navigateTo('outlet-supplier')">
             <div class="menu-icon" style="background:#059669">
               <i class="pi pi-building" style="color:white"></i>
             </div>
             <span class="menu-label">Supplier</span>
           </div>
 
-          <div class="menu-card" @click="navigateTo('outlet-kategori-menu')">
+          <!-- Kategori Menu -->
+          <div v-if="canAccess('view_menu')" class="menu-card" @click="navigateTo('outlet-kategori-menu')">
             <div class="menu-icon" style="background:#db2777">
               <i class="pi pi-th-large" style="color:white"></i>
             </div>
             <span class="menu-label">Kategori Menu</span>
           </div>
 
-          <div class="menu-card" @click="navigateTo('outlet-users')">
+          <!-- Manajemen User -->
+          <div v-if="canAccess('manage_users')" class="menu-card" @click="navigateTo('outlet-users')">
             <div class="menu-icon" style="background:#7c3aed">
               <i class="pi pi-user-edit" style="color:white"></i>
             </div>
             <span class="menu-label">Manajemen User</span>
           </div>
 
-          <div class="menu-card" @click="navigateTo('outlet-employee-beverage')">
+          <!-- Jatah Minum -->
+          <div v-if="canAccess('view_employees')" class="menu-card" @click="navigateTo('outlet-employee-beverage')">
             <div class="menu-icon" style="background:#0284c7">
               <i class="pi pi-star" style="color:white"></i>
             </div>
             <span class="menu-label">Jatah Minum</span>
           </div>
 
-          <div class="menu-card" @click="navigateTo('outlet-tables')">
+          <!-- Meja -->
+          <div v-if="canAccess('manage_tables')" class="menu-card" @click="navigateTo('outlet-tables')">
             <div class="menu-icon" style="background:#b45309">
               <i class="pi pi-table" style="color:white"></i>
             </div>
             <span class="menu-label">Meja</span>
           </div>
 
-          <div class="menu-card" @click="navigateTo('outlet-stations')">
+          <!-- Stasiun KDS -->
+          <div v-if="isOutletAdmin" class="menu-card" @click="navigateTo('outlet-stations')">
             <div class="menu-icon" style="background:#dc2626">
               <i class="pi pi-desktop" style="color:white"></i>
             </div>
             <span class="menu-label">Stasiun KDS</span>
           </div>
 
-          <div class="menu-card" @click="navigateTo('outlet-kitchen')">
+          <!-- Kitchen Order -->
+          <div v-if="canAccess('access_kitchen_display')" class="menu-card" @click="navigateTo('outlet-kitchen')">
             <div class="menu-icon" style="background:#d97706">
               <i class="pi pi-bolt" style="color:white"></i>
             </div>
@@ -468,6 +495,7 @@ import { useRouter, useRoute } from 'vue-router'
 import { useToast } from 'primevue/usetoast'
 import { useI18n } from 'vue-i18n'
 import api from '@/services/api'
+import { useAuthStore } from '@/stores/auth'
 import Card from 'primevue/card'
 import Button from 'primevue/button'
 import Avatar from 'primevue/avatar'
@@ -475,10 +503,26 @@ import Chip from 'primevue/chip'
 
 const router = useRouter()
 const route = useRoute()
+const authStore = useAuthStore()
 const toast = useToast()
 const { t } = useI18n()
 
 const outletId = route.params.outletId || route.meta.defaultOutletId || 1
+
+/**
+ * Cek permission outlet user untuk menu-card filtering.
+ * Superadmin & owner selalu true.
+ */
+const canAccess = (permission) => {
+  return authStore.hasOutletPermission(outletId, permission)
+}
+
+// Owner / superadmin bisa akses semua menu admin
+const isOutletAdmin = computed(() => {
+  if (authStore.isSuperAdmin) return true
+  const m = authStore.getOutletMembership(outletId)
+  return m?.roles?.some(r => r.name === 'owner' || r.name === 'manager') ?? true
+})
 const outlet = ref(null)
 const currentTime = ref('')
 const currentDate = ref('')
