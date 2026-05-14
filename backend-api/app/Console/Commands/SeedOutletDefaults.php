@@ -10,23 +10,23 @@ use Illuminate\Support\Facades\DB;
 class SeedOutletDefaults extends Command
 {
     /**
-     * The name and signature of the console command.
+     * Seed default master data ke outlet yang sudah ada.
      *
      * Usage:
      *   php artisan outlet:seed-defaults          → seed semua outlet
-     *   php artisan outlet:seed-defaults 3        → seed outlet dengan id=3
-     *   php artisan outlet:seed-defaults --force  → paksa seed meskipun data sudah ada
+     *   php artisan outlet:seed-defaults 3        → seed outlet ID=3 saja
+     *
+     * Idempotent per-item: data yang sudah ada (cek by nama) dilewati,
+     * data yang belum ada akan di-insert. Aman dijalankan berulang kali.
      */
     protected $signature = 'outlet:seed-defaults
-                            {outlet_id? : ID outlet yang ingin di-seed (kosong = semua outlet)}
-                            {--force : Paksa seed ulang meskipun data sudah ada (hapus cek idempotency)}';
+                            {outlet_id? : ID outlet yang ingin di-seed (kosong = semua outlet)}';
 
-    protected $description = 'Seed default master data (satuan, kategori, bahan baku, menu) ke outlet yang sudah ada';
+    protected $description = 'Seed default master data (satuan, kategori BB, bahan baku, kategori menu, menu) ke outlet';
 
     public function handle(): int
     {
         $outletId = $this->argument('outlet_id');
-        $force    = $this->option('force');
 
         $outlets = $outletId
             ? Outlet::where('id', $outletId)->get()
@@ -40,45 +40,39 @@ class SeedOutletDefaults extends Command
             return Command::FAILURE;
         }
 
-        $seeder = new OutletDefaultDataSeeder();
-
+        $seeder  = new OutletDefaultDataSeeder();
         $success = 0;
-        $skipped = 0;
         $failed  = 0;
 
         foreach ($outlets as $outlet) {
-            $this->line("─────────────────────────────────────────");
-            $this->info("Outlet: [{$outlet->id}] {$outlet->name} — schema: {$outlet->schema_name}");
+            $this->line('');
+            $this->line('─────────────────────────────────────────────────');
+            $this->info("Outlet [{$outlet->id}]: {$outlet->name}");
+            $this->line("Schema: {$outlet->schema_name}");
 
-            // Cek apakah sudah ada data satuan (indikator sudah di-seed)
             try {
-                DB::statement("SET search_path TO {$outlet->schema_name}, public");
-                $satuanCount = DB::table('satuan')->count();
-                DB::statement('SET search_path TO public');
-            } catch (\Throwable $e) {
-                $this->warn("  ⚠ Gagal cek schema ({$outlet->schema_name}): " . $e->getMessage());
-                $failed++;
-                continue;
-            }
-
-            if ($satuanCount > 0 && !$force) {
-                $this->warn("  ⟳ Sudah ada {$satuanCount} satuan — dilewati (gunakan --force untuk paksa seed ulang)");
-                $skipped++;
-                continue;
-            }
-
-            if ($satuanCount > 0 && $force) {
-                $this->warn("  ⚠ --force aktif: data lama TIDAK dihapus, seeder akan skip karena idempotency guard");
-                $this->warn("  ℹ Untuk benar-benar reset, hapus data manual dulu di schema {$outlet->schema_name}");
-                $skipped++;
-                continue;
-            }
-
-            // Jalankan seeder
-            try {
-                $this->line("  → Menjalankan seeder...");
                 $seeder->seed($outlet->schema_name);
-                $this->info("  ✓ Berhasil di-seed");
+
+                $stats = $seeder->stats;
+
+                $this->table(
+                    ['Bagian', 'Ditambah', 'Dilewati (sudah ada)'],
+                    [
+                        ['Satuan',          $stats['satuan']['inserted'],        $stats['satuan']['skipped']],
+                        ['Kategori BB',     $stats['kategori_bb']['inserted'],   $stats['kategori_bb']['skipped']],
+                        ['Bahan Baku',      $stats['bahan_baku']['inserted'],    $stats['bahan_baku']['skipped']],
+                        ['Kategori Menu',   $stats['kategori_menu']['inserted'], $stats['kategori_menu']['skipped']],
+                        ['Menu',            $stats['menu']['inserted'],          $stats['menu']['skipped']],
+                    ]
+                );
+
+                $totalInserted = array_sum(array_column($stats, 'inserted'));
+                if ($totalInserted > 0) {
+                    $this->info("  ✓ Selesai — {$totalInserted} item baru ditambahkan");
+                } else {
+                    $this->warn('  ⟳ Semua data sudah ada, tidak ada yang ditambahkan');
+                }
+
                 $success++;
             } catch (\Throwable $e) {
                 $this->error("  ✗ Gagal: " . $e->getMessage());
@@ -86,8 +80,9 @@ class SeedOutletDefaults extends Command
             }
         }
 
-        $this->line("─────────────────────────────────────────");
-        $this->info("Selesai. Berhasil: {$success} | Dilewati: {$skipped} | Gagal: {$failed}");
+        $this->line('');
+        $this->line('─────────────────────────────────────────────────');
+        $this->info("Selesai. Outlet berhasil: {$success} | Gagal: {$failed}");
 
         return $failed > 0 ? Command::FAILURE : Command::SUCCESS;
     }
