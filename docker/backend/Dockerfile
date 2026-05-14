@@ -1,11 +1,39 @@
 # syntax=docker/dockerfile:1.6
 FROM php:8.3-fpm-alpine AS base
 
-RUN apk add --no-cache \
+# phpredis pinned to a known-good release compatible with PHP 8.3.
+# We build from the GitHub source (shallow clone of an immutable tag)
+# instead of `pecl install redis`, which has been intermittently
+# unavailable from pecl.php.net.
+ARG PHPREDIS_VERSION=6.0.2
+
+# Runtime + build-time packages. The build-only ones are tagged with the
+# `.build-deps` virtual package so we can `apk del` them at the end and
+# keep the final image lean.
+RUN set -eux; \
+    apk add --no-cache \
         bash \
-        git \
         curl \
+        git \
         unzip \
+        tzdata \
+        icu-libs \
+        libpq \
+        libzip \
+        oniguruma \
+        libxml2 \
+        libpng \
+        libjpeg-turbo \
+        freetype \
+        postgresql-client \
+        nginx \
+        supervisor; \
+    apk add --no-cache --virtual .build-deps \
+        autoconf \
+        g++ \
+        make \
+        pkgconf \
+        re2c \
         icu-dev \
         libpq-dev \
         libzip-dev \
@@ -13,16 +41,9 @@ RUN apk add --no-cache \
         libxml2-dev \
         libpng-dev \
         libjpeg-turbo-dev \
-        freetype-dev \
-        autoconf \
-        g++ \
-        make \
-        postgresql-client \
-        nginx \
-        supervisor \
-        tzdata \
-    && docker-php-ext-configure gd --with-freetype --with-jpeg \
-    && docker-php-ext-install -j$(nproc) \
+        freetype-dev; \
+    docker-php-ext-configure gd --with-freetype --with-jpeg; \
+    docker-php-ext-install -j"$(nproc)" \
         pdo \
         pdo_pgsql \
         pgsql \
@@ -33,10 +54,19 @@ RUN apk add --no-cache \
         exif \
         pcntl \
         gd \
-        opcache \
-    && pecl install redis \
-    && docker-php-ext-enable redis \
-    && apk del autoconf g++ make
+        opcache; \
+    git clone --depth 1 --branch "${PHPREDIS_VERSION}" \
+        https://github.com/phpredis/phpredis.git /tmp/phpredis; \
+    cd /tmp/phpredis; \
+    phpize; \
+    ./configure --enable-redis; \
+    make -j"$(nproc)"; \
+    make install; \
+    cd /; \
+    docker-php-ext-enable redis; \
+    php -m | grep -qi '^redis$'; \
+    rm -rf /tmp/phpredis; \
+    apk del --no-network .build-deps
 
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
