@@ -154,8 +154,8 @@ class RBACSeeder extends Seeder
             [
                 'title' => 'Dashboard',
                 'icon' => 'pi pi-home',
-                'route' => '/dashboard',
-                'url' => '/dashboard',
+                'route' => '/admin/dashboard',
+                'url' => '/admin/dashboard',
                 'order' => 1,
                 'is_active' => true,
             ]
@@ -168,8 +168,8 @@ class RBACSeeder extends Seeder
             [
                 'title' => 'User Management',
                 'icon' => 'pi pi-users',
-                'route' => '/users',
-                'url' => '/users',
+                'route' => '/admin/users',
+                'url' => '/admin/users',
                 'order' => 2,
                 'is_active' => true,
             ]
@@ -182,8 +182,8 @@ class RBACSeeder extends Seeder
             [
                 'title' => 'Role Management',
                 'icon' => 'pi pi-shield',
-                'route' => '/roles',
-                'url' => '/roles',
+                'route' => '/admin/roles',
+                'url' => '/admin/roles',
                 'order' => 3,
                 'is_active' => true,
             ]
@@ -196,8 +196,8 @@ class RBACSeeder extends Seeder
             [
                 'title' => 'Permission Management',
                 'icon' => 'pi pi-lock',
-                'route' => '/permissions',
-                'url' => '/permissions',
+                'route' => '/admin/permissions',
+                'url' => '/admin/permissions',
                 'order' => 4,
                 'is_active' => true,
             ]
@@ -210,8 +210,8 @@ class RBACSeeder extends Seeder
             [
                 'title' => 'Menu Management',
                 'icon' => 'pi pi-bars',
-                'route' => '/menus',
-                'url' => '/menus',
+                'route' => '/admin/menus',
+                'url' => '/admin/menus',
                 'order' => 5,
                 'is_active' => true,
             ]
@@ -224,8 +224,8 @@ class RBACSeeder extends Seeder
             [
                 'title' => 'Reports',
                 'icon' => 'pi pi-chart-bar',
-                'route' => '/reports',
-                'url' => '/reports',
+                'route' => '/admin/reports',
+                'url' => '/admin/reports',
                 'order' => 6,
                 'is_active' => true,
             ]
@@ -238,8 +238,8 @@ class RBACSeeder extends Seeder
             [
                 'title' => 'Settings',
                 'icon' => 'pi pi-cog',
-                'route' => '/settings',
-                'url' => '/settings',
+                'route' => '/admin/settings',
+                'url' => '/admin/settings',
                 'order' => 7,
                 'is_active' => true,
             ]

@@ -139,7 +139,13 @@ const handleLogin = async () => {
   if (!form.value.password) { errors.value.password = 'Password is required'; return }
   try {
     await authStore.login(form.value)
-    router.push(route.query.redirect || '/dashboard')
+    if (route.query.redirect) {
+      router.push(route.query.redirect)
+    } else if (authStore.isSuperAdmin) {
+      router.push('/admin/dashboard')
+    } else {
+      router.push('/dashboard')
+    }
   } catch (e) {
     console.error('Login failed:', e)
   }

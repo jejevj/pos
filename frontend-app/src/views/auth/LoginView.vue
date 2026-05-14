@@ -165,8 +165,8 @@ const handleLogin = async () => {
       const encoded = firstOutlet.encoded_outlet_id || encodeOutletId(firstOutlet.outlet_id)
       router.push(`/outlets/${encoded}/dashboard`)
     } else {
-      // Superadmin atau user biasa — redirect ke dashboard global atau halaman asal
-      const redirectPath = route.query.redirect || '/dashboard'
+      // Superadmin atau user biasa — redirect ke admin dashboard atau halaman asal
+      const redirectPath = route.query.redirect || (authStore.isSuperAdmin ? '/admin/dashboard' : '/dashboard')
       router.push(redirectPath)
     }
   } catch (error) {

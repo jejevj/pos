@@ -3,8 +3,8 @@
     :links="navLinks"
     :page-title="pageTitle"
     :theme="vueroTheme"
-    :show-sidebar="showSidebar"
-    :open-on-mounted="showSidebar"
+    :show-sidebar="true"
+    :open-on-mounted="true"
   >
     <!-- Logo slot -->
     <template #logo>
@@ -19,17 +19,6 @@
         {{ currentLanguage.flag }}
       </button>
       <Menu ref="languageMenu" :model="languageMenuItems" popup />
-
-      <!-- WA badge (outlet only) -->
-      <button
-        v-if="outletId && unreadCount > 0"
-        class="toolbar-btn wa-btn"
-        @click="goToWhatsApp"
-        title="WhatsApp"
-      >
-        <i class="pi pi-whatsapp" />
-        <span class="wa-badge">{{ unreadCount > 99 ? '99+' : unreadCount }}</span>
-      </button>
 
       <!-- User menu -->
       <button class="toolbar-btn user-btn" @click="toggleUserMenu">
@@ -55,24 +44,13 @@
     <!-- Page content -->
     <router-view />
   </VueroLayout>
-
-  <!-- WhatsApp FAB (outlet context) -->
-  <div v-if="outletId" class="wa-fab-wrap">
-    <button class="wa-fab" @click="goToWhatsApp" title="WhatsApp">
-      <i class="pi pi-whatsapp" />
-      <span v-if="unreadCount > 0" class="wa-fab-badge">
-        {{ unreadCount > 99 ? '99+' : unreadCount }}
-      </span>
-    </button>
-  </div>
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useLanguage } from '@/composables/useLanguage'
-import { useWahaSocket, clearWahaUnread } from '@/composables/useWahaSocket'
 import { useI18n } from 'vue-i18n'
 import Menu from 'primevue/menu'
 import VueroLayout from './layouts/VueroLayout.vue'
@@ -88,14 +66,8 @@ const vueroTheme   = ref('default') // default | color | curved | color-curved
 const userMenu     = ref()
 const languageMenu = ref()
 
-const { unreadCount } = useWahaSocket()
-const outletId = computed(() => route.params.outletId)
-
 // ─── Computed ────────────────────────────────────────────────────
 const pageTitle = computed(() => route.meta.title || t('common.dashboard'))
-
-/** Outlet users never have a sidebar */
-const showSidebar = computed(() => false)
 
 const userInitial = computed(() => {
   const name = authStore.user?.name || ''
@@ -112,8 +84,20 @@ const currentLanguage = computed(() =>
   availableLocales.find(l => l.code === locale.value) || availableLocales[0]
 )
 
-/** Outlet users have no global nav links */
-const navLinks = computed(() => [])
+const navLinks = computed(() => {
+  return (authStore.menus || []).map(menu => {
+    if (menu.children?.length) {
+      return {
+        id:       menu.id,
+        type:     'collapse',
+        label:    menu.title,
+        icon:     menu.icon,
+        children: menu.children.map(c => ({ label: c.title, to: c.url, icon: c.icon })),
+      }
+    }
+    return { id: menu.id, type: 'link', label: menu.title, icon: menu.icon, to: menu.url }
+  })
+})
 
 const languageMenuItems = computed(() =>
   availableLocales.map(lang => ({
@@ -144,11 +128,12 @@ const userMenuItems = computed(() => [
 const toggleUserMenu     = (e) => userMenu.value.toggle(e)
 const toggleLanguageMenu = (e) => languageMenu.value.toggle(e)
 
-const goToWhatsApp = () => {
-  clearWahaUnread()
-  router.push({ name: 'outlet-whatsapp', params: { outletId: outletId.value } })
-}
-
+// ─── Lifecycle ───────────────────────────────────────────────────
+onMounted(async () => {
+  if (authStore.menus.length === 0) {
+    await authStore.fetchMenus()
+  }
+})
 </script>
 
 <style scoped>
@@ -212,25 +197,6 @@ const goToWhatsApp = () => {
   white-space: nowrap;
 }
 
-/* WA button */
-.wa-btn {
-  position: relative;
-  color: #25d366;
-}
-.wa-badge {
-  position: absolute;
-  top: 0; right: 0;
-  min-width: 16px; height: 16px;
-  padding: 0 3px;
-  border-radius: 9999px;
-  background: #ef4444;
-  color: #fff;
-  font-size: 0.6rem;
-  font-weight: 700;
-  display: flex; align-items: center; justify-content: center;
-  border: 2px solid #fff;
-}
-
 /* Sidebar footer user pill */
 .sidebar-user {
   display: flex;
@@ -267,44 +233,6 @@ const goToWhatsApp = () => {
 .user-meta-role {
   font-size: 0.7rem;
   color: var(--light-text, #a2a5b9);
-}
-
-/* WhatsApp FAB */
-.wa-fab-wrap {
-  position: fixed;
-  bottom: 1.5rem;
-  left: 1.5rem;
-  z-index: 200;
-}
-.wa-fab {
-  position: relative;
-  width: 50px; height: 50px;
-  border-radius: 50%;
-  background: #25d366;
-  border: none;
-  cursor: pointer;
-  display: flex; align-items: center; justify-content: center;
-  color: #fff;
-  font-size: 1.4rem;
-  box-shadow: 0 4px 12px rgba(37,211,102,.4);
-  transition: transform 0.15s, box-shadow 0.15s;
-}
-.wa-fab:hover {
-  transform: scale(1.08);
-  box-shadow: 0 6px 18px rgba(37,211,102,.55);
-}
-.wa-fab-badge {
-  position: absolute;
-  top: -3px; right: -3px;
-  min-width: 18px; height: 18px;
-  padding: 0 4px;
-  border-radius: 9999px;
-  background: #ef4444;
-  color: #fff;
-  font-size: 0.6rem;
-  font-weight: 700;
-  display: flex; align-items: center; justify-content: center;
-  border: 2px solid #fff;
 }
 
 @media (max-width: 768px) {

@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import DashboardLayout from '@/layouts/DashboardLayout.vue'
+import AdminLayout from '@/layouts/AdminLayout.vue'
 import { encodeOutletId } from '@/utils/outletId'
 
 const router = createRouter({
@@ -26,29 +27,13 @@ const router = createRouter({
       meta: { guest: true }
     },
     {
-      path: '/',
-      component: DashboardLayout,
-      meta: { requiresAuth: true },
+      path: '/admin',
+      component: AdminLayout,
+      meta: { requiresAuth: true, superadminOnly: true },
       children: [
+        { path: '', redirect: '/admin/dashboard' },
         {
-          path: '',
-          redirect: '/dashboard'
-        },
-        {
-          // Main dashboard — shows outlet 1 dashboard directly
           path: 'dashboard',
-          name: 'dashboard',
-          component: () => import('@/views/outlet/OutletDashboardView.vue'),
-          meta: {
-            requiresAuth: true,
-            title: 'Dashboard',
-            defaultOutletId: 1,
-            superadminOnly: true,
-          }
-        },
-        {
-          // Admin/superadmin dashboard (old /dashboard)
-          path: 'admin/dashboard',
           name: 'admin-dashboard',
           component: () => import('@/views/DashboardView.vue'),
           meta: {
@@ -61,7 +46,7 @@ const router = createRouter({
           path: 'users',
           name: 'users',
           component: () => import('@/views/admin/UsersView.vue'),
-          meta: { 
+          meta: {
             requiresAuth: true,
             title: 'User Management',
             permission: 'users.view'
@@ -71,7 +56,7 @@ const router = createRouter({
           path: 'roles',
           name: 'roles',
           component: () => import('@/views/admin/RolesView.vue'),
-          meta: { 
+          meta: {
             requiresAuth: true,
             title: 'Role Management',
             permission: 'roles.view'
@@ -81,7 +66,7 @@ const router = createRouter({
           path: 'permissions',
           name: 'permissions',
           component: () => import('@/views/admin/PermissionsView.vue'),
-          meta: { 
+          meta: {
             requiresAuth: true,
             title: 'Permission Management',
             permission: 'permissions.view'
@@ -98,7 +83,7 @@ const router = createRouter({
           }
         },
         {
-          path: 'admin/site-settings',
+          path: 'site-settings',
           name: 'site-settings',
           component: () => import('@/views/admin/SiteSettingsView.vue'),
           meta: {
@@ -111,7 +96,7 @@ const router = createRouter({
           path: 'reports',
           name: 'reports',
           component: () => import('@/views/ReportsView.vue'),
-          meta: { 
+          meta: {
             requiresAuth: true,
             title: 'Reports',
             permission: 'reports.view'
@@ -121,17 +106,49 @@ const router = createRouter({
           path: 'settings',
           name: 'settings',
           component: () => import('@/views/SettingsView.vue'),
-          meta: { 
+          meta: {
             requiresAuth: true,
             title: 'Settings',
             permission: 'settings.view'
+          }
+        },
+      ]
+    },
+    {
+      path: '/',
+      component: DashboardLayout,
+      meta: { requiresAuth: true },
+      children: [
+        {
+          path: '',
+          redirect: () => {
+            const authStore = useAuthStore()
+            if (authStore.isSuperAdmin) return '/admin/dashboard'
+            if (authStore.isOutletUser && authStore.outletMemberships?.length > 0) {
+              const first = authStore.outletMemberships[0]
+              const encoded = first.encoded_outlet_id || encodeOutletId(first.outlet_id)
+              return `/outlets/${encoded}/dashboard`
+            }
+            return '/login'
+          }
+        },
+        {
+          // Main dashboard — shows outlet 1 dashboard directly (legacy entrypoint)
+          path: 'dashboard',
+          name: 'dashboard',
+          component: () => import('@/views/outlet/OutletDashboardView.vue'),
+          meta: {
+            requiresAuth: true,
+            title: 'Dashboard',
+            defaultOutletId: 1,
+            superadminOnly: true,
           }
         },
         {
           path: 'outlets',
           name: 'outlets',
           component: () => import('@/views/OutletsView.vue'),
-          meta: { 
+          meta: {
             requiresAuth: true,
             title: 'Outlet Management',
             permission: 'outlets.view'
@@ -428,6 +445,7 @@ router.beforeEach((to, _from) => {
       const encoded = firstOutlet.encoded_outlet_id || encodeOutletId(firstOutlet.outlet_id)
       return { path: `/outlets/${encoded}/dashboard` }
     }
+    if (authStore.isSuperAdmin) return { name: 'admin-dashboard' }
     return { name: 'dashboard' }
   }
 
