@@ -1,786 +1,558 @@
 <template>
   <div class="tracking-page">
-
-    <!-- Header Bar -->
-    <div class="tracking-header">
-      <div class="header-brand">
-        <i class="pi pi-box brand-icon"></i>
-        <span class="brand-name">{{ data?.outlet?.name || 'Moira' }}</span>
-      </div>
-      <div class="header-badge">
-        <i class="pi pi-map-marker"></i>
-        Lacak Pesanan
-      </div>
-    </div>
-
     <!-- Loading -->
-    <div v-if="loading" class="state-center">
-      <ProgressSpinner style="width:48px;height:48px" strokeWidth="4" fill="transparent" />
-      <p>Memuat status pesanan...</p>
+    <div v-if="loading" class="receipt-wrap">
+      <div class="receipt">
+        <div class="receipt-header">
+          <div class="skeleton-line w-40 mx-auto mb-2"></div>
+          <div class="skeleton-line w-28 mx-auto"></div>
+        </div>
+        <div class="receipt-divider"></div>
+        <div v-for="i in 3" :key="i" class="skeleton-item">
+          <div class="skeleton-line w-32 mb-1"></div>
+          <div class="skeleton-line w-20"></div>
+        </div>
+      </div>
     </div>
 
     <!-- Error -->
-    <div v-else-if="error" class="state-center">
-      <div class="error-box">
-        <i class="pi pi-exclamation-circle error-icon"></i>
-        <h3>Pesanan Tidak Ditemukan</h3>
-        <p>{{ error }}</p>
+    <div v-else-if="error" class="receipt-wrap">
+      <div class="receipt">
+        <div class="receipt-header">
+          <div class="brand-icon">
+            <i class="pi pi-times-circle" style="font-size:2rem;color:#FA896B"></i>
+          </div>
+          <h2 class="outlet-name">Pesanan Tidak Ditemukan</h2>
+          <p class="order-code">{{ error }}</p>
+        </div>
+        <div class="receipt-divider"></div>
+        <p class="text-center text-muted" style="padding:1rem 0">
+          Pastikan kode pesanan Anda benar, atau hubungi kasir.
+        </p>
+        <div class="receipt-bottom-cut"></div>
       </div>
     </div>
 
-    <!-- Receipt -->
-    <div v-else-if="data" class="receipt-wrapper">
+    <!-- Data -->
+    <div v-else-if="data" class="receipt-wrap">
+      <div class="receipt">
 
-      <!-- ═══ RECEIPT PAPER ═══ -->
-      <div class="receipt-paper">
-
-        <!-- Outlet Header -->
-        <div class="receipt-top">
-          <div class="receipt-outlet-name">{{ data.outlet?.name }}</div>
-          <div v-if="data.outlet?.address" class="receipt-outlet-address">{{ data.outlet.address }}</div>
-          <div class="receipt-dashes">- - - - - - - - - - - - - - - - - - - - -</div>
+        <!-- Header -->
+        <div class="receipt-header">
+          <div class="brand-icon">
+            <i class="pi pi-shop"></i>
+          </div>
+          <h1 class="outlet-name">{{ data.outlet.name }}</h1>
+          <p class="order-code"># {{ data.order.kode }}</p>
+          <p class="order-date">{{ formatDate(data.order.created_at) }}</p>
         </div>
 
-        <!-- Order Code + Status -->
-        <div class="receipt-order-block">
-          <div class="receipt-order-label">NO. PESANAN</div>
-          <div class="receipt-order-code">{{ data.order.kode }}</div>
-          <div class="receipt-status-pill" :class="`status-${data.order.kitchen_status}`">
-            <i :class="kitchenIcon(data.order.kitchen_status)"></i>
-            {{ kitchenLabel(data.order.kitchen_status) }}
-          </div>
+        <!-- Customer & table info -->
+        <div class="receipt-divider dashed"></div>
+        <div class="info-row" v-if="data.order.customer_name">
+          <span class="info-label">Pelanggan</span>
+          <span class="info-value">{{ data.order.customer_name }}</span>
+        </div>
+        <div class="info-row" v-if="data.order.table_number">
+          <span class="info-label">Meja</span>
+          <span class="info-value">{{ data.order.table_number }}</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">Tipe</span>
+          <span class="info-value">{{ formatOrderType(data.order.order_type) }}</span>
+        </div>
+        <div class="info-row" v-if="data.order.notes">
+          <span class="info-label">Catatan</span>
+          <span class="info-value note-text">{{ data.order.notes }}</span>
         </div>
 
-        <div class="receipt-dashes">- - - - - - - - - - - - - - - - - - - - -</div>
-
-        <!-- Order Meta -->
-        <div class="receipt-meta-block">
-          <div class="receipt-meta-row">
-            <span class="meta-key">Waktu</span>
-            <span class="meta-val">{{ formatDateTime(data.order.created_at) }}</span>
-          </div>
-          <div class="receipt-meta-row">
-            <span class="meta-key">Tipe</span>
-            <span class="meta-val">{{ orderTypeLabel(data.order.order_type) }}</span>
-          </div>
-          <div v-if="data.order.table_number" class="receipt-meta-row">
-            <span class="meta-key">Meja</span>
-            <span class="meta-val">{{ data.order.table_number }}</span>
-          </div>
-          <div v-if="data.order.customer_name" class="receipt-meta-row">
-            <span class="meta-key">Pelanggan</span>
-            <span class="meta-val">{{ data.order.customer_name }}</span>
+        <!-- Status badge -->
+        <div class="receipt-divider dashed"></div>
+        <div class="status-section">
+          <div class="status-badge" :class="statusClass(data.order.kitchen_status)">
+            <i :class="statusIcon(data.order.kitchen_status)"></i>
+            {{ statusLabel(data.order.kitchen_status) }}
           </div>
         </div>
 
-        <div class="receipt-dashes">- - - - - - - - - - - - - - - - - - - - -</div>
+        <!-- Timeline -->
+        <div class="receipt-divider dashed"></div>
+        <div class="timeline">
+          <div
+            v-for="step in data.timeline"
+            :key="step.key"
+            class="timeline-step"
+            :class="{ done: step.done }"
+          >
+            <div class="timeline-dot" :style="step.done ? `background:${step.color}` : ''">
+              <i :class="step.icon"></i>
+            </div>
+            <div class="timeline-body">
+              <span class="timeline-label">{{ step.label }}</span>
+              <span class="timeline-time" v-if="step.time">{{ formatTime(step.time) }}</span>
+            </div>
+          </div>
+        </div>
 
         <!-- Items -->
-        <div class="receipt-section-label">PESANAN ({{ data.order.items?.length || 0 }} ITEM)</div>
-        <div class="receipt-items">
-          <div v-for="item in data.order.items" :key="item.id" class="receipt-item-row">
-            <div class="item-row-top">
-              <span class="item-row-name">{{ item.menu_name }}</span>
-              <span class="item-row-qty">×{{ item.quantity }}</span>
-            </div>
-            <div v-if="item.notes" class="item-row-notes">
-              <i class="pi pi-comment"></i> {{ item.notes }}
-            </div>
-            <div v-if="item.station_name" class="item-row-station"
-                 :style="{ color: item.station_color }">
-              <i class="pi pi-cog"></i> {{ item.station_name }}
-            </div>
+        <div class="receipt-divider"></div>
+        <p class="section-title">DAFTAR PESANAN</p>
+
+        <div
+          v-for="item in allItems"
+          :key="item.id"
+          class="item-row"
+        >
+          <div class="item-main">
+            <span class="item-qty">{{ item.quantity }}x</span>
+            <span class="item-name">{{ item.menu_name }}</span>
+            <span class="item-status-dot" :class="itemStatusClass(item.status)">
+              {{ itemStatusLabel(item.status) }}
+            </span>
+          </div>
+          <div v-if="item.notes" class="item-notes">
+            <i class="pi pi-comment"></i> {{ item.notes }}
           </div>
         </div>
 
-        <div class="receipt-dashes">- - - - - - - - - - - - - - - - - - - - -</div>
-
-        <!-- Status Timeline -->
-        <div class="receipt-section-label">STATUS PESANAN</div>
-        <div class="receipt-timeline">
-          <div v-for="(step, idx) in data.timeline" :key="step.key"
-               class="timeline-row" :class="{ done: step.done, last: idx === data.timeline.length - 1 }">
-            <!-- Connector line -->
-            <div class="tl-line-wrap">
-              <div class="tl-dot" :style="step.done ? { background: step.color, borderColor: step.color } : {}">
-                <i :class="step.icon" :style="step.done ? { color: '#fff' } : {}"></i>
-              </div>
-              <div v-if="idx < data.timeline.length - 1" class="tl-connector"
-                   :class="{ filled: step.done }"></div>
-            </div>
-            <!-- Content -->
-            <div class="tl-content">
-              <div class="tl-label" :class="{ active: step.done }">{{ step.label }}</div>
-              <div v-if="step.done && step.time" class="tl-time">
-                <i class="pi pi-clock"></i> {{ formatTime(step.time) }}
-              </div>
-              <div v-else-if="!step.done" class="tl-pending">
-                <i class="pi pi-hourglass"></i> Menunggu...
-              </div>
-            </div>
+        <!-- Footer -->
+        <div class="receipt-divider dashed"></div>
+        <div class="receipt-footer">
+          <p class="footer-text">Terima kasih atas pesanan Anda!</p>
+          <p class="footer-subtext">Halaman ini otomatis diperbarui setiap 15 detik</p>
+          <div class="refresh-indicator">
+            <i class="pi pi-refresh" :class="{ spinning: refreshing }"></i>
+            <span>{{ lastUpdated }}</span>
           </div>
         </div>
 
-        <div class="receipt-dashes">- - - - - - - - - - - - - - - - - - - - -</div>
-
-        <!-- Kitchen Stations -->
-        <template v-for="station in data.stations" :key="station.station_id || 'no_station'">
-          <div class="receipt-section-label" :style="{ color: station.station_color }">
-            <span class="station-dot" :style="{ background: station.station_color }"></span>
-            {{ station.station_name.toUpperCase() }}
+        <!-- Thermal cut effect -->
+        <div class="receipt-cut">
+          <div class="cut-line"></div>
+          <div class="cut-circles">
+            <span v-for="i in 20" :key="i" class="cut-circle"></span>
           </div>
-          <div class="receipt-station-items">
-            <div v-for="item in station.items" :key="item.id" class="station-item-row">
-              <div class="station-item-top">
-                <span class="station-item-name">{{ item.menu_name }}</span>
-                <span class="station-item-qty">×{{ item.quantity }}</span>
-              </div>
-              <div class="station-item-status"
-                   :class="`item-status-${item.status}`">
-                <i :class="itemIcon(item.status)"></i>
-                {{ itemLabel(item.status) }}
-              </div>
-              <div v-if="item.notes" class="station-item-notes">
-                <i class="pi pi-comment"></i> {{ item.notes }}
-              </div>
-            </div>
-          </div>
-          <div class="receipt-dashes">- - - - - - - - - - - - - - - - - - - - -</div>
-        </template>
-
-        <!-- Receipt Footer -->
-        <div class="receipt-footer-text">
-          <div>Terima kasih atas pesanan Anda</div>
-          <div class="receipt-footer-sub">Scan QR untuk memantau status</div>
         </div>
-
-        <!-- Perforated bottom edge -->
-        <div class="receipt-tear"></div>
-
       </div>
-      <!-- ═══ END RECEIPT ═══ -->
-
-      <!-- Auto-refresh pill -->
-      <div class="refresh-pill">
-        <i class="pi pi-refresh spin-icon"></i>
-        <span>Diperbarui otomatis dalam <strong>{{ countdown }}s</strong></span>
-      </div>
-
     </div>
-
-    <!-- Footer -->
-    <div class="tracking-footer">
-      Powered by Moira &bull; View Only
-    </div>
-
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
 import axios from 'axios'
-import ProgressSpinner from 'primevue/progressspinner'
 
-const route = useRoute()
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api'
+const route   = useRoute()
+const loading = ref(true)
+const error   = ref(null)
+const data    = ref(null)
+const refreshing = ref(false)
+const lastUpdated = ref('')
+let timer = null
 
-const loading   = ref(true)
-const error     = ref(null)
-const data      = ref(null)
-const countdown = ref(10)
-const REFRESH_INTERVAL = 10
+const outletId  = route.params.outletId
+const orderCode = route.params.orderCode
 
-let countdownTimer = null
+// ── Computed ────────────────────────────────────────────────
+const allItems = computed(() => {
+  if (!data.value) return []
+  return data.value.stations.flatMap(s => s.items)
+})
 
-const fetchTracking = async () => {
+// ── Fetch ───────────────────────────────────────────────────
+const fetchOrder = async (silent = false) => {
+  if (!silent) loading.value = true
+  else refreshing.value = true
+
   try {
-    const { outletId, orderCode } = route.params
-    const res = await axios.get(`${API_URL}/track/${outletId}/${orderCode}`)
+    const base = import.meta.env.VITE_API_URL || '/api'
+    const res  = await axios.get(`${base}/track/${outletId}/${orderCode}`)
     data.value  = res.data
     error.value = null
+    lastUpdated.value = 'Diperbarui ' + new Date().toLocaleTimeString('id-ID')
   } catch (e) {
-    error.value = e.response?.data?.message || 'Pesanan tidak ditemukan'
+    if (!silent) {
+      error.value = e.response?.data?.message || 'Gagal memuat pesanan'
+    }
   } finally {
-    loading.value = false
+    loading.value   = false
+    refreshing.value = false
   }
 }
 
-const startAutoRefresh = () => {
-  countdown.value = REFRESH_INTERVAL
-  countdownTimer = setInterval(() => {
-    countdown.value--
-    if (countdown.value <= 0) {
-      countdown.value = REFRESH_INTERVAL
-      fetchTracking()
-    }
-  }, 1000)
-}
+// ── Auto refresh ────────────────────────────────────────────
+onMounted(() => {
+  fetchOrder()
+  timer = setInterval(() => fetchOrder(true), 15000)
+})
+onUnmounted(() => clearInterval(timer))
 
-// ── Labels & helpers ──────────────────────────────────────────────────────────
-const kitchenLabel = (s) => ({ pending: 'Menunggu', preparing: 'Diproses', ready: 'Siap', served: 'Disajikan' }[s] || 'Menunggu')
-const kitchenIcon  = (s) => ({ pending: 'pi pi-clock', preparing: 'pi pi-spin pi-cog', ready: 'pi pi-bell', served: 'pi pi-check-circle' }[s] || 'pi pi-clock')
-const itemLabel    = (s) => ({ pending: 'Antrian', preparing: 'Diproses', ready: 'Siap', served: 'Disajikan' }[s] || 'Antrian')
-const itemIcon     = (s) => ({ pending: 'pi pi-circle', preparing: 'pi pi-spin pi-cog', ready: 'pi pi-check', served: 'pi pi-check-circle' }[s] || 'pi pi-circle')
-const orderTypeLabel = (t) => ({ dine_in: 'Makan di Tempat', takeaway: 'Bungkus', delivery: 'Pengiriman' }[t] || t)
-
-const formatTime = (ts) => {
-  if (!ts) return ''
-  return new Date(ts).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })
-}
-
-const formatDateTime = (ts) => {
-  if (!ts) return ''
-  return new Date(ts).toLocaleString('id-ID', {
+// ── Formatters ──────────────────────────────────────────────
+const formatDate = (dt) => {
+  if (!dt) return ''
+  return new Date(dt).toLocaleString('id-ID', {
     day: '2-digit', month: 'short', year: 'numeric',
     hour: '2-digit', minute: '2-digit'
   })
 }
+const formatTime = (dt) => {
+  if (!dt) return ''
+  return new Date(dt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })
+}
+const formatOrderType = (t) => ({
+  dine_in: 'Makan di Tempat', takeaway: 'Bawa Pulang', delivery: 'Delivery'
+}[t] || t)
 
-onMounted(() => {
-  fetchTracking()
-  startAutoRefresh()
-})
+// ── Status helpers ───────────────────────────────────────────
+const statusLabel = (s) => ({
+  pending:   'Menunggu Diproses',
+  preparing: 'Sedang Dimasak',
+  ready:     'Siap Disajikan',
+  served:    'Sudah Disajikan',
+  cancelled: 'Dibatalkan',
+}[s] || s)
 
-onUnmounted(() => clearInterval(countdownTimer))
+const statusIcon = (s) => ({
+  pending:   'pi pi-clock',
+  preparing: 'pi pi-spin pi-cog',
+  ready:     'pi pi-bell',
+  served:    'pi pi-check-circle',
+  cancelled: 'pi pi-times-circle',
+}[s] || 'pi pi-info-circle')
+
+const statusClass = (s) => ({
+  pending:   'status-pending',
+  preparing: 'status-preparing',
+  ready:     'status-ready',
+  served:    'status-served',
+  cancelled: 'status-cancelled',
+}[s] || '')
+
+const itemStatusLabel = (s) => ({
+  pending:   'Antrian',
+  preparing: 'Dimasak',
+  ready:     'Siap',
+  served:    'Disajikan',
+}[s] || s || 'Antrian')
+
+const itemStatusClass = (s) => ({
+  pending:   'dot-pending',
+  preparing: 'dot-preparing',
+  ready:     'dot-ready',
+  served:    'dot-served',
+}[s] || 'dot-pending')
 </script>
 
 <style scoped>
-/* ── Page shell ──────────────────────────────────────────────────────────── */
+/* ── Page ───────────────────────────────────────────────── */
 .tracking-page {
   min-height: 100vh;
-  background: #e8ecf0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  color: #2A3547;
+  background: #f0f0f0;
   display: flex;
-  flex-direction: column;
-}
-
-/* ── Header ──────────────────────────────────────────────────────────────── */
-.tracking-header {
-  background: linear-gradient(135deg, #5D87FF 0%, #4A6FD6 100%);
-  color: white;
-  padding: 0.875rem 1.25rem;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  box-shadow: 0 4px 12px rgba(93,135,255,0.35);
-  position: sticky;
-  top: 0;
-  z-index: 10;
-}
-
-.header-brand {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-weight: 700;
-  font-size: 1.05rem;
-}
-
-.brand-icon { font-size: 1.3rem; }
-
-.header-badge {
-  background: rgba(255,255,255,0.22);
-  padding: 0.35rem 0.75rem;
-  border-radius: 20px;
-  font-size: 0.78rem;
-  display: flex;
-  align-items: center;
-  gap: 0.3rem;
-  backdrop-filter: blur(8px);
-  font-weight: 600;
-}
-
-/* ── States ──────────────────────────────────────────────────────────────── */
-.state-center {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
-  gap: 1.25rem;
-  padding: 3rem 1rem;
-  color: #7C8FAC;
+  padding: 2rem 1rem 4rem;
+  font-family: 'Courier New', 'Courier', monospace;
 }
 
-.state-center p { margin: 0; font-size: 0.9rem; }
-
-.error-box {
-  text-align: center;
-  background: white;
-  border-radius: 12px;
-  padding: 2rem 1.5rem;
-  box-shadow: 0 4px 16px rgba(0,0,0,0.08);
-  max-width: 320px;
-}
-
-.error-icon { font-size: 2.5rem; color: #FA896B; margin-bottom: 0.75rem; display: block; }
-.error-box h3 { margin: 0 0 0.5rem; font-size: 1rem; color: #2A3547; }
-.error-box p  { margin: 0; font-size: 0.85rem; color: #7C8FAC; }
-
-/* ── Receipt wrapper ─────────────────────────────────────────────────────── */
-.receipt-wrapper {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 1.5rem 1rem 1rem;
-  gap: 1rem;
-}
-
-/* ── Receipt paper ───────────────────────────────────────────────────────── */
-.receipt-paper {
+/* ── Receipt wrapper ────────────────────────────────────── */
+.receipt-wrap {
   width: 100%;
   max-width: 380px;
+}
+
+.receipt {
   background: #fff;
   border-radius: 4px 4px 0 0;
-  box-shadow:
-    0 2px 4px rgba(0,0,0,0.06),
-    0 8px 24px rgba(0,0,0,0.10),
-    0 0 0 1px rgba(0,0,0,0.04);
-  padding: 1.5rem 1.25rem 0;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.13);
   position: relative;
-  /* Subtle paper texture */
-  background-image: repeating-linear-gradient(
-    0deg,
-    transparent,
-    transparent 27px,
-    rgba(0,0,0,0.015) 27px,
-    rgba(0,0,0,0.015) 28px
-  );
-}
-
-/* ── Outlet header ───────────────────────────────────────────────────────── */
-.receipt-top {
-  text-align: center;
-  margin-bottom: 1rem;
-}
-
-.receipt-outlet-name {
-  font-size: 1.1rem;
-  font-weight: 900;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: #1a2332;
-  margin-bottom: 0.3rem;
-}
-
-.receipt-outlet-address {
-  font-size: 0.72rem;
-  color: #7C8FAC;
-  line-height: 1.5;
-  margin-bottom: 0.5rem;
-}
-
-/* ── Dashed divider ──────────────────────────────────────────────────────── */
-.receipt-dashes {
-  text-align: center;
-  font-size: 0.7rem;
-  color: #c8d0da;
-  letter-spacing: 0.05em;
-  margin: 0.75rem 0;
-  user-select: none;
   overflow: hidden;
 }
 
-/* ── Order code block ────────────────────────────────────────────────────── */
-.receipt-order-block {
+/* ── Header ─────────────────────────────────────────────── */
+.receipt-header {
   text-align: center;
-  margin: 0.5rem 0;
+  padding: 2rem 1.5rem 1.2rem;
 }
 
-.receipt-order-label {
-  font-size: 0.65rem;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  color: #7C8FAC;
-  margin-bottom: 0.35rem;
-}
-
-.receipt-order-code {
-  font-size: 2rem;
-  font-weight: 900;
-  font-family: 'Courier New', 'Courier', monospace;
-  letter-spacing: 0.12em;
-  color: #1a2332;
-  line-height: 1;
-  margin-bottom: 0.75rem;
-}
-
-/* Status pill */
-.receipt-status-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  padding: 0.45rem 1.1rem;
-  border-radius: 20px;
-  font-size: 0.8rem;
-  font-weight: 700;
-  letter-spacing: 0.03em;
-}
-
-.status-pending   { background: #FEF5E5; color: #FFAE1F; }
-.status-preparing { background: #FEF5E5; color: #e08a00; }
-.status-ready     { background: #ECF2FF; color: #5D87FF; }
-.status-served    { background: #E6FFFA; color: #13DEB9; }
-
-/* ── Meta block ──────────────────────────────────────────────────────────── */
-.receipt-meta-block {
-  margin: 0.25rem 0;
-}
-
-.receipt-meta-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  font-size: 0.8rem;
-  padding: 0.3rem 0;
-  border-bottom: 1px dotted #edf0f4;
-}
-
-.receipt-meta-row:last-child { border-bottom: none; }
-
-.meta-key {
-  color: #7C8FAC;
-  font-weight: 600;
-  font-size: 0.75rem;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  flex-shrink: 0;
-}
-
-.meta-val {
-  color: #2A3547;
-  font-weight: 700;
-  text-align: right;
-  margin-left: 0.5rem;
-}
-
-/* ── Section label ───────────────────────────────────────────────────────── */
-.receipt-section-label {
-  font-size: 0.65rem;
-  font-weight: 800;
-  letter-spacing: 0.12em;
-  color: #7C8FAC;
-  text-transform: uppercase;
-  margin-bottom: 0.6rem;
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-}
-
-.station-dot {
-  width: 8px;
-  height: 8px;
+.brand-icon {
+  width: 56px;
+  height: 56px;
   border-radius: 50%;
-  display: inline-block;
-  flex-shrink: 0;
-}
-
-/* ── Items ───────────────────────────────────────────────────────────────── */
-.receipt-items {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  margin-bottom: 0.25rem;
-}
-
-.receipt-item-row {
-  padding: 0.5rem 0.6rem;
-  background: #f8fafc;
-  border-radius: 4px;
-  border-left: 3px solid #5D87FF;
-}
-
-.item-row-top {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.item-row-name {
-  font-size: 0.85rem;
-  font-weight: 700;
-  color: #1a2332;
-  flex: 1;
-}
-
-.item-row-qty {
-  font-size: 0.8rem;
-  font-weight: 700;
-  color: #5D87FF;
-  background: #ECF2FF;
-  padding: 0.1rem 0.4rem;
-  border-radius: 4px;
-  flex-shrink: 0;
-}
-
-.item-row-notes {
-  font-size: 0.72rem;
-  color: #7C8FAC;
-  font-style: italic;
-  margin-top: 0.25rem;
-  display: flex;
-  align-items: center;
-  gap: 0.3rem;
-}
-
-.item-row-notes i { font-size: 0.65rem; }
-
-.item-row-station {
-  font-size: 0.72rem;
-  font-weight: 600;
-  margin-top: 0.25rem;
-  display: flex;
-  align-items: center;
-  gap: 0.3rem;
-}
-
-.item-row-station i { font-size: 0.65rem; }
-
-/* ── Timeline ────────────────────────────────────────────────────────────── */
-.receipt-timeline {
-  display: flex;
-  flex-direction: column;
-  margin-bottom: 0.25rem;
-}
-
-.timeline-row {
-  display: flex;
-  align-items: flex-start;
-  gap: 0.75rem;
-}
-
-.tl-line-wrap {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  flex-shrink: 0;
-  width: 28px;
-}
-
-.tl-dot {
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  border: 2px solid #dde3ea;
-  background: #f8fafc;
+  background: #f4f4f4;
   display: flex;
   align-items: center;
   justify-content: center;
-  flex-shrink: 0;
-  transition: all 0.3s;
-  z-index: 1;
+  margin: 0 auto 0.75rem;
+  font-size: 1.6rem;
+  color: #333;
 }
 
-.tl-dot i {
-  font-size: 0.75rem;
-  color: #c0c9d4;
-}
-
-.timeline-row.done .tl-dot i { color: #fff; }
-
-.tl-connector {
-  width: 2px;
-  flex: 1;
-  min-height: 20px;
-  background: #dde3ea;
-  margin: 2px 0;
-}
-
-.tl-connector.filled { background: #5D87FF; }
-
-.tl-content {
-  padding: 0.3rem 0 0.75rem;
-  flex: 1;
-}
-
-.tl-label {
-  font-size: 0.82rem;
-  font-weight: 500;
-  color: #9ca3af;
-}
-
-.tl-label.active {
-  color: #1a2332;
+.outlet-name {
+  font-size: 1.15rem;
   font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin: 0 0 0.3rem;
+  color: #111;
 }
 
-.tl-time {
-  font-size: 0.7rem;
-  color: #5D87FF;
+.order-code {
+  font-size: 0.95rem;
   font-weight: 700;
-  margin-top: 0.2rem;
-  display: flex;
-  align-items: center;
-  gap: 0.25rem;
+  color: #333;
+  letter-spacing: 0.05em;
+  margin: 0 0 0.15rem;
 }
 
-.tl-time i { font-size: 0.65rem; }
-
-.tl-pending {
-  font-size: 0.7rem;
-  color: #b0bac5;
-  margin-top: 0.2rem;
-  display: flex;
-  align-items: center;
-  gap: 0.25rem;
-  animation: pulse-text 2s ease-in-out infinite;
+.order-date {
+  font-size: 0.78rem;
+  color: #888;
+  margin: 0;
 }
 
-.tl-pending i { font-size: 0.65rem; }
-
-@keyframes pulse-text {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
+/* ── Dividers ───────────────────────────────────────────── */
+.receipt-divider {
+  height: 1px;
+  background: #333;
+  margin: 0;
+}
+.receipt-divider.dashed {
+  background: none;
+  border-top: 1.5px dashed #ccc;
 }
 
-/* ── Station items ───────────────────────────────────────────────────────── */
-.receipt-station-items {
-  display: flex;
-  flex-direction: column;
-  gap: 0.45rem;
-  margin-bottom: 0.25rem;
-}
-
-.station-item-row {
-  padding: 0.5rem 0.6rem;
-  background: #f8fafc;
-  border-radius: 4px;
-  border-left: 3px solid #e5eaef;
-}
-
-.station-item-top {
+/* ── Info rows ──────────────────────────────────────────── */
+.info-row {
   display: flex;
   justify-content: space-between;
-  align-items: center;
-  gap: 0.5rem;
-  margin-bottom: 0.35rem;
-}
-
-.station-item-name {
+  align-items: flex-start;
+  padding: 0.3rem 1.5rem;
   font-size: 0.82rem;
-  font-weight: 700;
-  color: #1a2332;
-  flex: 1;
 }
-
-.station-item-qty {
-  font-size: 0.75rem;
-  font-weight: 700;
-  color: #7C8FAC;
-  background: #f0f4f8;
-  padding: 0.1rem 0.35rem;
-  border-radius: 4px;
+.info-label {
+  color: #888;
   flex-shrink: 0;
+  margin-right: 1rem;
+}
+.info-value {
+  color: #222;
+  font-weight: 600;
+  text-align: right;
+}
+.note-text {
+  font-style: italic;
+  font-weight: 400;
+  color: #555;
 }
 
-.station-item-status {
+/* ── Status badge ───────────────────────────────────────── */
+.status-section {
+  padding: 0.75rem 1.5rem;
+  text-align: center;
+}
+.status-badge {
   display: inline-flex;
   align-items: center;
-  gap: 0.35rem;
-  font-size: 0.72rem;
+  gap: 0.5rem;
+  padding: 0.5rem 1.2rem;
+  border-radius: 999px;
+  font-size: 0.85rem;
   font-weight: 700;
-  padding: 0.25rem 0.6rem;
-  border-radius: 12px;
-}
-
-.item-status-pending   { background: #f3f4f6; color: #9ca3af; }
-.item-status-preparing { background: #FEF5E5; color: #e08a00; }
-.item-status-ready     { background: #ECF2FF; color: #5D87FF; }
-.item-status-served    { background: #E6FFFA; color: #13DEB9; }
-
-.station-item-notes {
-  font-size: 0.7rem;
-  color: #7C8FAC;
-  font-style: italic;
-  margin-top: 0.3rem;
-  display: flex;
-  align-items: center;
-  gap: 0.3rem;
-}
-
-.station-item-notes i { font-size: 0.65rem; }
-
-/* ── Receipt footer text ─────────────────────────────────────────────────── */
-.receipt-footer-text {
-  text-align: center;
-  padding: 1rem 0 1.25rem;
-  font-size: 0.78rem;
-  color: #7C8FAC;
-  font-weight: 600;
   letter-spacing: 0.03em;
 }
+.status-pending   { background: #fff7e6; color: #b45309; border: 1.5px solid #fcd34d; }
+.status-preparing { background: #eff6ff; color: #1d4ed8; border: 1.5px solid #93c5fd; }
+.status-ready     { background: #ecfdf5; color: #065f46; border: 1.5px solid #6ee7b7; }
+.status-served    { background: #f0fdf4; color: #166534; border: 1.5px solid #86efac; }
+.status-cancelled { background: #fef2f2; color: #991b1b; border: 1.5px solid #fca5a5; }
 
-.receipt-footer-sub {
-  font-size: 0.68rem;
-  color: #b0bac5;
-  margin-top: 0.25rem;
-  font-weight: 400;
+/* ── Timeline ───────────────────────────────────────────── */
+.timeline {
+  padding: 0.75rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+.timeline-step {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.4rem 0;
+  opacity: 0.35;
+  transition: opacity 0.3s;
+}
+.timeline-step.done { opacity: 1; }
+
+.timeline-dot {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #e5e7eb;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  flex-shrink: 0;
+  color: #fff;
+  transition: background 0.3s;
+}
+.timeline-step:not(.done) .timeline-dot { color: #aaa; }
+
+.timeline-body {
+  display: flex;
+  flex-direction: column;
+}
+.timeline-label {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #222;
+}
+.timeline-time {
+  font-size: 0.72rem;
+  color: #888;
 }
 
-/* ── Perforated tear edge ────────────────────────────────────────────────── */
-.receipt-tear {
-  height: 16px;
-  background:
-    radial-gradient(circle at 0 50%, #e8ecf0 8px, transparent 8px),
-    radial-gradient(circle at 100% 50%, #e8ecf0 8px, transparent 8px);
-  background-size: 20px 16px;
-  background-position: 0 0, 10px 0;
-  background-repeat: repeat-x;
-  margin: 0 -1.25rem;
-  position: relative;
+/* ── Section title ──────────────────────────────────────── */
+.section-title {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: #888;
+  text-align: center;
+  margin: 0.6rem 0 0.2rem;
 }
 
-/* ── Refresh pill ────────────────────────────────────────────────────────── */
-.refresh-pill {
+/* ── Items ──────────────────────────────────────────────── */
+.item-row {
+  padding: 0.45rem 1.5rem;
+  border-bottom: 1px dashed #eee;
+}
+.item-main {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  background: white;
-  border: 1px solid #dde3ea;
-  border-radius: 20px;
-  padding: 0.5rem 1rem;
-  font-size: 0.78rem;
-  color: #7C8FAC;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+}
+.item-qty {
+  font-weight: 700;
+  font-size: 0.88rem;
+  color: #333;
+  min-width: 28px;
+}
+.item-name {
+  flex: 1;
+  font-size: 0.88rem;
+  color: #111;
+  font-weight: 600;
+}
+.item-notes {
+  font-size: 0.75rem;
+  color: #888;
+  padding-left: 36px;
+  margin-top: 0.15rem;
+  font-style: italic;
 }
 
-.refresh-pill strong { color: #5D87FF; }
-
-.spin-icon {
-  font-size: 0.85rem;
-  color: #5D87FF;
-  animation: spin-anim 2s linear infinite;
+/* Item status dots */
+.item-status-dot {
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  flex-shrink: 0;
 }
+.dot-pending   { background: #fef9c3; color: #713f12; }
+.dot-preparing { background: #dbeafe; color: #1e40af; }
+.dot-ready     { background: #dcfce7; color: #166534; }
+.dot-served    { background: #f0fdf4; color: #15803d; }
 
-@keyframes spin-anim {
-  to { transform: rotate(360deg); }
-}
-
-/* ── Footer ──────────────────────────────────────────────────────────────── */
-.tracking-footer {
+/* ── Footer ─────────────────────────────────────────────── */
+.receipt-footer {
   text-align: center;
-  padding: 0.875rem;
+  padding: 1rem 1.5rem 0.5rem;
+}
+.footer-text {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #333;
+  margin: 0 0 0.2rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.footer-subtext {
   font-size: 0.72rem;
-  color: #b0bac5;
-  background: #e8ecf0;
+  color: #aaa;
+  margin: 0 0 0.5rem;
+}
+.refresh-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  font-size: 0.72rem;
+  color: #bbb;
+}
+.pi-refresh.spinning {
+  animation: spin 1s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Thermal cut ────────────────────────────────────────── */
+.receipt-cut {
+  margin-top: 0.5rem;
+  position: relative;
+  height: 24px;
+}
+.cut-line {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  height: 1px;
+  border-top: 2px dashed #ccc;
+}
+.cut-circles {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: space-between;
+  padding: 0 0;
+}
+.cut-circle {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #f0f0f0;
+  flex-shrink: 0;
+  margin: 0 -7px;
 }
 
-/* ── Mobile tweaks ───────────────────────────────────────────────────────── */
-@media (max-width: 480px) {
-  .receipt-wrapper { padding: 1rem 0.5rem 0.75rem; }
+/* ── Skeleton ───────────────────────────────────────────── */
+.skeleton-line {
+  height: 12px;
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: 4px;
+  margin-bottom: 6px;
+}
+.skeleton-item { padding: 0.5rem 1.5rem; }
+.w-40 { width: 10rem; }
+.w-28 { width: 7rem; }
+.w-32 { width: 8rem; }
+.w-20 { width: 5rem; }
+.mx-auto { margin-left: auto; margin-right: auto; }
+.mb-2 { margin-bottom: 0.5rem; }
+.mb-1 { margin-bottom: 0.25rem; }
+.text-center { text-align: center; }
+.text-muted { color: #aaa; font-size: 0.85rem; }
 
-  .receipt-paper {
-    max-width: 100%;
-    border-radius: 4px 4px 0 0;
-    padding: 1.25rem 1rem 0;
-  }
-
-  .receipt-order-code { font-size: 1.75rem; }
-
-  .receipt-tear { margin: 0 -1rem; }
+@keyframes shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
 }
 </style>
