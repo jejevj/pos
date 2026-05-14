@@ -333,6 +333,69 @@ class RolePermissionController extends Controller
     /**
      * Get user permissions
      */
+    /**
+     * Get permissions assigned to a specific role
+     */
+    public function getRolePermissions(Request $request, $outletId, $roleId)
+    {
+        try {
+            $this->authorizeAndUseSchema($outletId);
+
+            $permissions = DB::table('role_permissions')
+                ->join('permissions', 'role_permissions.permission_id', '=', 'permissions.id')
+                ->where('role_permissions.role_id', $roleId)
+                ->select('permissions.*')
+                ->get();
+
+            DB::statement('SET search_path TO public');
+            return response()->json($permissions);
+        } catch (\Exception $e) {
+            DB::statement('SET search_path TO public');
+            return response()->json(['message' => 'Failed to fetch role permissions', 'error' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Assign permissions to a role (replaces existing)
+     */
+    public function assignPermissionsToRole(Request $request, $outletId, $roleId)
+    {
+        $request->validate(['permissions' => 'required|array', 'permissions.*' => 'integer']);
+
+        try {
+            $this->authorizeAndUseSchema($outletId, true);
+
+            // Verify role exists in this outlet schema
+            $role = DB::table('roles')->where('id', $roleId)->first();
+            if (!$role) {
+                DB::statement('SET search_path TO public');
+                return response()->json(['message' => 'Role not found'], 404);
+            }
+
+            // Replace all permissions for this role
+            DB::table('role_permissions')->where('role_id', $roleId)->delete();
+
+            if (!empty($request->permissions)) {
+                $inserts = array_map(fn($pid) => [
+                    'role_id'       => $roleId,
+                    'permission_id' => $pid,
+                    'created_at'    => now(),
+                    'updated_at'    => now(),
+                ], $request->permissions);
+                DB::table('role_permissions')->insert($inserts);
+            }
+
+            DB::statement('SET search_path TO public');
+            return response()->json(['message' => 'Permissions updated successfully']);
+        } catch (\Exception $e) {
+            DB::statement('SET search_path TO public');
+            return response()->json(['message' => 'Failed to update permissions', 'error' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Get permissions for a specific user
+     */
     public function getUserPermissions(Request $request, $outletId, $userId)
     {
         try {
