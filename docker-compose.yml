@@ -1,0 +1,155 @@
+# Single-stack compose: only the `proxy` service publishes a port to the host.
+# Everything else (backend, frontend, postgres, redis, waha) talks over the
+# internal `app-net` network. Override with docker-compose.override.yml if you
+# need direct access to a service during debugging.
+
+name: pos
+
+services:
+  proxy:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_started
+      frontend:
+        condition: service_started
+      waha:
+        condition: service_started
+    ports:
+      - "${APP_PORT:-8080}:80"
+    volumes:
+      - ./docker/proxy/nginx.conf:/etc/nginx/nginx.conf:ro
+    networks: [app-net]
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  frontend:
+    build:
+      context: .
+      dockerfile: docker/frontend/Dockerfile
+      args:
+        VITE_API_URL: ${VITE_API_URL:-/api}
+        VITE_WAHA_URL: ${VITE_WAHA_URL:-/waha}
+        VITE_WAHA_API_KEY: ${VITE_WAHA_API_KEY:-change-me}
+    restart: unless-stopped
+    networks: [app-net]
+
+  backend:
+    build:
+      context: .
+      dockerfile: docker/backend/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    env_file:
+      - .env.docker
+    environment:
+      APP_ENV: ${APP_ENV:-production}
+      APP_DEBUG: ${APP_DEBUG:-false}
+      APP_URL: ${APP_URL:-http://localhost:8080}
+      APP_KEY: ${APP_KEY:-}
+      LOG_CHANNEL: stack
+      DB_CONNECTION: pgsql
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_DATABASE: ${POSTGRES_DB:-saas_app}
+      DB_USERNAME: ${POSTGRES_USER:-postgres}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      REDIS_CLIENT: phpredis
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: "${REDIS_PASSWORD:-}"
+      CACHE_STORE: ${CACHE_STORE:-redis}
+      SESSION_DRIVER: ${SESSION_DRIVER:-redis}
+      QUEUE_CONNECTION: ${QUEUE_CONNECTION:-redis}
+      BROADCAST_CONNECTION: log
+      SANCTUM_STATEFUL_DOMAINS: ${SANCTUM_STATEFUL_DOMAINS:-localhost,localhost:8080,127.0.0.1,127.0.0.1:8080}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:8080}
+      WAHA_ENABLED: ${WAHA_ENABLED:-true}
+      WAHA_BASE_URL: http://waha:3000
+      WAHA_API_KEY: ${WAHA_API_KEY:?WAHA_API_KEY is required}
+      WAHA_SESSION: ${WAHA_SESSION:-default}
+      RUN_MIGRATIONS: ${RUN_MIGRATIONS:-true}
+      RUN_QUEUE_WORKER: ${RUN_QUEUE_WORKER:-true}
+    volumes:
+      - backend-storage:/var/www/html/storage
+    networks: [app-net]
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8080/up"]
+      interval: 30s
+      timeout: 5s
+      start_period: 60s
+      retries: 5
+
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-saas_app}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks: [app-net]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-saas_app}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command:
+      - sh
+      - -c
+      - >
+        if [ -n "$$REDIS_PASSWORD" ]; then
+          exec redis-server --requirepass "$$REDIS_PASSWORD" --appendonly yes;
+        else
+          exec redis-server --appendonly yes;
+        fi
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+    volumes:
+      - redis-data:/data
+    networks: [app-net]
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli ${REDIS_PASSWORD:+-a $$REDIS_PASSWORD} ping | grep -q PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  waha:
+    image: devlikeapro/waha:latest
+    restart: unless-stopped
+    environment:
+      WHATSAPP_API_KEY: ${WAHA_API_KEY:?WAHA_API_KEY is required}
+      WHATSAPP_DEFAULT_ENGINE: ${WAHA_ENGINE:-WEBJS}
+      WAHA_PRINT_QR: "false"
+    volumes:
+      - waha-sessions:/app/.sessions
+    networks: [app-net]
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000/api/health || exit 0"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+networks:
+  app-net:
+    driver: bridge
+
+volumes:
+  postgres-data:
+  redis-data:
+  waha-sessions:
+  backend-storage:

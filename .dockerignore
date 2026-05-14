@@ -1,0 +1,45 @@
+**/.git
+**/.gitignore
+**/.idea
+**/.vscode
+**/.fleet
+**/.nova
+**/.zed
+
+# Backend
+backend-api/vendor
+backend-api/node_modules
+backend-api/storage/logs/*
+backend-api/storage/framework/cache/data/*
+backend-api/storage/framework/sessions/*
+backend-api/storage/framework/views/*
+backend-api/storage/app/public/*
+backend-api/bootstrap/cache/*.php
+backend-api/.env
+backend-api/.env.*
+backend-api/public/storage
+backend-api/public/build
+backend-api/public/hot
+backend-api/test_*.php
+backend-api/check_*.php
+backend-api/get_office_location.php
+backend-api/update_*.php
+
+# Frontend
+frontend-app/node_modules
+frontend-app/dist
+frontend-app/dist-ssr
+frontend-app/.env
+frontend-app/.env.*
+
+# WAHA local sessions
+waha/.sessions
+
+# Misc
+**/*.log
+**/.DS_Store
+**/Thumbs.db
+.env
+.env.*
+!.env.docker.example
+docker-compose.override.yml
