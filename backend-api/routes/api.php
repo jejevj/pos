@@ -69,6 +69,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('outlets/{outlet}/roles/{roleId}', [\App\Http\Controllers\Api\Outlet\RolePermissionController::class, 'deleteRole']);
     Route::get('outlets/{outlet}/permissions', [\App\Http\Controllers\Api\Outlet\RolePermissionController::class, 'getPermissions']);
     Route::post('outlets/{outlet}/assign-role', [\App\Http\Controllers\Api\Outlet\RolePermissionController::class, 'assignRole']);
+    Route::get('outlets/{outlet}/roles/{roleId}/permissions', [\App\Http\Controllers\Api\Outlet\RolePermissionController::class, 'getRolePermissions']);
+    Route::put('outlets/{outlet}/roles/{roleId}/permissions', [\App\Http\Controllers\Api\Outlet\RolePermissionController::class, 'assignPermissionsToRole']);
     Route::get('outlets/{outlet}/users/{userId}/permissions', [\App\Http\Controllers\Api\Outlet\RolePermissionController::class, 'getUserPermissions']);
     
     // Bahan Baku Module - Kategori
