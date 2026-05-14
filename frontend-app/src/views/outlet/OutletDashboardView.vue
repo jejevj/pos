@@ -200,6 +200,69 @@
             <span class="menu-label">Pengaturan RBAC</span>
           </div>
 
+          <div class="menu-card" @click="navigateTo('outlet-kategori-bahan-baku')">
+            <div class="menu-icon" style="background:#6366f1">
+              <i class="pi pi-list" style="color:white"></i>
+            </div>
+            <span class="menu-label">Kategori Bahan Baku</span>
+          </div>
+
+          <div class="menu-card" @click="navigateTo('outlet-satuan')">
+            <div class="menu-icon" style="background:#0891b2">
+              <i class="pi pi-ruler" style="color:white"></i>
+            </div>
+            <span class="menu-label">Satuan</span>
+          </div>
+
+          <div class="menu-card" @click="navigateTo('outlet-supplier')">
+            <div class="menu-icon" style="background:#059669">
+              <i class="pi pi-building" style="color:white"></i>
+            </div>
+            <span class="menu-label">Supplier</span>
+          </div>
+
+          <div class="menu-card" @click="navigateTo('outlet-kategori-menu')">
+            <div class="menu-icon" style="background:#db2777">
+              <i class="pi pi-th-large" style="color:white"></i>
+            </div>
+            <span class="menu-label">Kategori Menu</span>
+          </div>
+
+          <div class="menu-card" @click="navigateTo('outlet-users')">
+            <div class="menu-icon" style="background:#7c3aed">
+              <i class="pi pi-user-edit" style="color:white"></i>
+            </div>
+            <span class="menu-label">Manajemen User</span>
+          </div>
+
+          <div class="menu-card" @click="navigateTo('outlet-employee-beverage')">
+            <div class="menu-icon" style="background:#0284c7">
+              <i class="pi pi-star" style="color:white"></i>
+            </div>
+            <span class="menu-label">Jatah Minum</span>
+          </div>
+
+          <div class="menu-card" @click="navigateTo('outlet-tables')">
+            <div class="menu-icon" style="background:#b45309">
+              <i class="pi pi-table" style="color:white"></i>
+            </div>
+            <span class="menu-label">Meja</span>
+          </div>
+
+          <div class="menu-card" @click="navigateTo('outlet-stations')">
+            <div class="menu-icon" style="background:#dc2626">
+              <i class="pi pi-desktop" style="color:white"></i>
+            </div>
+            <span class="menu-label">Stasiun KDS</span>
+          </div>
+
+          <div class="menu-card" @click="navigateTo('outlet-kitchen')">
+            <div class="menu-icon" style="background:#d97706">
+              <i class="pi pi-bolt" style="color:white"></i>
+            </div>
+            <span class="menu-label">Kitchen Order</span>
+          </div>
+
         </div>
       </div>
 
