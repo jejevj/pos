@@ -1,20 +1,155 @@
-/* Minimal global styles - let PrimeVue handle the rest */
+/*
+ * Global styles — Vuero design tokens + overrides
+ * Ported from vuero-demo-v3.1.0 CSS variables
+ */
 
-/* Sage Green Color Palette - Lighter Version */
+/* ── Vuero CSS Variables ────────────────────────────────────────── */
 :root {
-  --sage-primary: #8fbc8f;      /* Main sage green - lighter */
-  --sage-hover: #7aa87a;         /* Darker for hover */
-  --sage-light: #a8d5a8;         /* Lighter variant */
-  --sage-bg: rgba(143, 188, 143, 0.1);  /* Background with opacity */
-  --sage-shadow: rgba(143, 188, 143, 0.2); /* Shadow/focus ring */
+  /* Primary (Vuero teal-green) */
+  --primary:              oklch(66.67% 0.146 173.07deg);
+  --primary--dark-color:  color-mix(in oklab, var(--primary), black 5%);
+  --primary--light-color: color-mix(in oklab, var(--primary), white 90%);
+
+  /* Semantic */
+  --info:    #0398e2;
+  --success: #05d69e;
+  --warning: #faad42;
+  --danger:  #e62864;
+  --dark:    #222225;
+  --secondary: #336aeb;
+
+  /* Layout / grey scale */
+  --body-color:      #f4f4f5;
+  --background-grey: #fafafa;
+  --white:           #ffffff;
+  --border:          #dbdbdb;
+  --medium-grey:     #ddd;
+  --light-grey:      #eee;
+  --fade-grey:       #ededed;
+  --widget-grey:     #f5f6fa;
+  --smoke-white:     #fcfcfc;
+  --muted-grey:      #999;
+  --placeholder:     #cfcfcf;
+
+  /* Text */
+  --dark-text:  #283252;
+  --light-text: #a2a5b9;
+  --dark-sidebar: #222225;
+
+  /* Radius */
+  --radius-small:   2px;
+  --radius:         4px;
+  --radius-large:   6px;
+  --radius-rounded: 9999px;
+
+  /* Shadows */
+  --base-shadow:        rgb(0 0 0 / 12%);
+  --light-box-shadow:   -1px 3px 10px 0 rgb(0 0 0 / 6%);
+  --light-box-shadow-md:-1px 3px 10px 0 rgb(0 0 0 / 12%);
+
+  /* Typography */
+  --font:           'Roboto Flex Variable', 'Segoe UI', Roboto, sans-serif;
+  --font-alt:       'Montserrat Variable', 'Segoe UI', sans-serif;
+  --font-monospace: 'Fira Code Variable', monospace;
+  --font-size:      14px;
+
+  /* Legacy sage vars (kept for backwards compat in some views) */
+  --sage-primary: var(--primary);
+  --sage-hover:   var(--primary--dark-color);
+  --sage-light:   var(--primary--light-color);
+  --sage-bg:      color-mix(in oklab, var(--primary), white 90%);
+  --sage-shadow:  color-mix(in oklab, var(--primary), white 70%);
+}
+
+/* ── Base reset / body ──────────────────────────────────────────── */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+  font-family:              var(--font);
+  font-size:                var(--font-size);
+  background:               var(--background-grey);
+  color:                    var(--dark-text);
+  -webkit-font-smoothing:   antialiased;
+  -moz-osx-font-smoothing:  grayscale;
+  margin: 0;
+  padding: 0;
 }
 
 #app {
   min-height: 100vh;
+}
+
+/* ── Vuero hamburger animation lines (global — used by VueroLayout) */
+.icon-line-top,
+.icon-line-center,
+.icon-line-bottom {
+  display: block;
+  width: 20px;
+  height: 2px;
+  background: var(--light-text);
+  border-radius: 2px;
+  transition: transform 0.3s, opacity 0.3s, width 0.3s;
+}
+.icon-box-toggle {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-start;
+  gap: 4px;
+  width: 22px;
+  height: 22px;
+}
+.icon-box-toggle.active .icon-line-top    { transform: translateY(6px) rotate(45deg); }
+.icon-box-toggle.active .icon-line-center { opacity: 0; width: 0; }
+.icon-box-toggle.active .icon-line-bottom { transform: translateY(-6px) rotate(-45deg); }
+
+/* ── PrimeVue overrides ─────────────────────────────────────────── */
+
+/* Primary color for all PrimeVue components */
+:root {
+  --p-primary-color:      var(--primary);
+  --p-primary-hover-color:var(--primary--dark-color);
+}
+
+/* Focus ring */
+:deep(.p-inputtext:enabled:focus),
+:deep(.p-password-input:enabled:focus) {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 0.2rem var(--sage-shadow);
+}
+
+/* Card elevation — Vuero light shadow */
+:deep(.p-card) {
+  box-shadow: var(--light-box-shadow);
+  border-radius: var(--radius-large);
+}
+
+/* DataTable header */
+:deep(.p-datatable .p-datatable-thead > tr > th) {
+  font-family: var(--font-alt);
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--light-text);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  background: var(--widget-grey);
+}
+
+/* Button primary */
+:deep(.p-button.p-button-primary) {
+  background: var(--primary);
+  border-color: var(--primary);
+}
+:deep(.p-button.p-button-primary:hover) {
+  background: var(--primary--dark-color);
+  border-color: var(--primary--dark-color);
+}
+
+/* Sidebar menu active color */
+:deep(.p-menu .p-menuitem-link.p-menuitem-link-active) {
+  color: var(--primary);
 }
