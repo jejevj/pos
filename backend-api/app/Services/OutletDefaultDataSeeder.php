@@ -314,14 +314,13 @@ class OutletDefaultDataSeeder
                 continue;
             }
             DB::table('bahan_baku')->insert(array_merge([
-                'supplier_id'            => null,
-                'lokasi_penyimpanan'     => null,
-                'expired_date'           => null,
-                'gambar_url'             => null,
-                'harga_per_satuan_dasar' => null,
-                'is_active'              => true,
-                'created_at'             => $now,
-                'updated_at'             => $now,
+                'supplier_id'        => null,
+                'lokasi_penyimpanan' => null,
+                'expired_date'       => null,
+                'gambar_url'         => null,
+                'is_active'          => true,
+                'created_at'         => $now,
+                'updated_at'         => $now,
             ], $item));
             $this->stats['bahan_baku']['inserted']++;
         }
