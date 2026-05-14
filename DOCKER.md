@@ -256,6 +256,60 @@ SANCTUM_STATEFUL_DOMAINS=pos.your-domain.tld
 
 Frontend `VITE_API_URL` / `VITE_WAHA_URL` stay as relative paths (`/api`, `/waha`) — same-origin, no CORS gymnastics, no rebuild needed if the domain changes.
 
+## Troubleshooting
+
+### `npm error EAI_AGAIN getaddrinfo registry.npmjs.org`
+
+The frontend build hit a transient DNS failure inside the build container. The frontend Dockerfile already configures longer npm retries and pins the registry, so the first thing to do is just retry:
+
+```bash
+# Retry the same build — most EAI_AGAIN failures clear on the second pass
+docker compose build frontend
+
+# Force a clean rebuild of only the frontend if the cached layer is wedged
+docker compose build --no-cache frontend
+```
+
+If retries keep failing, your Docker builder is using a broken resolver. Point the Docker daemon at public DNS:
+
+```bash
+# /etc/docker/daemon.json on the Docker host
+{
+  "dns": ["1.1.1.1", "8.8.8.8"]
+}
+```
+
+```bash
+sudo systemctl restart docker     # Linux
+# On Docker Desktop: Settings → Docker Engine, paste the same JSON, Apply & Restart.
+docker compose build --no-cache frontend
+```
+
+You can also verify resolution from inside a transient build container:
+
+```bash
+docker run --rm node:22-alpine sh -c 'apk add --no-cache bind-tools >/dev/null && nslookup registry.npmjs.org'
+```
+
+### `pecl install redis` or backend image fails to build
+
+Already handled — phpredis now builds from a pinned git tag instead of pecl. If you have a cached half-broken backend layer, force a clean build:
+
+```bash
+docker compose build --no-cache backend
+```
+
+### Backend can't reach the host Postgres
+
+Test name resolution from inside the backend container:
+
+```bash
+docker compose exec backend getent hosts host.docker.internal
+docker compose exec backend pg_isready -h host.docker.internal -p 5432 -U postgres
+```
+
+If `getent` returns nothing on Linux, your Docker Engine is older than 20.10 — upgrade. If `pg_isready` fails but `getent` works, your host Postgres is bound to `127.0.0.1` only — set `listen_addresses = '*'` and add the Docker bridge subnet (commonly `172.16.0.0/12`) to `pg_hba.conf`.
+
 ## Keeping local (non-Docker) dev intact
 
 Nothing in `backend-api/`, `frontend-app/`, or `waha/` was changed. The README's `php artisan serve` + `npm run dev` flow still works because `.env` (read by Laravel directly) and the Docker `.env` are separate files — only the latter is consumed by compose. Just don't commit either.
