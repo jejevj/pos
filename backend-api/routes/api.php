@@ -236,6 +236,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('outlets/{outlet}/employee-beverages/allowed/{id}', [\App\Http\Controllers\Api\Outlet\EmployeeBeverageController::class, 'removeAllowedBeverage']);
     Route::get('outlets/{outlet}/employee-beverages/claims', [\App\Http\Controllers\Api\Outlet\EmployeeBeverageController::class, 'getEmployeeClaims']);
     Route::post('outlets/{outlet}/employee-beverages/claim', [\App\Http\Controllers\Api\Outlet\EmployeeBeverageController::class, 'claimBeverage']);
+    Route::get('outlets/{outlet}/employee-beverages/my-quota', [\App\Http\Controllers\Api\Outlet\EmployeeBeverageController::class, 'getMyQuotaStatus']);
     Route::get('outlets/{outlet}/employee-beverages/quota/{userId}', [\App\Http\Controllers\Api\Outlet\EmployeeBeverageController::class, 'getEmployeeQuotaStatus']);
     Route::get('outlets/{outlet}/employee-beverages/statistics', [\App\Http\Controllers\Api\Outlet\EmployeeBeverageController::class, 'getStatistics']);
     Route::put('outlets/{outlet}/payroll-settings', [\App\Http\Controllers\Api\Outlet\EmployeeController::class, 'updatePayrollSettings']);
