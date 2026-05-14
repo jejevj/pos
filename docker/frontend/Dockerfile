@@ -39,6 +39,9 @@ COPY frontend-app/ ./
 RUN npm run build
 
 FROM nginx:1.27-alpine AS runtime
+# tzdata lets the TZ env var take effect, so nginx $time_local in access
+# logs renders in the chosen zone (defaults to Asia/Jakarta via compose).
+RUN apk add --no-cache tzdata
 RUN rm -rf /etc/nginx/conf.d/*
 COPY docker/frontend/nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /app/dist /usr/share/nginx/html

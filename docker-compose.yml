@@ -26,6 +26,16 @@ services:
         condition: service_started
     ports:
       - "${APP_PORT:-9080}:80"
+    environment:
+      TZ: ${TZ:-Asia/Jakarta}
+    # Install tzdata so $time_local in nginx access logs honours TZ.
+    # The base nginx:alpine image does not ship tzdata; without this,
+    # access_log timestamps stay in UTC even when TZ is set.
+    command: >
+      /bin/sh -c "apk add --no-cache tzdata >/dev/null 2>&1 || true;
+      cp /usr/share/zoneinfo/${TZ:-Asia/Jakarta} /etc/localtime 2>/dev/null || true;
+      echo ${TZ:-Asia/Jakarta} > /etc/timezone 2>/dev/null || true;
+      exec nginx -g 'daemon off;'"
     volumes:
       - ./docker/proxy/nginx.conf:/etc/nginx/nginx.conf:ro
     networks: [app-net]
@@ -53,6 +63,8 @@ services:
         VITE_WAHA_URL: ${VITE_WAHA_URL:-https://waha.ourtestcloud.my.id}
         VITE_WAHA_API_KEY: ${VITE_WAHA_API_KEY:-}
     restart: unless-stopped
+    environment:
+      TZ: ${TZ:-Asia/Jakarta}
     networks: [app-net]
 
   backend:
@@ -71,6 +83,13 @@ services:
     env_file:
       - .env.docker
     environment:
+      # tzdata is installed in the backend image, so setting TZ makes
+      # nginx access-log $time_local, PHP-FPM logs, and supervisor logs
+      # render in Asia/Jakarta. Docker's own log driver still timestamps
+      # in UTC at the daemon level (visible in `docker logs --timestamps`),
+      # but the in-line application log lines respect TZ.
+      TZ: ${TZ:-Asia/Jakarta}
+      APP_TIMEZONE: ${APP_TIMEZONE:-Asia/Jakarta}
       APP_ENV: ${APP_ENV:-production}
       APP_DEBUG: ${APP_DEBUG:-false}
       APP_URL: ${APP_URL:-http://localhost:9080}
@@ -123,6 +142,7 @@ services:
     profiles: ["internal-db"]
     restart: unless-stopped
     environment:
+      TZ: ${TZ:-Asia/Jakarta}
       POSTGRES_DB: ${POSTGRES_DB:-pos_sc}
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required when using the internal-db profile}
@@ -149,6 +169,7 @@ services:
         fi
     environment:
       REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+      TZ: ${TZ:-Asia/Jakarta}
     volumes:
       - redis-data:/data
     networks: [app-net]
@@ -180,6 +201,7 @@ services:
       # is what publishes the service to the internet.
       - "127.0.0.1:${WAHA_PORT:-9081}:3000"
     environment:
+      TZ: ${TZ:-Asia/Jakarta}
       # WAHA accepts both WHATSAPP_API_KEY and WAHA_API_KEY; we set both
       # for forward compatibility across image versions.
       WAHA_API_KEY: "${WAHA_API_KEY:-}"
