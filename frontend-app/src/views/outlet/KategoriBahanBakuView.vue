@@ -31,11 +31,11 @@
         <DataTable :value="filteredCategories" :loading="loading" paginator :rows="10"
                    :rowsPerPageOptions="[5, 10, 20, 50]" stripedRows showGridlines>
           <template #header>
-            <div class="table-header">
-              <IconField>
-                <InputIcon><i class="pi pi-search" /></InputIcon>
-                <InputText v-model="searchQuery" :placeholder="$t('common.search')" />
-              </IconField>
+            <div class="filter-bar">
+              <div class="filter-group">
+                <label class="filter-label"><i class="pi pi-search" /> {{ $t('common.search') }}</label>
+                <InputText v-model="searchQuery" :placeholder="$t('common.search') + '...'" class="filter-input" />
+              </div>
             </div>
           </template>
           <template #empty>
@@ -110,8 +110,6 @@ import Button from 'primevue/button'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
 import InputText from 'primevue/inputtext'
-import IconField from 'primevue/iconfield'
-import InputIcon from 'primevue/inputicon'
 import Textarea from 'primevue/textarea'
 import Checkbox from 'primevue/checkbox'
 import Dialog from 'primevue/dialog'
@@ -258,7 +256,10 @@ onMounted(() => {
 
 .card-header { display: flex; justify-content: space-between; align-items: center; width: 100%; }
 
-.table-header { display: flex; justify-content: flex-end; margin-bottom: 1rem; }
+.filter-bar { display: flex; align-items: flex-end; gap: 1rem; flex-wrap: wrap; margin-bottom: 0.5rem; }
+.filter-group { display: flex; flex-direction: column; gap: 0.35rem; }
+.filter-label { font-size: 0.75rem; font-weight: 600; color: #6b7280; text-transform: uppercase; letter-spacing: 0.04em; display: flex; align-items: center; gap: 0.3rem; }
+.filter-input { width: 220px; }
 
 .action-buttons { display: flex; gap: 0.25rem; }
 
