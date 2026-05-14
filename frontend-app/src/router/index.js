@@ -422,11 +422,12 @@ router.beforeEach((to, _from) => {
     return { name: 'forbidden' }
   }
   
-  // Check permissions (skip for dashboard and error pages to prevent infinite loop)
-  if (to.meta.permission && !['dashboard', 'admin-dashboard', 'unauthorized', 'forbidden'].includes(to.name)) {
+  // Check permissions (skip for dashboard, error pages, and outlet-scoped routes)
+  // Outlet routes use hasOutletPermission (checked inside each view/component), not global permissions.
+  const isOutletRoute = to.path.includes('/outlets/') && to.params.outletId
+  if (to.meta.permission && !isOutletRoute && !['dashboard', 'admin-dashboard', 'unauthorized', 'forbidden'].includes(to.name)) {
     if (!authStore.isSuperAdmin && !authStore.hasPermission(to.meta.permission)) {
       console.warn('Permission denied for:', to.meta.permission)
-      // Redirect to forbidden page (403)
       return { name: 'forbidden' }
     }
   }
