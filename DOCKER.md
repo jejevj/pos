@@ -1,11 +1,16 @@
-# Docker — one stack, one port
+# Docker — POS stack + stand-alone WAHA
 
-This repo ships a Docker Compose stack that runs the Vue SPA, the Laravel API, and Redis. Only **one** port is published to the host — an nginx reverse proxy that fronts every other service on the internal `app-net` network.
+This repo ships a Docker Compose stack that runs the Vue SPA, the Laravel API, and Redis behind a single nginx proxy. WAHA (the WhatsApp gateway) is defined in the same compose file but runs as its **own** service on its own port, fronted by its own Cloudflare Tunnel hostname.
 
-**Postgres and WAHA are NOT bundled by default.**
+| Port (host) | Service | Default tunnel hostname |
+| --- | --- | --- |
+| `${APP_PORT:-9080}` → proxy:80 | Vue SPA + Laravel API + Sanctum | `pos.your-domain.tld` |
+| `127.0.0.1:${WAHA_PORT:-9081}` → waha:3000 | WAHA WhatsApp gateway (REST + WebSocket) | `waha.ourtestcloud.my.id` |
+
+**Postgres and WAHA are NOT started by default.**
 
 * Postgres → the stack expects you to point `DB_HOST` at an existing Postgres reachable from the Docker host. See [Database options](#database-options).
-* WAHA (WhatsApp gateway) → off by default; enable later via a profile or by pointing the backend at an external WAHA instance. See [WhatsApp / WAHA](#whatsapp--waha).
+* WAHA → off by default; start it on demand with `docker compose up -d waha`. See [WhatsApp / WAHA](#whatsapp--waha).
 
 ## TL;DR
 
@@ -25,19 +30,19 @@ docker compose up -d --build
 # → open http://localhost:9080
 ```
 
-WAHA stays off until you opt in (see [WhatsApp / WAHA](#whatsapp--waha)). Hitting `/waha/*` in the meantime returns a 502 from the proxy — the rest of the app is unaffected.
+WAHA stays off until you start it explicitly (see [WhatsApp / WAHA](#whatsapp--waha)). Hitting `/waha/*` on the POS proxy returns **410 Gone** — that path is deprecated; WAHA now lives on its own hostname.
 
-## Why one port?
+## Proxy routing
 
-The default `APP_PORT=9080` is the only port mapped to your host. The proxy routes:
+The `APP_PORT=9080` proxy fronts the POS app only. The proxy routes:
 
 | Path prefix | Goes to | Notes |
 | --- | --- | --- |
 | `/api/*`, `/sanctum/*`, `/storage/*`, `/up`, `/api/documentation` | `backend:8080` | Laravel + Swagger |
-| `/waha/*` | `waha:3000` (optional) | REST + WebSocket; prefix is stripped. 502 when WAHA isn't running. |
+| `/waha/*` | — | **Deprecated.** Returns `410 Gone`. Use the WAHA hostname directly. |
 | everything else | `frontend:80` | Vue SPA |
 
-Redis and the PHP-FPM backend are reachable only from inside the Docker network. Postgres lives outside the compose stack by default (see [Database options](#database-options)); WAHA is optional (see [WhatsApp / WAHA](#whatsapp--waha)).
+Redis and the PHP-FPM backend are reachable only from inside the Docker network. Postgres lives outside the compose stack by default (see [Database options](#database-options)). WAHA is on its own port (`127.0.0.1:9081`) and tunneled separately — see [WhatsApp / WAHA](#whatsapp--waha).
 
 Need direct access during debugging? Add a `docker-compose.override.yml` that publishes extra ports. The base file stays clean.
 
@@ -200,6 +205,7 @@ docker compose down -v   # also drops postgres, redis, waha sessions
 | Var | Default | Meaning |
 | --- | --- | --- |
 | `APP_PORT` | `9080` | Host port the proxy listens on |
+| `WAHA_PORT` | `9081` | Host port for the stand-alone WAHA service. Bound to `127.0.0.1` — exposed publicly via Cloudflare Tunnel only. |
 | `APP_KEY` | *(empty)* | Laravel key — generate once, paste in. Empty means an ephemeral key on each boot. |
 | `DB_HOST` | `host.docker.internal` | Where the backend dials Postgres |
 | `DB_PORT` | `5432` | Postgres port on `DB_HOST` |
@@ -208,8 +214,12 @@ docker compose down -v   # also drops postgres, redis, waha sessions
 | `DB_PASSWORD` | `qwert12345!` | Override in `.env.docker` for any other deployment |
 | `POSTGRES_PASSWORD` | required only with `--profile internal-db` | Password for the bundled Postgres |
 | `WAHA_ENABLED` | `false` | Flip to `true` after WAHA is reachable (backend side) |
-| `WAHA_API_KEY` | empty | Only required when `WAHA_ENABLED=true` |
-| `WAHA_BASE_URL` | `http://waha:3000` | Internal service name by default; override for an external WAHA |
+| `WAHA_API_KEY` | empty | REQUIRED when `WAHA_ENABLED=true`. Generate with `openssl rand -hex 32`. |
+| `WAHA_BASE_URL` | `https://waha.ourtestcloud.my.id` | Public Cloudflare-tunneled hostname by default. Override to `http://waha:3000` for in-cluster calls. |
+| `WAHA_DASHBOARD_USERNAME` / `WAHA_DASHBOARD_PASSWORD` | empty | Basic-auth for the WAHA dashboard. Set before exposing WAHA publicly. |
+| `WAHA_SWAGGER_USERNAME` / `WAHA_SWAGGER_PASSWORD` | empty | Basic-auth for WAHA's Swagger UI. |
+| `WAHA_PUBLIC_HOSTNAME` / `WAHA_PUBLIC_PORT` / `WAHA_PUBLIC_SCHEMA` | `waha.ourtestcloud.my.id` / `443` / `https` | What WAHA advertises about itself in webhooks/Swagger. Match the tunnel hostname. |
+| `WAHA_ENGINE` | `WEBJS` | `WEBJS`, `NOWEB`, or `GOWS`. |
 | `VITE_WAHA_ENABLED` | `false` | Frontend-side opt-in. When `false` or `VITE_WAHA_API_KEY` is empty/placeholder, the SPA does NOT open the WAHA WebSocket or call the WAHA REST API, and the WhatsApp view shows an "unconfigured" banner. Baked at build time — change requires `docker compose build frontend`. |
 | `VITE_WAHA_API_KEY` | empty | Must be a real, non-placeholder key (NOT `change-me`) for the frontend to talk to WAHA. Baked at build time. |
 | `REDIS_PASSWORD` | empty | Optional; Redis only listens on the internal network |
@@ -223,23 +233,25 @@ docker compose down -v   # also drops postgres, redis, waha sessions
 * `backend` — `curl /up` (Laravel's built-in health endpoint)
 * `frontend` — `wget /` (returns the SPA shell)
 * `proxy` — `wget /` (proxied SPA)
-* `waha` (only with `--profile whatsapp`) — `wget /api/health` (tolerant; some WAHA versions don't expose it)
+* `waha` (only when you ran `docker compose up -d waha`) — `wget /api/health` (tolerant; some WAHA versions don't expose it)
 * `postgres` (only with `--profile internal-db`) — `pg_isready`
 
 `backend` waits for `redis: service_healthy` via `depends_on`. The external Postgres is *not* gated by Docker — the entrypoint script polls it with `pg_isready` before running migrations.
 
 ## Port strategy explained
 
-You asked whether all the internal services need their own host ports. They don't. The stack uses:
+The stack uses:
 
-- **1 external port** (`APP_PORT`, default 9080) → nginx proxy
-- **0 external ports** for backend / postgres / redis / waha / frontend (Docker DNS resolves them by service name on `app-net`)
+- **1 public port** for POS (`APP_PORT`, default 9080) → nginx proxy
+- **1 localhost-only port** for WAHA (`WAHA_PORT`, default 9081, bound to `127.0.0.1`) → tunneled via Cloudflare to `waha.ourtestcloud.my.id`
+- **0 external ports** for backend / postgres / redis / frontend (Docker DNS resolves them by service name on `app-net`)
 
 Tradeoffs:
 
-- ✅ Smaller attack surface, no port collisions, single URL for the team.
-- ✅ Frontend `VITE_API_URL=/api` and `VITE_WAHA_URL=/waha` — no CORS pain because everything is same-origin.
-- ⚠️ If you want to hit Postgres from a desktop tool (DBeaver/TablePlus), add a port mapping in a local override file — don't publish it in the base compose file.
+- ✅ Smaller attack surface; backend, frontend, redis, postgres stay on the internal network.
+- ✅ WAHA is operated, restarted, and tunneled independently of the POS app — no proxy reloads or full stack restarts when fiddling with WhatsApp.
+- ✅ Frontend `VITE_API_URL=/api` is same-origin; `VITE_WAHA_URL` is an absolute URL to the WAHA hostname (CORS handled inside WAHA).
+- ⚠️ If you want to hit Postgres or WAHA from a desktop tool, add a port mapping in a local override file or use the existing localhost binding via an SSH tunnel.
 
 ## What was NOT verified
 
@@ -261,57 +273,70 @@ Docker is not available in the sandbox where this scaffolding was generated, so 
 
 ## WhatsApp / WAHA
 
-WAHA is **off by default**. The stack boots, key generation runs, and the app works fine without it. `/waha/*` returns 502 from the proxy until you turn WAHA on. Two options when you're ready:
+WAHA is **off by default**. The POS stack boots, key generation runs, and the app works fine without it. The proxy's old `/waha/*` route now returns `410 Gone`; WAHA lives on its own hostname.
 
-### Option A — bundled WAHA (profile: `whatsapp`)
+### Running WAHA
 
-In `.env.docker` and `.env`:
+WAHA is defined in `docker-compose.yml` as a stand-alone service (no profile). It binds **only to `127.0.0.1:${WAHA_PORT:-9081}`** so the only thing on the host that can talk to it is `cloudflared` (or you, locally). To start / stop it independently of the POS app:
+
+```bash
+docker compose up -d waha       # start (or restart) just WAHA
+docker compose logs -f waha     # follow logs
+docker compose stop waha        # stop without touching POS
+```
+
+Sessions persist under the `waha-sessions` volume; media under `waha-media`.
+
+### Required env
+
+In `.env.docker` and `.env`, before running `docker compose up -d waha`:
 
 ```env
-WAHA_ENABLED=true
-WAHA_API_KEY=<some-strong-random-string>
-WAHA_BASE_URL=http://waha:3000      # internal service name; this is the default
+WAHA_PORT=9081
+WAHA_API_KEY=<openssl rand -hex 32>
+WAHA_DASHBOARD_USERNAME=<pick one>
+WAHA_DASHBOARD_PASSWORD=<strong random>
+WAHA_SWAGGER_USERNAME=<pick one>
+WAHA_SWAGGER_PASSWORD=<strong random>
+WAHA_PUBLIC_HOSTNAME=waha.ourtestcloud.my.id
+WAHA_PUBLIC_PORT=443
+WAHA_PUBLIC_SCHEMA=https
+WAHA_ENGINE=WEBJS
+```
 
-# Frontend opt-in (baked at build time — rebuild the frontend after changing):
+> Do NOT commit real API keys or dashboard credentials. The example file ships with blanks.
+
+### Wiring POS to WAHA
+
+The backend reads `WAHA_*` env vars; the frontend reads `VITE_WAHA_*`. To turn the integration on:
+
+```env
+# .env.docker (read by the backend at runtime)
+WAHA_ENABLED=true
+WAHA_BASE_URL=https://waha.ourtestcloud.my.id   # the public tunnel hostname (default)
+WAHA_API_KEY=<same value as above>
+
+# .env (read by docker compose at build / up time)
 VITE_WAHA_ENABLED=true
-VITE_WAHA_API_KEY=${WAHA_API_KEY}
+VITE_WAHA_URL=https://waha.ourtestcloud.my.id
+VITE_WAHA_API_KEY=<same value as above>
 ```
 
 Then:
 
 ```bash
-docker compose --profile whatsapp up -d --build frontend
-# pair the device via the SPA's WhatsApp settings page
+docker compose up -d waha                # bring WAHA up
+docker compose build frontend            # bake the new VITE_WAHA_* values in
+docker compose up -d backend frontend    # apply backend env and ship the new bundle
 ```
 
-> The frontend bundle bakes in `VITE_WAHA_*` at build time. If you flip
-> `VITE_WAHA_ENABLED` from `false` → `true` (or change the key), you MUST
-> `docker compose build frontend` and redeploy, otherwise the running bundle
-> still has the old values and either no-ops or hits WAHA with the wrong key.
+> Vite envs are baked at **build time**. Flipping `VITE_WAHA_ENABLED=false` → `true`, or rotating `VITE_WAHA_API_KEY`, always requires a frontend rebuild + redeploy. The backend just needs `docker compose up -d backend` to pick up new env values.
 
-The bundled WAHA persists its session under the `waha-sessions` volume.
-
-### Option B — external WAHA
-
-Run WAHA wherever you like (another host, a managed service, the existing `waha/docker-compose.yml`, etc.) and point the backend at it:
-
-```env
-WAHA_ENABLED=true
-WAHA_API_KEY=<key-of-your-external-waha>
-WAHA_BASE_URL=http://your-waha-host:3000
-
-# Frontend opt-in (baked at build time — rebuild the frontend after changing):
-VITE_WAHA_ENABLED=true
-VITE_WAHA_API_KEY=${WAHA_API_KEY}
-```
-
-`docker compose build frontend && docker compose up -d` (no `--profile whatsapp`) — the bundled WAHA stays disabled, but the SPA now talks to your external WAHA.
-
-> Restart the backend after toggling WAHA env vars: `docker compose up -d backend`.
+If you'd rather keep POS-to-WAHA traffic inside the docker network (and skip the Cloudflare tunnel for backend → WAHA calls), set `WAHA_BASE_URL=http://waha:3000` instead. Both services join `app-net`, so the service-name resolution works. The frontend still has to use the public hostname because the browser is outside the network.
 
 ## Cloudflare Tunnel
 
-The proxy publishes a single port, so the tunnel needs **one** hostname pointed at `http://localhost:9080`. Path routing (`/api`, `/sanctum`, `/storage`, `/waha`, `/`) is already handled by the in-stack nginx — no separate `frontend.*` / `api.*` / `waha.*` hostnames required.
+Two tunnel hostnames now — one for POS, one for WAHA. Both point at `localhost` ports on the Docker host.
 
 `config.yml` example for `cloudflared`:
 
@@ -319,10 +344,19 @@ The proxy publishes a single port, so the tunnel needs **one** hostname pointed 
 ingress:
   - hostname: pos.your-domain.tld
     service: http://localhost:9080
+  - hostname: waha.ourtestcloud.my.id
+    service: http://localhost:9081
   - service: http_status:404
 ```
 
-Then update **both** `.env.docker` and `.env` so Laravel and Sanctum trust the public hostname:
+If you manage the tunnel from the Cloudflare One dashboard instead of a `config.yml`, add two **Public Hostname** rows on the tunnel:
+
+| Subdomain | Domain | Service |
+| --- | --- | --- |
+| `pos` | `your-domain.tld` | `HTTP` → `localhost:9080` |
+| `waha` | `ourtestcloud.my.id` | `HTTP` → `localhost:9081` |
+
+Then update `.env.docker` and `.env` so Laravel and Sanctum trust the public POS hostname:
 
 ```env
 APP_URL=https://pos.your-domain.tld
@@ -330,7 +364,7 @@ FRONTEND_URL=https://pos.your-domain.tld
 SANCTUM_STATEFUL_DOMAINS=pos.your-domain.tld
 ```
 
-Frontend `VITE_API_URL` / `VITE_WAHA_URL` stay as relative paths (`/api`, `/waha`) — same-origin, no CORS gymnastics, no rebuild needed if the domain changes.
+Frontend `VITE_API_URL` stays relative (`/api`) — same-origin POS API. `VITE_WAHA_URL` is the WAHA tunnel hostname (cross-origin, but WAHA handles CORS itself).
 
 ## Troubleshooting
 

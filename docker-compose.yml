@@ -1,12 +1,17 @@
-# Single-stack compose: only the `proxy` service publishes a port to the host.
-# Everything else (backend, frontend, redis, plus the optional postgres and
-# waha services) talks over the internal `app-net` network. Override with
-# docker-compose.override.yml if you need direct access to a service during
-# debugging.
+# Single-stack compose. Two ports are published on the host:
+#   - APP_PORT  (default 9080) -> nginx proxy fronting backend + frontend
+#   - WAHA_PORT (default 9081) -> WAHA WhatsApp gateway, bound to 127.0.0.1
+#
+# Everything else (backend, frontend, redis, optional postgres) talks over
+# the internal `app-net` network. Override with docker-compose.override.yml
+# if you need direct access to a service during debugging.
+#
+# WAHA is a stand-alone optional service: it does NOT sit behind the POS
+# proxy anymore. Run it independently with `docker compose up -d waha` and
+# tunnel `127.0.0.1:9081` via Cloudflare Tunnel (e.g. waha.your-domain.tld).
 #
 # Profiles:
 #   internal-db  -> start a bundled Postgres alongside the app
-#   whatsapp     -> start a bundled WAHA WhatsApp gateway
 
 name: pos
 
@@ -41,7 +46,11 @@ services:
         # To enable, set VITE_WAHA_ENABLED=true + a real VITE_WAHA_API_KEY in .env
         # and rebuild the frontend image.
         VITE_WAHA_ENABLED: ${VITE_WAHA_ENABLED:-false}
-        VITE_WAHA_URL: ${VITE_WAHA_URL:-/waha}
+        # WAHA now lives on its own hostname (Cloudflare tunnel). Default to
+        # the production domain; override per-environment if needed. The
+        # placeholder key is intentionally empty so the frontend stays in
+        # "unconfigured" mode unless a real key is baked in at build time.
+        VITE_WAHA_URL: ${VITE_WAHA_URL:-https://waha.ourtestcloud.my.id}
         VITE_WAHA_API_KEY: ${VITE_WAHA_API_KEY:-}
     restart: unless-stopped
     networks: [app-net]
@@ -84,10 +93,12 @@ services:
       SANCTUM_STATEFUL_DOMAINS: ${SANCTUM_STATEFUL_DOMAINS:-localhost,localhost:9080,127.0.0.1,127.0.0.1:9080}
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:9080}
       # WhatsApp / WAHA is OFF by default. Enable it later by setting
-      # WAHA_ENABLED=true, providing WAHA_BASE_URL + WAHA_API_KEY (either
-      # the bundled `whatsapp` profile or an external WAHA instance).
+      # WAHA_ENABLED=true and a real WAHA_API_KEY. WAHA_BASE_URL defaults
+      # to the Cloudflare-tunneled hostname; for an in-cluster call you can
+      # set it to http://waha:3000 instead (the `waha` service joins the
+      # same app-net network).
       WAHA_ENABLED: ${WAHA_ENABLED:-false}
-      WAHA_BASE_URL: ${WAHA_BASE_URL:-http://waha:3000}
+      WAHA_BASE_URL: ${WAHA_BASE_URL:-https://waha.ourtestcloud.my.id}
       WAHA_API_KEY: "${WAHA_API_KEY:-}"
       WAHA_SESSION: ${WAHA_SESSION:-default}
       RUN_MIGRATIONS: ${RUN_MIGRATIONS:-true}
@@ -147,23 +158,44 @@ services:
       timeout: 5s
       retries: 10
 
-  # Optional bundled WAHA (WhatsApp gateway). NOT started by default.
-  # Enable with:
-  #   docker compose --profile whatsapp up -d
-  # In that case make sure WAHA_API_KEY is set in .env / .env.docker, and
-  # the backend env has WAHA_ENABLED=true. You can also point the backend
-  # at any external WAHA instance by setting WAHA_BASE_URL and skipping
-  # this profile entirely.
+  # Stand-alone WAHA (WhatsApp gateway). Independent of the POS proxy.
+  # Bound to 127.0.0.1:9081 on the host so only the local Cloudflare Tunnel
+  # daemon can reach it; expose publicly by pointing a tunnel hostname
+  # (e.g. waha.ourtestcloud.my.id) at http://localhost:9081.
+  #
+  # Run it on its own:
+  #   docker compose up -d waha
+  # Stop just WAHA:
+  #   docker compose stop waha
+  #
+  # The backend's WAHA_ENABLED / WAHA_BASE_URL / WAHA_API_KEY env vars are
+  # the only thing that ties POS to WAHA; this service is intentionally
+  # detached from the proxy so it can be operated, scaled, and tunneled
+  # separately.
   waha:
     image: devlikeapro/waha:latest
-    profiles: ["whatsapp"]
     restart: unless-stopped
+    ports:
+      # host:container — localhost-only by design. Cloudflared on this host
+      # is what publishes the service to the internet.
+      - "127.0.0.1:${WAHA_PORT:-9081}:3000"
     environment:
+      # WAHA accepts both WHATSAPP_API_KEY and WAHA_API_KEY; we set both
+      # for forward compatibility across image versions.
+      WAHA_API_KEY: "${WAHA_API_KEY:-}"
       WHATSAPP_API_KEY: "${WAHA_API_KEY:-}"
+      WAHA_DASHBOARD_USERNAME: "${WAHA_DASHBOARD_USERNAME:-}"
+      WAHA_DASHBOARD_PASSWORD: "${WAHA_DASHBOARD_PASSWORD:-}"
+      WHATSAPP_SWAGGER_USERNAME: "${WAHA_SWAGGER_USERNAME:-}"
+      WHATSAPP_SWAGGER_PASSWORD: "${WAHA_SWAGGER_PASSWORD:-}"
+      WHATSAPP_API_HOSTNAME: "${WAHA_PUBLIC_HOSTNAME:-waha.ourtestcloud.my.id}"
+      WHATSAPP_API_PORT: "${WAHA_PUBLIC_PORT:-443}"
+      WHATSAPP_API_SCHEMA: "${WAHA_PUBLIC_SCHEMA:-https}"
       WHATSAPP_DEFAULT_ENGINE: ${WAHA_ENGINE:-WEBJS}
       WAHA_PRINT_QR: "false"
     volumes:
       - waha-sessions:/app/.sessions
+      - waha-media:/app/.media
     networks: [app-net]
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000/api/health || exit 0"]
@@ -180,4 +212,5 @@ volumes:
   postgres-data:
   redis-data:
   waha-sessions:
+  waha-media:
   backend-storage:
