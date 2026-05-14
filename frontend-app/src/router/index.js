@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import DashboardLayout from '@/layouts/DashboardLayout.vue'
+import { encodeOutletId } from '@/utils/outletId'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -405,10 +406,11 @@ router.beforeEach((to, _from) => {
   
   // Redirect authenticated users away from guest pages
   if (to.meta.guest && authStore.isAuthenticated) {
-    // Outlet user: redirect ke outlet dashboard mereka
+    // Outlet user: redirect ke outlet dashboard mereka (encoded ID)
     if (authStore.isOutletUser && authStore.outletMemberships.length > 0) {
       const firstOutlet = authStore.outletMemberships[0]
-      return { path: `/outlets/${firstOutlet.outlet_id}/dashboard` }
+      const encoded = firstOutlet.encoded_outlet_id || encodeOutletId(firstOutlet.outlet_id)
+      return { path: `/outlets/${encoded}/dashboard` }
     }
     return { name: 'dashboard' }
   }
@@ -417,7 +419,8 @@ router.beforeEach((to, _from) => {
   if (to.meta.superadminOnly && authStore.isAuthenticated && authStore.isOutletUser) {
     if (authStore.outletMemberships.length > 0) {
       const firstOutlet = authStore.outletMemberships[0]
-      return { path: `/outlets/${firstOutlet.outlet_id}/dashboard` }
+      const encoded = firstOutlet.encoded_outlet_id || encodeOutletId(firstOutlet.outlet_id)
+      return { path: `/outlets/${encoded}/dashboard` }
     }
     return { name: 'forbidden' }
   }
