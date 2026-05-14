@@ -318,7 +318,6 @@ class OutletDefaultDataSeeder
                 'lokasi_penyimpanan' => null,
                 'expired_date'       => null,
                 'gambar_url'         => null,
-                'defers_on_bon'      => false,
                 'is_active'          => true,
                 'created_at'         => $now,
                 'updated_at'         => $now,
