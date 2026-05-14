@@ -629,6 +629,10 @@ class OutletProvisioner
             DB::statement("ALTER TABLE {$schema}.order_items ADD COLUMN confirmed_at TIMESTAMP NULL");
             DB::statement("ALTER TABLE {$schema}.order_items ADD COLUMN confirmed_by BIGINT NULL");
         }
+        // KDS timeline columns — added after initial station release
+        DB::statement("ALTER TABLE {$schema}.order_items ADD COLUMN IF NOT EXISTS preparing_at TIMESTAMP NULL");
+        DB::statement("ALTER TABLE {$schema}.order_items ADD COLUMN IF NOT EXISTS ready_at TIMESTAMP NULL");
+        DB::statement("ALTER TABLE {$schema}.order_items ADD COLUMN IF NOT EXISTS served_at TIMESTAMP NULL");
         if (!$this->columnExists($schema, 'orders', 'kitchen_status')) {
             DB::statement("ALTER TABLE {$schema}.orders ADD COLUMN kitchen_status VARCHAR(20) DEFAULT 'pending'");
         }
