@@ -100,7 +100,8 @@ class StationController extends Controller
 
         $station = Station::findOrFail($id);
 
-        // Show orders (draft or paid) that still have unserved items for this station
+        // Show orders that have items for this station OR items with no station assigned.
+        // Items without station_id are shown on all stations (fallback).
         $orders = DB::select("
             SELECT DISTINCT
                 o.id, o.kode, o.order_type, o.table_number, o.customer_name,
@@ -108,21 +109,21 @@ class StationController extends Controller
             FROM orders o
             INNER JOIN order_items oi ON oi.order_id = o.id
             INNER JOIN menu m ON m.id = oi.menu_id
-            WHERE m.station_id = ?
+            WHERE (m.station_id = ? OR m.station_id IS NULL)
               AND o.status IN ('draft', 'paid')
               AND o.deleted_at IS NULL
               AND oi.status IN ('pending', 'preparing', 'ready')
             ORDER BY o.created_at ASC
         ", [$id]);
 
-        // For each order, load only items belonging to this station
+        // For each order, load items for this station + items without station
         foreach ($orders as $order) {
             $order->items = DB::select("
                 SELECT oi.id, oi.menu_id, oi.menu_name, oi.quantity, oi.notes,
                        oi.status, oi.confirmed_at, m.station_id
                 FROM order_items oi
                 INNER JOIN menu m ON m.id = oi.menu_id
-                WHERE oi.order_id = ? AND m.station_id = ?
+                WHERE oi.order_id = ? AND (m.station_id = ? OR m.station_id IS NULL)
                 ORDER BY oi.id ASC
             ", [$order->id, $id]);
         }
