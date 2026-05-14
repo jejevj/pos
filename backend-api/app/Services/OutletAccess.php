@@ -55,11 +55,11 @@ class OutletAccess
     public function authorize($outletId, array $options = []): array
     {
         $opts = array_merge([
-            'permission' => null,
+            'permission'      => null,
             'allowSuperadmin' => true,
-            'allowOwner' => true,
-            'setSchema' => true,
-            'strictPermission' => false,
+            'allowOwner'      => true,
+            'setSchema'       => true,
+            'strictPermission'=> false,
         ], $options);
 
         /** @var User|null $user */
@@ -77,11 +77,8 @@ class OutletAccess
         }
 
         $isSuperAdmin = method_exists($user, 'isSuperAdmin') ? $user->isSuperAdmin() : false;
-        $isOwner = $outlet->user_id === $user->id;
+        $isOwner      = $outlet->user_id === $user->id;
 
-        // Try to resolve outlet_user mapping (by email) even for owner/SA —
-        // some employee-facing endpoints need the outlet_user.id even when
-        // the caller is the owner.
         // Always set schema temporarily to query outlet_users — even when setSchema=false.
         // Without this, the query falls to the public schema where outlet_users does not exist.
         DB::statement("SET search_path TO {$outlet->schema_name}, public");
@@ -99,11 +96,6 @@ class OutletAccess
             $outletUser = null;
         }
 
-        // If caller does not want the schema to remain set, reset it now.
-        if (!$opts['setSchema']) {
-            DB::statement("SET search_path TO public");
-        }
-
         $hasMapping = $outletUser !== null;
 
         $baseAccess =
@@ -112,9 +104,7 @@ class OutletAccess
             || $hasMapping;
 
         if (!$baseAccess) {
-            if ($opts['setSchema']) {
-                DB::statement("SET search_path TO public");
-            }
+            DB::statement("SET search_path TO public");
             $this->deny(
                 403,
                 'Akun Anda tidak terdaftar sebagai pengguna outlet ini.',
@@ -123,6 +113,8 @@ class OutletAccess
             );
         }
 
+        // Permission check — schema must be set during this check.
+        // We do this BEFORE potentially resetting search_path below.
         if ($opts['permission']) {
             $bypass = !$opts['strictPermission'] && (
                 ($opts['allowSuperadmin'] && $isSuperAdmin)
@@ -130,9 +122,7 @@ class OutletAccess
             );
             if (!$bypass) {
                 if (!$hasMapping || !$this->outletUserHasPermission($outletUser->id, $opts['permission'])) {
-                    if ($opts['setSchema']) {
-                        DB::statement("SET search_path TO public");
-                    }
+                    DB::statement("SET search_path TO public");
                     $this->deny(
                         403,
                         'Akun outlet Anda tidak memiliki izin: ' . $opts['permission'],
@@ -143,18 +133,23 @@ class OutletAccess
             }
         }
 
+        // Reset search_path AFTER permission check if caller does not want it set.
+        if (!$opts['setSchema']) {
+            DB::statement("SET search_path TO public");
+        }
+
         return [
-            'outlet' => $outlet,
-            'outlet_user' => $outletUser,
-            'is_superadmin' => $isSuperAdmin,
-            'is_owner' => $isOwner,
+            'outlet'       => $outlet,
+            'outlet_user'  => $outletUser,
+            'is_superadmin'=> $isSuperAdmin,
+            'is_owner'     => $isOwner,
         ];
     }
 
     /**
      * Check if the resolved outlet_user has a permission, via user_roles
-     * joined with role_permissions and permissions. Assumes search_path is
-     * already on the outlet schema.
+     * joined with role_permissions and permissions.
+     * NOTE: Assumes search_path is already set to the outlet schema.
      */
     public function outletUserHasPermission(int $outletUserId, string $permission): bool
     {
