@@ -1,10 +1,24 @@
 <template>
-  <div class="sidebar-layout" :class="{ 'is-dark': isDark }">
-    <!-- Mobile navbar -->
-    <div class="mobile-navbar navbar-faded">
+  <div class="vuero-app" :class="{ 'is-dark': isDark }">
+
+    <!-- ─── Mobile navbar ─── -->
+    <nav class="mobile-navbar">
       <div class="navbar-brand">
-        <button v-if="showSidebar" class="menu-toggle" @click="isMobileOpen = !isMobileOpen">
-          <i class="pi pi-bars"></i>
+        <button
+          v-if="showSidebar"
+          class="vuero-hamburger"
+          aria-label="Toggle menu"
+          @click="isMobileOpen = !isMobileOpen"
+        >
+          <span class="menu-toggle" :class="{ active: isMobileOpen }">
+            <span class="icon-box-toggle">
+              <span class="rotate">
+                <i class="icon-line-top" />
+                <i class="icon-line-center" />
+                <i class="icon-line-bottom" />
+              </span>
+            </span>
+          </span>
         </button>
         <slot name="logo">
           <span class="brand-name">App</span>
@@ -13,59 +27,93 @@
           <slot name="toolbar-mobile" />
         </div>
       </div>
-    </div>
+    </nav>
 
-    <!-- Mobile overlay -->
+    <!-- ─── Mobile overlay ─── -->
     <Transition name="fade">
-      <div v-if="isMobileOpen" class="mobile-overlay" @click="isMobileOpen = false" />
+      <div
+        v-if="isMobileOpen"
+        class="app-overlay is-active"
+        @click="isMobileOpen = false"
+      />
     </Transition>
 
-    <!-- Sideblock (desktop + mobile) — hanya tampil jika showSidebar true -->
+    <!-- ─── Mobile sideblock ─── -->
     <Transition name="slide-x">
       <div
-        v-if="showSidebar && (isMobileOpen || isDesktopOpen)"
-        class="sidebar-block"
-        :class="[themeClass, isMobileOpen ? 'is-mobile' : '']"
+        v-if="showSidebar && isMobileOpen"
+        class="sidebar-block is-mobile"
+        :class="themeClass"
       >
         <div class="sidebar-block-header">
-          <slot name="logo">
-            <span class="brand-name">App</span>
-          </slot>
-          <button class="sidebar-close" @click="isDesktopOpen = false">
-            <i class="pi pi-times"></i>
+          <slot name="logo" />
+          <button class="sidebar-block-close" @click="isMobileOpen = false">
+            <i class="pi pi-times" />
           </button>
         </div>
-
         <div class="sidebar-block-inner">
           <ul>
-            <slot name="links">
-              <VueroNavItem
-                v-for="item in links"
-                :key="item.id || item.label"
-                :item="item"
-              />
-            </slot>
+            <slot name="links" />
           </ul>
         </div>
-
         <div class="sidebar-block-footer">
           <slot name="links-bottom" />
         </div>
       </div>
     </Transition>
 
-    <!-- Main content -->
+    <!-- ─── Desktop sideblock ─── -->
+    <Transition name="slide-x">
+      <div
+        v-if="showSidebar && isDesktopOpen"
+        class="sidebar-block"
+        :class="themeClass"
+      >
+        <div class="sidebar-block-header">
+          <slot name="logo" />
+        </div>
+        <div class="sidebar-block-inner">
+          <ul>
+            <slot name="links" />
+          </ul>
+        </div>
+        <div class="sidebar-block-footer">
+          <slot name="links-bottom" />
+        </div>
+      </div>
+    </Transition>
+
+    <!-- ─── Main view wrapper ─── -->
     <div
-      class="view-wrapper view-wrapper-full"
+      class="view-wrapper"
       :class="{ 'is-pushed-block': showSidebar && isDesktopOpen }"
     >
-      <!-- Page heading -->
-      <div class="page-heading">
-        <button v-if="showSidebar" class="sidebar-toggle" @click="isDesktopOpen = !isDesktopOpen">
-          <i class="pi pi-bars"></i>
-        </button>
-        <h1 class="page-title">{{ pageTitle }}</h1>
-        <div class="toolbar">
+      <!-- Sticky page title / toolbar -->
+      <div class="page-title">
+        <div
+          v-if="showSidebar"
+          class="vuero-hamburger nav-trigger push-resize"
+          role="button"
+          tabindex="0"
+          @click="isDesktopOpen = !isDesktopOpen"
+          @keydown.enter.prevent="isDesktopOpen = !isDesktopOpen"
+        >
+          <span class="menu-toggle has-chevron">
+            <span class="icon-box-toggle" :class="{ active: isDesktopOpen }">
+              <span class="rotate">
+                <i class="icon-line-top" />
+                <i class="icon-line-center" />
+                <i class="icon-line-bottom" />
+              </span>
+            </span>
+          </span>
+        </div>
+
+        <div class="title-wrap">
+          <h1 class="title is-5">{{ pageTitle }}</h1>
+        </div>
+
+        <div class="toolbar desktop-toolbar">
           <slot name="toolbar" />
         </div>
       </div>
@@ -83,16 +131,15 @@
 <script setup>
 import { ref, computed, watch, provide } from 'vue'
 import { useRoute } from 'vue-router'
-import VueroNavItem from './VueroNavItem.vue'
 
 const props = defineProps({
   links:         { type: Array,   default: () => [] },
-  theme:         { type: String,  default: 'default' }, // default | color | curved | color-curved
+  theme:         { type: String,  default: 'default' },
   openOnMounted: { type: Boolean, default: true },
   closeOnChange: { type: Boolean, default: false },
   pageTitle:     { type: String,  default: '' },
   isDark:        { type: Boolean, default: false },
-  showSidebar:   { type: Boolean, default: true },  // false = sembunyikan sidebar sepenuhnya
+  showSidebar:   { type: Boolean, default: true },
 })
 
 const route = useRoute()
@@ -102,8 +149,8 @@ const isDesktopOpen = ref(props.showSidebar && props.openOnMounted)
 
 const themeClass = computed(() => {
   const map = {
-    color:        'is-colored',
-    curved:       'is-curved',
+    color:          'is-colored',
+    curved:         'is-curved',
     'color-curved': 'is-colored is-curved',
   }
   return map[props.theme] || ''
@@ -114,27 +161,39 @@ watch(() => route.fullPath, () => {
   if (props.closeOnChange) isDesktopOpen.value = false
 })
 
-// Ketika showSidebar berubah (misalnya auth state baru resolve), tutup sidebar
 watch(() => props.showSidebar, (val) => {
   if (!val) {
-    isMobileOpen.value = false
+    isMobileOpen.value  = false
     isDesktopOpen.value = false
   }
 })
 
-provide('vuero-layout', { isDesktopOpen, isMobileOpen, links: computed(() => props.links) })
+provide('vuero-layout', {
+  isDesktopOpen,
+  isMobileOpen,
+  links: computed(() => props.links),
+})
 
 defineExpose({ isDesktopOpen, isMobileOpen })
 </script>
 
 <style scoped>
-/* Mobile navbar */
+/* ─────────────────────────────────────────────────────────────────
+   Vuero design tokens (local — mirrors CSS vars in main.css)
+───────────────────────────────────────────────────────────────── */
+.vuero-app {
+  min-height: 100vh;
+  background: var(--background-grey, #fafafa);
+  font-family: var(--font, 'Roboto Flex Variable', sans-serif);
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   Mobile navbar
+───────────────────────────────────────────────────────────────── */
 .mobile-navbar {
   display: none;
   position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
+  top: 0; left: 0; right: 0;
   height: 60px;
   background: var(--white, #fff);
   border-bottom: 1px solid var(--border, #e5e7eb);
@@ -147,27 +206,91 @@ defineExpose({ isDesktopOpen, isMobileOpen })
   height: 100%;
   gap: 0.75rem;
 }
-.brand-end { margin-left: auto; display: flex; align-items: center; gap: 0.5rem; }
-.brand-name { font-weight: 700; font-size: 1.1rem; }
-.menu-toggle, .sidebar-close, .sidebar-toggle {
-  background: none; border: none; cursor: pointer;
-  width: 36px; height: 36px; border-radius: 8px;
-  display: flex; align-items: center; justify-content: center;
-  color: var(--light-text, #6b7280);
-  transition: background 0.2s;
-}
-.menu-toggle:hover, .sidebar-close:hover, .sidebar-toggle:hover {
-  background: var(--widget-grey, #f3f4f6);
+.brand-end {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 
-/* Mobile overlay */
-.mobile-overlay {
-  position: fixed; inset: 0;
-  background: rgba(0,0,0,0.4);
+/* ─────────────────────────────────────────────────────────────────
+   Vuero hamburger (matches vuero-demo animation)
+───────────────────────────────────────────────────────────────── */
+.vuero-hamburger {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: var(--radius-rounded, 9999px);
+  border: none;
+  background: none;
+  cursor: pointer;
+  transition: background 0.2s;
+  flex-shrink: 0;
+}
+.vuero-hamburger:hover {
+  background: var(--widget-grey, #f5f6fa);
+}
+.vuero-hamburger:focus {
+  outline: 2px solid var(--primary, #41b3a3);
+  outline-offset: 2px;
+}
+
+.menu-toggle {
+  position: relative;
+  display: inline-block;
+  width: 22px;
+  height: 22px;
+}
+.icon-box-toggle {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  width: 22px;
+  height: 22px;
+  gap: 4px;
+}
+.icon-line-top,
+.icon-line-center,
+.icon-line-bottom {
+  display: block;
+  width: 20px;
+  height: 2px;
+  background: var(--light-text, #a2a5b9);
+  border-radius: 2px;
+  transition: transform 0.3s, opacity 0.3s, width 0.3s;
+}
+.icon-box-toggle.active .icon-line-top {
+  transform: translateY(6px) rotate(45deg);
+}
+.icon-box-toggle.active .icon-line-center {
+  opacity: 0;
+  width: 0;
+}
+.icon-box-toggle.active .icon-line-bottom {
+  transform: translateY(-6px) rotate(-45deg);
+}
+
+/* has-chevron variant: rotate arrow on open */
+.has-chevron .icon-box-toggle.active {
+  /* reuse same animation */
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   App overlay (mobile)
+───────────────────────────────────────────────────────────────── */
+.app-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
   z-index: 34;
 }
 
-/* Sidebar block */
+/* ─────────────────────────────────────────────────────────────────
+   Sidebar block (Vuero sideblock style)
+───────────────────────────────────────────────────────────────── */
 .sidebar-block {
   position: fixed;
   top: 0; left: 0;
@@ -177,22 +300,49 @@ defineExpose({ isDesktopOpen, isMobileOpen })
   z-index: 35;
   display: flex;
   flex-direction: column;
-  border-right: 1px solid var(--border, #e5e7eb);
-  transition: transform 0.3s;
+  box-shadow: var(--light-box-shadow, -1px 3px 10px 0 rgba(0,0,0,.06));
+  transition: transform 0.3s, border-radius 0.3s;
 }
+
 .sidebar-block.is-curved {
-  border-top-right-radius: 2rem;
-  border-bottom-right-radius: 2rem;
+  border-start-end-radius: 2rem;
+  border-end-end-radius:   2rem;
+  border-right: 1px solid var(--border, #dbdbdb);
+  box-shadow: none;
 }
+
+.sidebar-block.is-colored {
+  background: color-mix(in oklab, #222225, black 12%);
+}
+
 .sidebar-block-header {
   display: flex;
   align-items: center;
   height: 60px;
-  padding: 0 1.5rem;
-  border-bottom: 1px solid var(--border, #e5e7eb);
+  padding: 0 2rem;
+  border-bottom: 1px solid var(--border, #dbdbdb);
   flex-shrink: 0;
+  gap: 0.75rem;
 }
-.sidebar-close { margin-left: auto; }
+
+.sidebar-block-close {
+  margin-left: auto;
+  background: none;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px; height: 32px;
+  border-radius: var(--radius-rounded, 9999px);
+  color: var(--light-text, #a2a5b9);
+  transition: background 0.2s;
+}
+.sidebar-block-close:hover {
+  background: var(--widget-grey, #f5f6fa);
+  color: var(--dark-text, #283252);
+}
+
 .sidebar-block-inner {
   flex: 1;
   overflow-y: auto;
@@ -200,71 +350,128 @@ defineExpose({ isDesktopOpen, isMobileOpen })
   padding: 0.5rem 0;
 }
 .sidebar-block-inner::-webkit-scrollbar { width: 3px; }
-.sidebar-block-inner::-webkit-scrollbar-thumb { border-radius: 5px; background: rgba(0,0,0,0.15); }
-.sidebar-block-inner ul { list-style: none; padding: 0; margin: 0; }
+.sidebar-block-inner::-webkit-scrollbar-thumb {
+  border-radius: 5px;
+  background: rgba(0,0,0,.15);
+}
+
+.sidebar-block-inner ul {
+  list-style: none;
+  padding: 10px 0;
+  margin: 0;
+}
+
 .sidebar-block-footer {
   height: 60px;
-  padding: 0 1.5rem;
+  padding: 0 2rem;
   display: flex;
   align-items: center;
-  border-top: 1px solid var(--border, #e5e7eb);
+  justify-content: space-between;
+  border-top: 1px solid var(--border, #dbdbdb);
   flex-shrink: 0;
 }
 
-/* View wrapper */
-.view-wrapper-full {
-  width: 100%;
+/* ─────────────────────────────────────────────────────────────────
+   View wrapper
+───────────────────────────────────────────────────────────────── */
+.view-wrapper {
+  display: flex;
+  flex-direction: column;
   min-height: 100vh;
-  background: var(--background-grey, #f5f5f5);
-  transition: margin-left 0.3s, width 0.3s;
+  transition: margin-left 0.3s;
 }
-.view-wrapper-full.is-pushed-block {
+.view-wrapper.is-pushed-block {
   margin-left: 280px;
-  width: calc(100% - 280px);
 }
 
-/* Page heading */
-.page-heading {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 0 1.5rem;
-  height: 60px;
-  background: var(--white, #fff);
-  border-bottom: 1px solid var(--border, #e5e7eb);
+/* ─────────────────────────────────────────────────────────────────
+   Page title / toolbar (Vuero style)
+───────────────────────────────────────────────────────────────── */
+.page-title {
   position: sticky;
   top: 0;
-  z-index: 20;
-}
-.page-title { margin: 0; font-size: 1.25rem; font-weight: 700; flex: 1; }
-.toolbar { display: flex; align-items: center; gap: 0.5rem; }
-
-/* Page content */
-.page-content-wrapper { padding: 1.5rem; }
-.page-content { background: transparent; }
-
-/* Colored theme */
-.sidebar-block.is-colored {
-  background: #1a1a2e;
-  border-color: #1a1a2e;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  height: 60px;
+  padding: 0 1.5rem;
+  background: var(--white, #fff);
+  border-bottom: 1px solid var(--border, #dbdbdb);
+  gap: 0.75rem;
+  box-shadow: var(--light-box-shadow, -1px 3px 10px 0 rgba(0,0,0,.06));
 }
 
-/* Transitions */
-.slide-x-enter-active, .slide-x-leave-active { transition: transform 0.3s ease; }
-.slide-x-enter-from, .slide-x-leave-to { transform: translateX(-100%); }
-.fade-enter-active, .fade-leave-active { transition: opacity 0.2s; }
-.fade-enter-from, .fade-leave-to { opacity: 0; }
+.title-wrap {
+  flex: 1;
+  margin-left: 0.25rem;
+}
+.title-wrap .title {
+  margin: 0;
+  font-family: var(--font-alt, 'Montserrat Variable', sans-serif);
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--dark-text, #283252);
+  line-height: 1;
+}
 
-/* Responsive */
+.desktop-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-left: auto;
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   Page content
+───────────────────────────────────────────────────────────────── */
+.page-content-wrapper {
+  flex: 1;
+  padding: 1.5rem;
+}
+.page-content {
+  background: transparent;
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   Transitions
+───────────────────────────────────────────────────────────────── */
+.slide-x-enter-active,
+.slide-x-leave-active { transition: transform 0.3s ease; }
+.slide-x-enter-from,
+.slide-x-leave-to     { transform: translateX(-100%); }
+
+.fade-enter-active,
+.fade-leave-active { transition: opacity 0.25s; }
+.fade-enter-from,
+.fade-leave-to     { opacity: 0; }
+
+/* ─────────────────────────────────────────────────────────────────
+   Responsive
+───────────────────────────────────────────────────────────────── */
 @media (max-width: 768px) {
-  .mobile-navbar { display: flex; }
-  .sidebar-toggle { display: none; }
-  .view-wrapper-full { margin-top: 60px; }
-  .view-wrapper-full.is-pushed-block { margin-left: 0; width: 100%; }
+  .mobile-navbar   { display: flex; }
+  .view-wrapper    { margin-top: 60px; }
+  .view-wrapper.is-pushed-block { margin-left: 0; }
   .sidebar-block:not(.is-mobile) { display: none; }
-  .sidebar-block.is-mobile { z-index: 36; }
+  .page-title .vuero-hamburger.nav-trigger { display: none; }
+  .page-content-wrapper { padding: 1rem; }
 }
 @media (min-width: 769px) {
   .mobile-navbar { display: none; }
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   Dark mode stubs
+───────────────────────────────────────────────────────────────── */
+.is-dark .sidebar-block {
+  background: #2a2a2d;
+  border-color: #2a2a2d;
+}
+.is-dark .page-title {
+  background: #1e1e21;
+  border-color: #2a2a2d;
+}
+.is-dark .title-wrap .title {
+  color: #e2e2e4;
 }
 </style>
