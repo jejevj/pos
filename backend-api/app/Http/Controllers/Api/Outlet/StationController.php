@@ -110,7 +110,7 @@ class StationController extends Controller
             INNER JOIN order_items oi ON oi.order_id = o.id
             INNER JOIN menu m ON m.id = oi.menu_id
             WHERE (m.station_id = ? OR m.station_id IS NULL)
-              AND o.status IN ('draft', 'paid')
+              AND o.status IN ('draft', 'paid', 'bon')
               AND o.deleted_at IS NULL
               AND oi.status IN ('pending', 'preparing', 'ready')
             ORDER BY o.created_at ASC
