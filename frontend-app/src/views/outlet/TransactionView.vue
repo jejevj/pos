@@ -868,21 +868,22 @@ const formatNumber = (num) => Number(num || 0).toLocaleString('id-ID', { minimum
 // Format seconds into human-readable duration with auto unit selection and 1 decimal
 const formatDuration = (seconds) => {
   if (seconds === null || seconds === undefined) return '-'
-  
+  if (seconds < 0) return '-'
+
   // Convert to hours if >= 60 minutes
   if (seconds >= 3600) {
     const hours = seconds / 3600
-    return `${hours.toFixed(1)}h`
+    return `${hours.toFixed(1)} jam`
   }
-  
+
   // Convert to minutes if >= 60 seconds
   if (seconds >= 60) {
     const minutes = seconds / 60
-    return `${minutes.toFixed(1)}m`
+    return `${minutes.toFixed(1)} mnt`
   }
-  
+
   // Show seconds
-  return `${seconds.toFixed(1)}d`
+  return `${seconds.toFixed(1)} dtk`
 }
 
 // Color-code prep time: green < 5m, yellow < 10m, red >= 10m
