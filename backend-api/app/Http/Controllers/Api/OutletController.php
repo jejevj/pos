@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Outlet;
+use App\Services\OutletProvisioner;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Validator;
@@ -78,19 +79,32 @@ class OutletController extends Controller
 
         try {
             $outlet = Outlet::create($data);
-            
-            // Manually create schema (in case event doesn't fire)
-            $schemaCreated = $outlet->createSchema();
-            
+
+            // The `created` model event already provisions schema + tables +
+            // RBAC and maps the creating global user as an owner outlet_user.
+            // Calling provisioner again here is idempotent and acts as a
+            // safety net in case the event was suppressed.
+            $provisioner = app(OutletProvisioner::class);
+            $schemaCreated = $provisioner->provision($outlet);
+
             if (!$schemaCreated) {
-                // Rollback if schema creation failed
                 $outlet->delete();
                 return response()->json([
                     'message' => 'Failed to create outlet schema',
                     'error' => 'Schema creation failed'
                 ], 500);
             }
-            
+
+            // Ensure the creating global user is mapped as the outlet owner
+            // so they can clock-in / manage immediately. Only the creator is
+            // mapped — this preserves the rule that superadmin is NOT a
+            // universal employee of every outlet, only of outlets they
+            // personally created (or were explicitly added to).
+            $creator = Auth::user();
+            if ($creator) {
+                $provisioner->mapOwner($outlet, $creator);
+            }
+
             $outlet->load('owner:id,name,email');
 
             return response()->json([

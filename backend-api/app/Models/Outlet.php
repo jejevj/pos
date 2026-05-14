@@ -2,9 +2,11 @@
 
 namespace App\Models;
 
+use App\Services\OutletProvisioner;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
@@ -71,9 +73,22 @@ class Outlet extends Model
             }
         });
 
-        // Create PostgreSQL schema after outlet is created
+        // Fully provision the outlet (schema + all per-outlet tables + RBAC
+        // seed) immediately after creation, and map the creating global user
+        // as the outlet owner so they can clock in / manage this outlet.
+        // Idempotent — safe to call repeatedly.
         static::created(function ($outlet) {
-            $outlet->createSchema();
+            $provisioner = app(OutletProvisioner::class);
+            $provisioner->provision($outlet);
+
+            $creator = null;
+            if ($outlet->user_id) {
+                $creator = \App\Models\User::find($outlet->user_id);
+            }
+            $creator = $creator ?: Auth::user();
+            if ($creator) {
+                $provisioner->mapOwner($outlet, $creator);
+            }
         });
 
         // Drop PostgreSQL schema when outlet is deleted
@@ -85,53 +100,13 @@ class Outlet extends Model
     }
 
     /**
-     * Create PostgreSQL schema for this outlet
+     * Provision the per-outlet schema and every table needed for the app.
+     * Delegates to {@see OutletProvisioner} so command, controller, and
+     * model-event call sites share one idempotent implementation.
      */
     public function createSchema()
     {
-        try {
-            \Log::info("Creating schema: {$this->schema_name} for outlet ID: {$this->id}");
-            
-            // Create schema
-            DB::statement("CREATE SCHEMA IF NOT EXISTS {$this->schema_name}");
-            \Log::info("Schema created: {$this->schema_name}");
-            
-            // Create outlet_users table in the new schema
-            DB::statement("
-                CREATE TABLE IF NOT EXISTS {$this->schema_name}.outlet_users (
-                    id SERIAL PRIMARY KEY,
-                    outlet_id INTEGER NOT NULL,
-                    name VARCHAR(255) NOT NULL,
-                    email VARCHAR(255) NOT NULL UNIQUE,
-                    password VARCHAR(255) NOT NULL,
-                    phone VARCHAR(255),
-                    role VARCHAR(50) DEFAULT 'staff',
-                    is_active BOOLEAN DEFAULT true,
-                    settings JSONB,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    deleted_at TIMESTAMP
-                )
-            ");
-            \Log::info("Table outlet_users created in schema: {$this->schema_name}");
-
-            // Create index on email
-            DB::statement("
-                CREATE INDEX IF NOT EXISTS idx_outlet_users_email 
-                ON {$this->schema_name}.outlet_users(email)
-            ");
-            \Log::info("Index created on outlet_users.email in schema: {$this->schema_name}");
-
-            // Provision HR tables so attendance/payroll endpoints work without
-            // requiring an extra `outlet:create-hr-tables` artisan run.
-            $this->ensureHRTables();
-
-            return true;
-        } catch (\Exception $e) {
-            \Log::error("Failed to create schema for outlet {$this->id}: " . $e->getMessage());
-            \Log::error("Stack trace: " . $e->getTraceAsString());
-            return false;
-        }
+        return app(OutletProvisioner::class)->provision($this);
     }
 
     /**

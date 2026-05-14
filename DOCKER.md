@@ -271,6 +271,29 @@ Docker is not available in the sandbox where this scaffolding was generated, so 
 5. (Linux only) Confirm `host.docker.internal` resolves inside the container: `docker compose exec backend getent hosts host.docker.internal`. If your Postgres listens only on `127.0.0.1`, change `listen_addresses` to `*` (or the docker bridge IP) and update `pg_hba.conf` to allow the Docker bridge subnet — otherwise the backend will get `connection refused`.
 6. (Optional, later) Wire up WhatsApp — see [WhatsApp / WAHA](#whatsapp--waha).
 
+## Outlet provisioning
+
+New outlets are now fully provisioned automatically when created through the API (`POST /api/outlets`) or any Eloquent `Outlet::create(...)` path: the Postgres schema, every per-outlet table (`outlet_users`, RBAC, transactions, menu, station, bahan baku, stock opname, promo, membership, HR, shift, kasbon, purchase/expense, employee beverage) is created, default roles/permissions are seeded, and the creating global user is auto-mapped as an `outlet_users` row with the `owner` role so they can immediately clock in and manage that outlet.
+
+For outlets that existed **before** this change (e.g. the original "Outlet Pusat"), or whenever you want a self-healing re-run, use:
+
+```bash
+# Re-provision a single outlet AND map its global owner as outlet_user owner.
+# Use this to fix the NOT_OUTLET_EMPLOYEE error on an existing outlet.
+docker compose exec backend php artisan outlets:provision --outlet-id=1 --with-owner
+
+# Re-provision every outlet (idempotent — does nothing where tables already exist)
+docker compose exec backend php artisan outlets:provision --with-owner
+
+# Map a specific global user (by users.id) as the owner of outlet 1
+docker compose exec backend php artisan outlets:provision --outlet-id=1 --owner-user-id=1
+```
+
+Notes:
+- The command is idempotent — it uses `CREATE TABLE IF NOT EXISTS` / `ADD COLUMN IF NOT EXISTS` everywhere and `updateOrInsert` for seeded roles/permissions. Safe to re-run.
+- Superadmin is **not** silently mapped to every outlet. They get an `outlet_users` row only for outlets they personally created, or when you explicitly pass their `users.id` via `--owner-user-id`.
+- The legacy `outlets:create-schemas`, `outlets:create-rbac-tables`, `outlets:seed-rbac`, `outlets:create-transaction-tables`, `outlets:create-menu-tables`, `outlets:create-bahan-baku-tables`, `outlets:create-station-tables`, `outlets:create-stock-opname-tables`, `outlets:create-promo-tables`, `outlets:create-membership-tables`, `outlet:create-hr-tables`, `outlet:create-shift-tables`, `create:kasbon-tables`, `create:purchase-expense-tables`, and `outlets:create-employee-beverage-tables` commands still exist for backward compatibility, but you no longer need to chain them by hand.
+
 ## WhatsApp / WAHA
 
 WAHA is **off by default**. The POS stack boots, key generation runs, and the app works fine without it. The proxy's old `/waha/*` route now returns `410 Gone`; WAHA lives on its own hostname.
