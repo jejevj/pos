@@ -318,6 +318,7 @@ class OutletDefaultDataSeeder
                 'lokasi_penyimpanan' => null,
                 'expired_date'       => null,
                 'gambar_url'         => null,
+                'defers_on_bon'      => false,
                 'is_active'          => true,
                 'created_at'         => $now,
                 'updated_at'         => $now,
@@ -476,6 +477,8 @@ class OutletDefaultDataSeeder
             unset($item['bahan_baku']);
 
             $menuId = DB::table('menu')->insertGetId(array_merge([
+                'station_id'       => null,
+                'gambar_url'       => null,
                 'apply_fixed_cost' => true,
                 'is_available'     => true,
                 'is_active'        => true,
