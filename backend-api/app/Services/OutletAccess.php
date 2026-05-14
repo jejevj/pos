@@ -77,7 +77,7 @@ class OutletAccess
         }
 
         $isSuperAdmin = method_exists($user, 'isSuperAdmin') ? $user->isSuperAdmin() : false;
-        $isOwner      = $outlet->user_id === $user->id;
+        $isOwner      = (int) $outlet->user_id === (int) $user->id;
 
         // Always set schema temporarily to query outlet_users — even when setSchema=false.
         // Without this, the query falls to the public schema where outlet_users does not exist.
