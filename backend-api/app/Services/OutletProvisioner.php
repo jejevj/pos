@@ -7,6 +7,7 @@ use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
+use App\Services\OutletDefaultDataSeeder;
 
 /**
  * Idempotent provisioner for everything that lives inside a per-outlet
@@ -62,6 +63,10 @@ class OutletProvisioner
             $this->ensurePurchaseExpenseTables($outlet);
             $this->ensureEmployeeBeverageTables($outlet);
             $this->ensureCrossTableFks($outlet);
+
+            // Seed default master data (satuan, kategori, bahan baku, menu)
+            // Idempotent — aman dipanggil ulang, skip jika data sudah ada
+            (new OutletDefaultDataSeeder())->seed($outlet->schema_name);
 
             return true;
         } catch (\Throwable $e) {
