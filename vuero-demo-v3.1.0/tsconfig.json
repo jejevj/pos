@@ -1,0 +1,55 @@
+{
+  "compilerOptions": {
+    "target": "esnext",
+    "jsx": "preserve",
+    "jsxImportSource": "vue",
+    "lib": ["esnext", "dom"],
+    "useDefineForClassFields": true,
+    "baseUrl": ".",
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "paths": {
+      "photoswipe/lightbox": [
+        "./node_modules/photoswipe/dist/types/lightbox/lightbox.d.ts"
+      ],
+      "v-calendar": [
+        "./node_modules/v-calendar/dist/types/src/index.d.ts"
+      ],
+      "vue3-apexcharts": [
+        "./node_modules/vue3-apexcharts/typings/vue3-apexcharts.d.ts"
+      ],
+      "/@src/*": ["./src/*"],
+      "/@server/*": ["./server/*"]
+    },
+    "resolveJsonModule": true,
+    "types": [
+      "vite/client",
+      "vite-plugin-pwa/client",
+      "unplugin-vue-router/client",
+      "@intlify/unplugin-vue-i18n/messages"
+    ],
+    "allowImportingTsExtensions": true,
+    "allowJs": true,
+    "strict": true,
+    "noImplicitThis": true,
+    "importHelpers": true,
+    "noEmit": true,
+    "removeComments": true,
+    "allowSyntheticDefaultImports": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "isolatedModules": true,
+    "verbatimModuleSyntax": true,
+    "skipLibCheck": true
+  },
+  "include": [
+    "vite-plugin/**/*.ts",
+    "server/**/*.ts",
+    "types/**/*.d.ts",
+    "src/**/*.js",
+    "src/**/*.ts",
+    "src/**/*.vue",
+    "*.config.ts"
+  ],
+  "exclude": ["bulma-colors.ts", "components-meta.ts"]
+}
