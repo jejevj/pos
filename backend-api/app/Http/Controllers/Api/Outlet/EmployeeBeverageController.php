@@ -343,6 +343,50 @@ class EmployeeBeverageController extends Controller
     }
 
     /**
+     * Get quota status for the currently logged-in outlet user (no userId needed)
+     */
+    public function getMyQuotaStatus(Request $request, $outletId)
+    {
+        try {
+            $outlet = $this->authorizeOutlet($outletId);
+            $currentUser = $this->currentOutletUser();
+
+            if (!$currentUser) {
+                DB::statement("SET search_path TO public");
+                return response()->json([
+                    'message' => 'Akun outlet tidak ditemukan.',
+                    'code' => 'NOT_OUTLET_EMPLOYEE',
+                ], 403);
+            }
+
+            $settings = DB::table('employee_beverage_settings')->first();
+            $today = date('Y-m-d');
+
+            $claimsToday = DB::table('employee_beverage_claims')
+                ->where('user_id', $currentUser->id)
+                ->where('claimed_date', $today)
+                ->count();
+
+            $status = [
+                'user_id'     => $currentUser->id,
+                'date'        => $today,
+                'daily_quota' => $settings->daily_quota ?? 1,
+                'claimed'     => $claimsToday,
+                'remaining'   => max(0, ($settings->daily_quota ?? 1) - $claimsToday),
+                'can_claim'   => $claimsToday < ($settings->daily_quota ?? 1),
+            ];
+
+            DB::statement("SET search_path TO public");
+            return response()->json($status);
+        } catch (HttpResponseException $e) {
+            throw $e;
+        } catch (\Exception $e) {
+            DB::statement("SET search_path TO public");
+            return response()->json(['message' => 'Failed to fetch quota status', 'error' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
      * Get employee quota status
      */
     public function getEmployeeQuotaStatus(Request $request, $outletId, $userId)
