@@ -379,8 +379,6 @@ class RolePermissionController extends Controller
                 $inserts = array_map(fn($pid) => [
                     'role_id'       => $roleId,
                     'permission_id' => $pid,
-                    'created_at'    => now(),
-                    'updated_at'    => now(),
                 ], $request->permissions);
                 DB::table('role_permissions')->insert($inserts);
             }
