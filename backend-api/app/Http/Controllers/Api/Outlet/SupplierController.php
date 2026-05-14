@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\Outlet;
 
+use App\Http\Controllers\Concerns\AuthorizesOutletAccess;
 use App\Http\Controllers\Controller;
 use App\Models\Outlet;
 use App\Models\Supplier;
@@ -12,21 +13,14 @@ use Illuminate\Support\Facades\Validator;
 
 class SupplierController extends Controller
 {
+    use AuthorizesOutletAccess;
+
     /**
      * Get all suppliers for an outlet
      */
     public function index($outletId)
     {
-        $user = Auth::user();
-        $outlet = Outlet::find($outletId);
-
-        if (!$outlet) {
-            return response()->json(['message' => 'Outlet not found'], 404);
-        }
-
-        if (!$user->isSuperAdmin() && $outlet->user_id !== $user->id) {
-            return response()->json(['message' => 'Unauthorized'], 403);
-        }
+        $outlet = $this->authorizeOutlet($outletId);
 
         try {
             DB::statement("SET search_path TO {$outlet->schema_name}, public");
@@ -50,16 +44,7 @@ class SupplierController extends Controller
      */
     public function store(Request $request, $outletId)
     {
-        $user = Auth::user();
-        $outlet = Outlet::find($outletId);
-
-        if (!$outlet) {
-            return response()->json(['message' => 'Outlet not found'], 404);
-        }
-
-        if (!$user->isSuperAdmin() && $outlet->user_id !== $user->id) {
-            return response()->json(['message' => 'Unauthorized'], 403);
-        }
+        $outlet = $this->authorizeOutlet($outletId);
 
         $validator = Validator::make($request->all(), [
             'nama' => 'required|string|max:200',
@@ -110,16 +95,7 @@ class SupplierController extends Controller
      */
     public function show($outletId, $id)
     {
-        $user = Auth::user();
-        $outlet = Outlet::find($outletId);
-
-        if (!$outlet) {
-            return response()->json(['message' => 'Outlet not found'], 404);
-        }
-
-        if (!$user->isSuperAdmin() && $outlet->user_id !== $user->id) {
-            return response()->json(['message' => 'Unauthorized'], 403);
-        }
+        $outlet = $this->authorizeOutlet($outletId);
 
         try {
             DB::statement("SET search_path TO {$outlet->schema_name}, public");
@@ -147,16 +123,7 @@ class SupplierController extends Controller
      */
     public function update(Request $request, $outletId, $id)
     {
-        $user = Auth::user();
-        $outlet = Outlet::find($outletId);
-
-        if (!$outlet) {
-            return response()->json(['message' => 'Outlet not found'], 404);
-        }
-
-        if (!$user->isSuperAdmin() && $outlet->user_id !== $user->id) {
-            return response()->json(['message' => 'Unauthorized'], 403);
-        }
+        $outlet = $this->authorizeOutlet($outletId);
 
         $validator = Validator::make($request->all(), [
             'nama' => 'string|max:200',
@@ -211,16 +178,7 @@ class SupplierController extends Controller
      */
     public function destroy($outletId, $id)
     {
-        $user = Auth::user();
-        $outlet = Outlet::find($outletId);
-
-        if (!$outlet) {
-            return response()->json(['message' => 'Outlet not found'], 404);
-        }
-
-        if (!$user->isSuperAdmin() && $outlet->user_id !== $user->id) {
-            return response()->json(['message' => 'Unauthorized'], 403);
-        }
+        $outlet = $this->authorizeOutlet($outletId);
 
         try {
             DB::statement("SET search_path TO {$outlet->schema_name}, public");

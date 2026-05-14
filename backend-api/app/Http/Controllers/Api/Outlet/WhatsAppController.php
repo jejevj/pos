@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\Outlet;
 
+use App\Http\Controllers\Concerns\AuthorizesOutletAccess;
 use App\Http\Controllers\Controller;
 use App\Services\WahaService;
 use Illuminate\Http\Request;
@@ -9,18 +10,13 @@ use Illuminate\Support\Facades\DB;
 
 class WhatsAppController extends Controller
 {
+    use AuthorizesOutletAccess;
+
     protected WahaService $waha;
 
     public function __construct(WahaService $waha)
     {
         $this->waha = $waha;
-    }
-
-    protected function authorizeOutlet($outletId)
-    {
-        $outlet = \App\Models\Outlet::find($outletId);
-        if (!$outlet) abort(404, 'Outlet not found');
-        return $outlet;
     }
 
     /**
@@ -42,21 +38,36 @@ class WhatsAppController extends Controller
     }
 
     /**
-     * Get QR code for WAHA session.
+     * Get QR code for WAHA session. Restricted to platform admins since the
+     * WAHA session is a process-wide resource (anyone who can scan/start it
+     * can route WA messages for every outlet).
      */
     public function qrCode()
     {
+        $this->requireSuperAdmin();
         $qr = $this->waha->getQrCode();
         return response()->json(['qr' => $qr]);
     }
 
     /**
-     * Start WAHA session.
+     * Start WAHA session. Platform-admin only — see qrCode().
      */
     public function startSession()
     {
+        $this->requireSuperAdmin();
         $started = $this->waha->startSession();
         return response()->json(['success' => $started]);
+    }
+
+    private function requireSuperAdmin(): void
+    {
+        $user = \Illuminate\Support\Facades\Auth::user();
+        if (!$user || !method_exists($user, 'isSuperAdmin') || !$user->isSuperAdmin()) {
+            abort(response()->json([
+                'message' => 'Hanya superadmin yang boleh mengelola sesi WAHA global.',
+                'code' => 'SUPERADMIN_REQUIRED',
+            ], 403));
+        }
     }
 
     /**

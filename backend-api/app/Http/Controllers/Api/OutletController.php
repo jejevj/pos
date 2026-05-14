@@ -2,11 +2,14 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Http\Controllers\Concerns\AuthorizesOutletAccess;
 use App\Http\Controllers\Controller;
 use App\Models\Outlet;
+use App\Services\OutletAccess;
 use App\Services\OutletProvisioner;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 
 /**
@@ -17,6 +20,8 @@ use Illuminate\Support\Facades\Validator;
  */
 class OutletController extends Controller
 {
+    use AuthorizesOutletAccess;
+
     /**
      * @OA\Get(
      *     path="/api/outlets",
@@ -29,18 +34,53 @@ class OutletController extends Controller
     public function index()
     {
         $user = Auth::user();
-        
+
         // Superadmin can see all outlets
         if ($user->isSuperAdmin()) {
             $outlets = Outlet::with('owner:id,name,email')->get();
-        } else {
-            // Regular users only see their own outlets
-            $outlets = Outlet::where('user_id', $user->id)
-                ->with('owner:id,name,email')
-                ->get();
+            return response()->json($outlets);
         }
 
+        // Regular users see outlets they OWN plus outlets where they are
+        // mapped as an outlet_user (matched by email).
+        $ownedIds = Outlet::where('user_id', $user->id)->pluck('id')->all();
+        $mappedIds = $this->outletsMappedToUserByEmail($user->email);
+        $allIds = array_values(array_unique(array_merge($ownedIds, $mappedIds)));
+
+        $outlets = Outlet::whereIn('id', $allIds)
+            ->with('owner:id,name,email')
+            ->get();
+
         return response()->json($outlets);
+    }
+
+    /**
+     * For non-superadmin users, look at each outlet's schema and find
+     * which ones contain an active outlet_users row matching the global
+     * user's email. This keeps "your outlets" honest — staff see the
+     * outlets they actually work at, not just outlets they own.
+     */
+    private function outletsMappedToUserByEmail(string $email): array
+    {
+        $mapped = [];
+        $outlets = Outlet::where('is_active', true)->get(['id', 'schema_name']);
+        foreach ($outlets as $o) {
+            try {
+                DB::statement("SET search_path TO {$o->schema_name}, public");
+                $hit = DB::table('outlet_users')
+                    ->where('email', $email)
+                    ->where('is_active', true)
+                    ->whereNull('deleted_at')
+                    ->exists();
+                if ($hit) {
+                    $mapped[] = (int) $o->id;
+                }
+            } catch (\Throwable $e) {
+                // Schema may be incomplete; skip rather than 500.
+            }
+        }
+        DB::statement("SET search_path TO public");
+        return $mapped;
     }
 
     /**
@@ -130,18 +170,10 @@ class OutletController extends Controller
      */
     public function show($id)
     {
-        $user = Auth::user();
+        // Authorize: superadmin, owner, or mapped outlet_user can read.
+        $this->authorizeOutlet($id, ['setSchema' => false]);
+
         $outlet = Outlet::with('owner:id,name,email')->find($id);
-
-        if (!$outlet) {
-            return response()->json(['message' => 'Outlet not found'], 404);
-        }
-
-        // Check permission
-        if (!$user->isSuperAdmin() && $outlet->user_id !== $user->id) {
-            return response()->json(['message' => 'Unauthorized'], 403);
-        }
-
         return response()->json($outlet);
     }
 

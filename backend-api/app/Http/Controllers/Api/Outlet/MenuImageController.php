@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\Outlet;
 
+use App\Http\Controllers\Concerns\AuthorizesOutletAccess;
 use App\Http\Controllers\Controller;
 use App\Models\Outlet;
 use Illuminate\Http\Request;
@@ -12,21 +13,14 @@ use Illuminate\Support\Str;
 
 class MenuImageController extends Controller
 {
+    use AuthorizesOutletAccess;
+
     /**
      * Upload menu image
      */
     public function upload(Request $request, $outletId)
     {
-        $user = Auth::user();
-        $outlet = Outlet::find($outletId);
-
-        if (!$outlet) {
-            return response()->json(['message' => 'Outlet not found'], 404);
-        }
-
-        if (!$user->isSuperAdmin() && $outlet->user_id !== $user->id) {
-            return response()->json(['message' => 'Unauthorized'], 403);
-        }
+        $outlet = $this->authorizeOutlet($outletId);
 
         $validator = Validator::make($request->all(), [
             'image' => 'required|image|mimes:jpeg,png,jpg,gif,webp|max:2048', // Max 2MB
@@ -70,16 +64,7 @@ class MenuImageController extends Controller
      */
     public function delete(Request $request, $outletId)
     {
-        $user = Auth::user();
-        $outlet = Outlet::find($outletId);
-
-        if (!$outlet) {
-            return response()->json(['message' => 'Outlet not found'], 404);
-        }
-
-        if (!$user->isSuperAdmin() && $outlet->user_id !== $user->id) {
-            return response()->json(['message' => 'Unauthorized'], 403);
-        }
+        $outlet = $this->authorizeOutlet($outletId);
 
         $validator = Validator::make($request->all(), [
             'path' => 'required|string',

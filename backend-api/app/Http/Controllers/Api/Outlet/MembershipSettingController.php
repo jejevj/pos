@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\Outlet;
 
+use App\Http\Controllers\Concerns\AuthorizesOutletAccess;
 use App\Http\Controllers\Controller;
 use App\Models\Outlet;
 use App\Models\MembershipSetting;
@@ -12,14 +13,8 @@ use Illuminate\Support\Facades\Validator;
 
 class MembershipSettingController extends Controller
 {
-    private function authorizeOutlet($outletId)
-    {
-        $user = Auth::user();
-        $outlet = Outlet::find($outletId);
-        if (!$outlet) abort(404, 'Outlet not found');
-        if (!$user->isSuperAdmin() && $outlet->user_id !== $user->id) abort(403, 'Unauthorized');
-        return $outlet;
-    }
+    use AuthorizesOutletAccess;
+
 
     /**
      * Get membership settings

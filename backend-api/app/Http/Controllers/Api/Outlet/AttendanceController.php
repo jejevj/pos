@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\Outlet;
 
+use App\Http\Controllers\Concerns\AuthorizesOutletAccess;
 use App\Http\Controllers\Controller;
 use App\Models\Outlet;
 use Illuminate\Http\Request;
@@ -11,14 +12,15 @@ use Carbon\Carbon;
 
 class AttendanceController extends Controller
 {
-    private function authorizeOutlet($outletId)
+    use AuthorizesOutletAccess;
+
+    /**
+     * Authorize, ensure HR schema tables exist (self-heal for outlets
+     * provisioned before HR migrations landed), and return the outlet.
+     */
+    private function authorizeAttendanceOutlet($outletId): Outlet
     {
-        $user = Auth::user();
-        $outlet = Outlet::find($outletId);
-        if (!$outlet) abort(404, 'Outlet not found');
-        if (!$user->isSuperAdmin() && $outlet->user_id !== $user->id) abort(403, 'Unauthorized');
-        // Self-heal outlets created before HR provisioning was wired into
-        // Outlet::createSchema(). Idempotent — uses CREATE TABLE IF NOT EXISTS.
+        $outlet = $this->authorizeOutlet($outletId);
         $outlet->ensureHRTables();
         return $outlet;
     }
@@ -27,10 +29,14 @@ class AttendanceController extends Controller
      * Resolve the authenticated global user to an outlet_user row in this
      * outlet's schema. Returns the outlet_user record (stdClass) or null.
      *
-     * Assumes schema is already set on the connection (search_path).
+     * Prefers the outlet_user resolved by the trait (already keyed by email
+     * + active + outlet_id); falls back to a fresh query for safety.
      */
     private function resolveOutletUser($outlet)
     {
+        if ($this->currentOutletUser()) {
+            return $this->currentOutletUser();
+        }
         $authUser = Auth::user();
         if (!$authUser) return null;
 
@@ -61,7 +67,7 @@ class AttendanceController extends Controller
      */
     public function index(Request $request, $outletId)
     {
-        $outlet = $this->authorizeOutlet($outletId);
+        $outlet = $this->authorizeAttendanceOutlet($outletId);
 
         try {
             DB::statement("SET search_path TO {$outlet->schema_name}, public");
@@ -125,7 +131,7 @@ class AttendanceController extends Controller
      */
     public function clockIn(Request $request, $outletId)
     {
-        $outlet = $this->authorizeOutlet($outletId);
+        $outlet = $this->authorizeAttendanceOutlet($outletId);
 
         $request->validate([
             'photo' => 'required|string',
@@ -237,7 +243,7 @@ class AttendanceController extends Controller
      */
     public function clockOut(Request $request, $outletId)
     {
-        $outlet = $this->authorizeOutlet($outletId);
+        $outlet = $this->authorizeAttendanceOutlet($outletId);
 
         $request->validate([
             'photo' => 'required|string',
@@ -345,7 +351,7 @@ class AttendanceController extends Controller
      */
     public function getTodayStatus(Request $request, $outletId, $userId)
     {
-        $outlet = $this->authorizeOutlet($outletId);
+        $outlet = $this->authorizeAttendanceOutlet($outletId);
 
         try {
             DB::statement("SET search_path TO {$outlet->schema_name}, public");
@@ -390,7 +396,7 @@ class AttendanceController extends Controller
      */
     public function getSummary(Request $request, $outletId)
     {
-        $outlet = $this->authorizeOutlet($outletId);
+        $outlet = $this->authorizeAttendanceOutlet($outletId);
 
         $month = $request->input('month', Carbon::now()->month);
         $year = $request->input('year', Carbon::now()->year);

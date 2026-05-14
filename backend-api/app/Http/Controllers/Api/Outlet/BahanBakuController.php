@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\Outlet;
 
+use App\Http\Controllers\Concerns\AuthorizesOutletAccess;
 use App\Http\Controllers\Controller;
 use App\Models\Outlet;
 use App\Models\BahanBaku;
@@ -12,21 +13,14 @@ use Illuminate\Support\Facades\Validator;
 
 class BahanBakuController extends Controller
 {
+    use AuthorizesOutletAccess;
+
     /**
      * Get all bahan baku for an outlet
      */
     public function index(Request $request, $outletId)
     {
-        $user = Auth::user();
-        $outlet = Outlet::find($outletId);
-
-        if (!$outlet) {
-            return response()->json(['message' => 'Outlet not found'], 404);
-        }
-
-        if (!$user->isSuperAdmin() && $outlet->user_id !== $user->id) {
-            return response()->json(['message' => 'Unauthorized'], 403);
-        }
+        $outlet = $this->authorizeOutlet($outletId);
 
         try {
             DB::statement("SET search_path TO {$outlet->schema_name}, public");
@@ -75,16 +69,7 @@ class BahanBakuController extends Controller
      */
     public function store(Request $request, $outletId)
     {
-        $user = Auth::user();
-        $outlet = Outlet::find($outletId);
-
-        if (!$outlet) {
-            return response()->json(['message' => 'Outlet not found'], 404);
-        }
-
-        if (!$user->isSuperAdmin() && $outlet->user_id !== $user->id) {
-            return response()->json(['message' => 'Unauthorized'], 403);
-        }
+        $outlet = $this->authorizeOutlet($outletId);
 
         try {
             DB::statement("SET search_path TO {$outlet->schema_name}, public");
@@ -159,16 +144,7 @@ class BahanBakuController extends Controller
      */
     public function show($outletId, $id)
     {
-        $user = Auth::user();
-        $outlet = Outlet::find($outletId);
-
-        if (!$outlet) {
-            return response()->json(['message' => 'Outlet not found'], 404);
-        }
-
-        if (!$user->isSuperAdmin() && $outlet->user_id !== $user->id) {
-            return response()->json(['message' => 'Unauthorized'], 403);
-        }
+        $outlet = $this->authorizeOutlet($outletId);
 
         try {
             DB::statement("SET search_path TO {$outlet->schema_name}, public");
@@ -196,16 +172,7 @@ class BahanBakuController extends Controller
      */
     public function update(Request $request, $outletId, $id)
     {
-        $user = Auth::user();
-        $outlet = Outlet::find($outletId);
-
-        if (!$outlet) {
-            return response()->json(['message' => 'Outlet not found'], 404);
-        }
-
-        if (!$user->isSuperAdmin() && $outlet->user_id !== $user->id) {
-            return response()->json(['message' => 'Unauthorized'], 403);
-        }
+        $outlet = $this->authorizeOutlet($outletId);
 
         try {
             DB::statement("SET search_path TO {$outlet->schema_name}, public");
@@ -265,16 +232,7 @@ class BahanBakuController extends Controller
      */
     public function destroy($outletId, $id)
     {
-        $user = Auth::user();
-        $outlet = Outlet::find($outletId);
-
-        if (!$outlet) {
-            return response()->json(['message' => 'Outlet not found'], 404);
-        }
-
-        if (!$user->isSuperAdmin() && $outlet->user_id !== $user->id) {
-            return response()->json(['message' => 'Unauthorized'], 403);
-        }
+        $outlet = $this->authorizeOutlet($outletId);
 
         try {
             DB::statement("SET search_path TO {$outlet->schema_name}, public");
@@ -307,16 +265,7 @@ class BahanBakuController extends Controller
      */
     public function addStock(Request $request, $outletId, $id)
     {
-        $user = Auth::user();
-        $outlet = Outlet::find($outletId);
-
-        if (!$outlet) {
-            return response()->json(['message' => 'Outlet not found'], 404);
-        }
-
-        if (!$user->isSuperAdmin() && $outlet->user_id !== $user->id) {
-            return response()->json(['message' => 'Unauthorized'], 403);
-        }
+        $outlet = $this->authorizeOutlet($outletId);
 
         $validator = Validator::make($request->all(), [
             'quantity' => 'required|numeric|min:0.01',
@@ -372,16 +321,7 @@ class BahanBakuController extends Controller
      */
     public function reduceStock(Request $request, $outletId, $id)
     {
-        $user = Auth::user();
-        $outlet = Outlet::find($outletId);
-
-        if (!$outlet) {
-            return response()->json(['message' => 'Outlet not found'], 404);
-        }
-
-        if (!$user->isSuperAdmin() && $outlet->user_id !== $user->id) {
-            return response()->json(['message' => 'Unauthorized'], 403);
-        }
+        $outlet = $this->authorizeOutlet($outletId);
 
         $validator = Validator::make($request->all(), [
             'quantity' => 'required|numeric|min:0.01',
@@ -437,16 +377,7 @@ class BahanBakuController extends Controller
      */
     public function adjustStock(Request $request, $outletId, $id)
     {
-        $user = Auth::user();
-        $outlet = Outlet::find($outletId);
-
-        if (!$outlet) {
-            return response()->json(['message' => 'Outlet not found'], 404);
-        }
-
-        if (!$user->isSuperAdmin() && $outlet->user_id !== $user->id) {
-            return response()->json(['message' => 'Unauthorized'], 403);
-        }
+        $outlet = $this->authorizeOutlet($outletId);
 
         $validator = Validator::make($request->all(), [
             'new_stock' => 'required|numeric|min:0',
@@ -498,16 +429,7 @@ class BahanBakuController extends Controller
      */
     public function stockHistory($outletId, $id)
     {
-        $user = Auth::user();
-        $outlet = Outlet::find($outletId);
-
-        if (!$outlet) {
-            return response()->json(['message' => 'Outlet not found'], 404);
-        }
-
-        if (!$user->isSuperAdmin() && $outlet->user_id !== $user->id) {
-            return response()->json(['message' => 'Unauthorized'], 403);
-        }
+        $outlet = $this->authorizeOutlet($outletId);
 
         try {
             DB::statement("SET search_path TO {$outlet->schema_name}, public");

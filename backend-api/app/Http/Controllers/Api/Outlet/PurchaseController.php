@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\Outlet;
 
+use App\Http\Controllers\Concerns\AuthorizesOutletAccess;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -10,16 +11,8 @@ use Illuminate\Support\Facades\Storage;
 
 class PurchaseController extends Controller
 {
-    private function authorizeOutlet($outletId)
-    {
-        $outlet = DB::table('outlets')->where('id', $outletId)->first();
-        
-        if (!$outlet) {
-            abort(404, 'Outlet not found');
-        }
-        
-        return $outlet;
-    }
+    use AuthorizesOutletAccess;
+
 
     public function index(Request $request, $outletId)
     {

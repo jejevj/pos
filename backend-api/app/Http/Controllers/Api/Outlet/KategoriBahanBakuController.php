@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\Outlet;
 
+use App\Http\Controllers\Concerns\AuthorizesOutletAccess;
 use App\Http\Controllers\Controller;
 use App\Models\Outlet;
 use App\Models\KategoriBahanBaku;
@@ -18,6 +19,8 @@ use Illuminate\Support\Facades\Validator;
  */
 class KategoriBahanBakuController extends Controller
 {
+    use AuthorizesOutletAccess;
+
     /**
      * @OA\Get(
      *     path="/api/outlets/{outlet}/kategori-bahan-baku",
@@ -32,16 +35,7 @@ class KategoriBahanBakuController extends Controller
      */
     public function index($outletId)
     {
-        $user = Auth::user();
-        $outlet = Outlet::find($outletId);
-
-        if (!$outlet) {
-            return response()->json(['message' => 'Outlet not found'], 404);
-        }
-
-        if (!$user->isSuperAdmin() && $outlet->user_id !== $user->id) {
-            return response()->json(['message' => 'Unauthorized'], 403);
-        }
+        $outlet = $this->authorizeOutlet($outletId);
 
         try {
             // Switch to outlet schema
@@ -86,16 +80,7 @@ class KategoriBahanBakuController extends Controller
      */
     public function store(Request $request, $outletId)
     {
-        $user = Auth::user();
-        $outlet = Outlet::find($outletId);
-
-        if (!$outlet) {
-            return response()->json(['message' => 'Outlet not found'], 404);
-        }
-
-        if (!$user->isSuperAdmin() && $outlet->user_id !== $user->id) {
-            return response()->json(['message' => 'Unauthorized'], 403);
-        }
+        $outlet = $this->authorizeOutlet($outletId);
 
         $validator = Validator::make($request->all(), [
             'nama' => 'required|string|max:100',
@@ -135,16 +120,7 @@ class KategoriBahanBakuController extends Controller
      */
     public function show($outletId, $id)
     {
-        $user = Auth::user();
-        $outlet = Outlet::find($outletId);
-
-        if (!$outlet) {
-            return response()->json(['message' => 'Outlet not found'], 404);
-        }
-
-        if (!$user->isSuperAdmin() && $outlet->user_id !== $user->id) {
-            return response()->json(['message' => 'Unauthorized'], 403);
-        }
+        $outlet = $this->authorizeOutlet($outletId);
 
         try {
             DB::statement("SET search_path TO {$outlet->schema_name}, public");
@@ -172,16 +148,7 @@ class KategoriBahanBakuController extends Controller
      */
     public function update(Request $request, $outletId, $id)
     {
-        $user = Auth::user();
-        $outlet = Outlet::find($outletId);
-
-        if (!$outlet) {
-            return response()->json(['message' => 'Outlet not found'], 404);
-        }
-
-        if (!$user->isSuperAdmin() && $outlet->user_id !== $user->id) {
-            return response()->json(['message' => 'Unauthorized'], 403);
-        }
+        $outlet = $this->authorizeOutlet($outletId);
 
         $validator = Validator::make($request->all(), [
             'nama' => 'string|max:100',
@@ -228,16 +195,7 @@ class KategoriBahanBakuController extends Controller
      */
     public function destroy($outletId, $id)
     {
-        $user = Auth::user();
-        $outlet = Outlet::find($outletId);
-
-        if (!$outlet) {
-            return response()->json(['message' => 'Outlet not found'], 404);
-        }
-
-        if (!$user->isSuperAdmin() && $outlet->user_id !== $user->id) {
-            return response()->json(['message' => 'Unauthorized'], 403);
-        }
+        $outlet = $this->authorizeOutlet($outletId);
 
         try {
             DB::statement("SET search_path TO {$outlet->schema_name}, public");

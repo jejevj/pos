@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\Outlet;
 
+use App\Http\Controllers\Concerns\AuthorizesOutletAccess;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -9,14 +10,33 @@ use Illuminate\Support\Facades\Validator;
 
 class EmployeeBeverageController extends Controller
 {
+    use AuthorizesOutletAccess;
+
+    /**
+     * Authorize and set search_path. $requireAdmin gates outlet-admin-only
+     * actions (settings, allowed-list mutation, statistics). All other
+     * endpoints still require either outlet-admin OR a mapped outlet_user
+     * — anonymous-ish "any authenticated user" access is gone either way.
+     */
+    private function authorizeAndUseSchema($outletId, bool $requireAdmin = false): string
+    {
+        $outlet = $this->authorizeOutlet($outletId);
+        if ($requireAdmin && !$this->isOutletAdmin()) {
+            DB::statement("SET search_path TO public");
+            abort(response()->json([
+                'message' => 'Hanya admin/owner outlet yang boleh mengubah pengaturan ini.',
+                'code' => 'OUTLET_ADMIN_REQUIRED',
+            ], 403));
+        }
+        return $outlet->schema_name;
+    }
     /**
      * Get beverage settings
      */
     public function getSettings(Request $request, $outletId)
     {
         try {
-            $schemaName = $this->getOutletSchema($outletId);
-            DB::statement("SET search_path TO {$schemaName}, public");
+            $this->authorizeAndUseSchema($outletId);
 
             $settings = DB::table('employee_beverage_settings')->first();
             
@@ -58,8 +78,7 @@ class EmployeeBeverageController extends Controller
         }
 
         try {
-            $schemaName = $this->getOutletSchema($outletId);
-            DB::statement("SET search_path TO {$schemaName}, public");
+            $this->authorizeAndUseSchema($outletId, true);
 
             $settings = DB::table('employee_beverage_settings')->first();
             
@@ -98,8 +117,7 @@ class EmployeeBeverageController extends Controller
     public function getAllowedBeverages(Request $request, $outletId)
     {
         try {
-            $schemaName = $this->getOutletSchema($outletId);
-            DB::statement("SET search_path TO {$schemaName}, public");
+            $this->authorizeAndUseSchema($outletId);
 
             $beverages = DB::table('employee_allowed_beverages as eab')
                 ->join('menu as m', 'eab.menu_id', '=', 'm.id')
@@ -140,8 +158,7 @@ class EmployeeBeverageController extends Controller
         }
 
         try {
-            $schemaName = $this->getOutletSchema($outletId);
-            DB::statement("SET search_path TO {$schemaName}, public");
+            $this->authorizeAndUseSchema($outletId, true);
 
             // Check if already exists
             $exists = DB::table('employee_allowed_beverages')
@@ -174,8 +191,7 @@ class EmployeeBeverageController extends Controller
     public function removeAllowedBeverage(Request $request, $outletId, $id)
     {
         try {
-            $schemaName = $this->getOutletSchema($outletId);
-            DB::statement("SET search_path TO {$schemaName}, public");
+            $this->authorizeAndUseSchema($outletId, true);
 
             DB::table('employee_allowed_beverages')->where('id', $id)->delete();
 
@@ -193,11 +209,25 @@ class EmployeeBeverageController extends Controller
     public function getEmployeeClaims(Request $request, $outletId)
     {
         try {
-            $schemaName = $this->getOutletSchema($outletId);
-            DB::statement("SET search_path TO {$schemaName}, public");
+            $this->authorizeAndUseSchema($outletId);
 
             $date = $request->query('date', date('Y-m-d'));
             $userId = $request->query('user_id');
+
+            // Non-admin: force user_id to current outlet_user. Even if the
+            // caller passes ?user_id=99, we overwrite — they cannot peek at
+            // another staffer's claims.
+            if (!$this->isOutletAdmin()) {
+                $current = $this->currentOutletUser();
+                if (!$current) {
+                    DB::statement("SET search_path TO public");
+                    return response()->json([
+                        'message' => 'Akun outlet tidak ditemukan.',
+                        'code' => 'NOT_OUTLET_EMPLOYEE',
+                    ], 403);
+                }
+                $userId = $current->id;
+            }
 
             $query = DB::table('employee_beverage_claims as ebc')
                 ->join('outlet_users as u', 'ebc.user_id', '=', 'u.id')
@@ -235,7 +265,7 @@ class EmployeeBeverageController extends Controller
     public function claimBeverage(Request $request, $outletId)
     {
         $validator = Validator::make($request->all(), [
-            'user_id' => 'required|integer',
+            'user_id' => 'nullable|integer',
             'menu_id' => 'required|integer',
             'notes' => 'nullable|string'
         ]);
@@ -245,8 +275,14 @@ class EmployeeBeverageController extends Controller
         }
 
         try {
-            $schemaName = $this->getOutletSchema($outletId);
-            DB::statement("SET search_path TO {$schemaName}, public");
+            // Employee-only endpoint: even superadmin must be a mapped
+            // outlet_user to claim a beverage (you can't claim if you
+            // aren't an employee here). Owners can still claim if they
+            // also have an outlet_user row.
+            $outlet = $this->authorizeOutletAsEmployee($outletId);
+            $currentOutletUser = $this->currentOutletUser();
+            // Force user_id to caller's outlet_user; ignore any spoofed value.
+            $claimUserId = $currentOutletUser->id;
 
             // Get settings
             $settings = DB::table('employee_beverage_settings')->first();
@@ -270,7 +306,7 @@ class EmployeeBeverageController extends Controller
             // Check today's claims
             $today = date('Y-m-d');
             $claimsToday = DB::table('employee_beverage_claims')
-                ->where('user_id', $request->user_id)
+                ->where('user_id', $claimUserId)
                 ->where('claimed_date', $today)
                 ->count();
 
@@ -281,14 +317,14 @@ class EmployeeBeverageController extends Controller
                 ], 422);
             }
 
-            // Create claim
+            // Create claim — user_id is forced to the caller's outlet_user
             DB::table('employee_beverage_claims')->insert([
-                'user_id' => $request->user_id,
+                'user_id' => $claimUserId,
                 'menu_id' => $request->menu_id,
                 'claimed_at' => now(),
                 'claimed_date' => $today,
                 'notes' => $request->notes,
-                'created_by' => $request->user()->id ?? null
+                'created_by' => $currentOutletUser->id,
             ]);
 
             DB::statement("SET search_path TO public");
@@ -305,8 +341,17 @@ class EmployeeBeverageController extends Controller
     public function getEmployeeQuotaStatus(Request $request, $outletId, $userId)
     {
         try {
-            $schemaName = $this->getOutletSchema($outletId);
-            DB::statement("SET search_path TO {$schemaName}, public");
+            $this->authorizeAndUseSchema($outletId);
+            if (!$this->isOutletAdmin()) {
+                $current = $this->currentOutletUser();
+                if (!$current || (int) $current->id !== (int) $userId) {
+                    DB::statement("SET search_path TO public");
+                    return response()->json([
+                        'message' => 'Anda hanya boleh melihat kuota minuman Anda sendiri.',
+                        'code' => 'OUTLET_ADMIN_REQUIRED',
+                    ], 403);
+                }
+            }
 
             $settings = DB::table('employee_beverage_settings')->first();
             $today = date('Y-m-d');
@@ -339,8 +384,7 @@ class EmployeeBeverageController extends Controller
     public function getStatistics(Request $request, $outletId)
     {
         try {
-            $schemaName = $this->getOutletSchema($outletId);
-            DB::statement("SET search_path TO {$schemaName}, public");
+            $this->authorizeAndUseSchema($outletId, true);
 
             $today = date('Y-m-d');
             $startDate = $request->query('start_date', date('Y-m-d', strtotime('-30 days')));
@@ -391,12 +435,4 @@ class EmployeeBeverageController extends Controller
         }
     }
 
-    private function getOutletSchema($outletId)
-    {
-        $outlet = DB::table('outlets')->where('id', $outletId)->first();
-        if (!$outlet) {
-            throw new \Exception('Outlet not found');
-        }
-        return $outlet->schema_name;
-    }
 }

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\Outlet;
 
+use App\Http\Controllers\Concerns\AuthorizesOutletAccess;
 use App\Http\Controllers\Controller;
 use App\Models\WeatherData;
 use Illuminate\Http\Request;
@@ -9,11 +10,15 @@ use Illuminate\Support\Facades\DB;
 
 class WeatherController extends Controller
 {
+    use AuthorizesOutletAccess;
+
     /**
      * Get weather history for outlet
      */
     public function index(Request $request, $outletId)
     {
+        $this->authorizeOutlet($outletId, ['setSchema' => false]);
+
         $request->validate([
             'start_date' => 'nullable|date',
             'end_date' => 'nullable|date|after_or_equal:start_date',
@@ -42,6 +47,8 @@ class WeatherController extends Controller
      */
     public function latest($outletId)
     {
+        $this->authorizeOutlet($outletId, ['setSchema' => false]);
+
         $weather = WeatherData::where('outlet_id', $outletId)
             ->orderBy('recorded_at', 'desc')
             ->first();
@@ -60,6 +67,8 @@ class WeatherController extends Controller
      */
     public function statistics(Request $request, $outletId)
     {
+        $this->authorizeOutlet($outletId, ['setSchema' => false]);
+
         $request->validate([
             'start_date' => 'required|date',
             'end_date' => 'required|date|after_or_equal:start_date',
@@ -102,6 +111,8 @@ class WeatherController extends Controller
      */
     public function salesCorrelation(Request $request, $outletId)
     {
+        $this->authorizeOutlet($outletId, ['setSchema' => false]);
+
         $request->validate([
             'start_date' => 'required|date',
             'end_date' => 'required|date|after_or_equal:start_date',

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\Outlet;
 
+use App\Http\Controllers\Concerns\AuthorizesOutletAccess;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -9,14 +10,39 @@ use Illuminate\Support\Facades\Validator;
 
 class RolePermissionController extends Controller
 {
+    use AuthorizesOutletAccess;
+
+    /**
+     * Resolve the outlet, authorize the caller, set search_path, and return
+     * the schema name. Reading roles/permissions and listing user
+     * permissions is allowed for any mapped outlet_user; mutating roles
+     * (create/update/delete) and assigning roles to other users requires
+     * outlet admin (owner / superadmin).
+     */
+    private function authorizeAndUseSchema($outletId, bool $requireAdmin = false): string
+    {
+        $opts = ['setSchema' => true];
+        if ($requireAdmin) {
+            // Outlet-admin-only mutation. Don't strictPermission since owner
+            // implicitly has full rights; just gate by isOutletAdmin().
+        }
+        $outlet = $this->authorizeOutlet($outletId, $opts);
+        if ($requireAdmin && !$this->isOutletAdmin()) {
+            DB::statement("SET search_path TO public");
+            abort(response()->json([
+                'message' => 'Hanya admin/owner outlet yang boleh mengubah peran & izin.',
+                'code' => 'OUTLET_ADMIN_REQUIRED',
+            ], 403));
+        }
+        return $outlet->schema_name;
+    }
     /**
      * Get all roles with their permissions
      */
     public function getRoles(Request $request, $outletId)
     {
         try {
-            $schemaName = $this->getOutletSchema($outletId);
-            DB::statement("SET search_path TO {$schemaName}, public");
+            $schemaName = $this->authorizeAndUseSchema($outletId);
 
             $roles = DB::table('roles')
                 ->orderBy('level', 'desc')
@@ -52,8 +78,7 @@ class RolePermissionController extends Controller
     public function getPermissions(Request $request, $outletId)
     {
         try {
-            $schemaName = $this->getOutletSchema($outletId);
-            DB::statement("SET search_path TO {$schemaName}, public");
+            $schemaName = $this->authorizeAndUseSchema($outletId);
 
             $permissions = DB::table('permissions')
                 ->orderBy('group_name')
@@ -90,8 +115,7 @@ class RolePermissionController extends Controller
         }
 
         try {
-            $schemaName = $this->getOutletSchema($outletId);
-            DB::statement("SET search_path TO {$schemaName}, public");
+            $schemaName = $this->authorizeAndUseSchema($outletId, true);
 
             // Check if role name already exists
             $exists = DB::table('roles')->where('name', $request->name)->exists();
@@ -152,8 +176,7 @@ class RolePermissionController extends Controller
         }
 
         try {
-            $schemaName = $this->getOutletSchema($outletId);
-            DB::statement("SET search_path TO {$schemaName}, public");
+            $schemaName = $this->authorizeAndUseSchema($outletId, true);
 
             $role = DB::table('roles')->where('id', $roleId)->first();
             if (!$role) {
@@ -214,8 +237,7 @@ class RolePermissionController extends Controller
     public function deleteRole(Request $request, $outletId, $roleId)
     {
         try {
-            $schemaName = $this->getOutletSchema($outletId);
-            DB::statement("SET search_path TO {$schemaName}, public");
+            $schemaName = $this->authorizeAndUseSchema($outletId, true);
 
             $role = DB::table('roles')->where('id', $roleId)->first();
             if (!$role) {
@@ -261,8 +283,7 @@ class RolePermissionController extends Controller
         }
 
         try {
-            $schemaName = $this->getOutletSchema($outletId);
-            DB::statement("SET search_path TO {$schemaName}, public");
+            $schemaName = $this->authorizeAndUseSchema($outletId, true);
 
             // Check if user exists
             $user = DB::table('outlet_users')->where('id', $request->user_id)->first();
@@ -315,8 +336,18 @@ class RolePermissionController extends Controller
     public function getUserPermissions(Request $request, $outletId, $userId)
     {
         try {
-            $schemaName = $this->getOutletSchema($outletId);
-            DB::statement("SET search_path TO {$schemaName}, public");
+            $schemaName = $this->authorizeAndUseSchema($outletId);
+            // Non-admin staff may only read their own permissions.
+            if (!$this->isOutletAdmin()) {
+                $current = $this->currentOutletUser();
+                if (!$current || (int) $current->id !== (int) $userId) {
+                    DB::statement("SET search_path TO public");
+                    return response()->json([
+                        'message' => 'Anda hanya bisa melihat izin akun outlet Anda sendiri.',
+                        'code' => 'OUTLET_ADMIN_REQUIRED',
+                    ], 403);
+                }
+            }
 
             $permissions = DB::table('user_roles')
                 ->join('role_permissions', 'user_roles.role_id', '=', 'role_permissions.role_id')
@@ -334,12 +365,4 @@ class RolePermissionController extends Controller
         }
     }
 
-    private function getOutletSchema($outletId)
-    {
-        $outlet = DB::table('outlets')->where('id', $outletId)->first();
-        if (!$outlet) {
-            throw new \Exception('Outlet not found');
-        }
-        return $outlet->schema_name;
-    }
 }
