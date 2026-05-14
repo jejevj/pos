@@ -3,8 +3,10 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Outlet;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
 use OpenApi\Attributes as OA;
@@ -113,6 +115,7 @@ class AuthController extends Controller
         return response()->json([
             'user' => $user,
             'token' => $token,
+            'outlet_memberships' => $this->resolveOutletMemberships($user),
         ]);
     }
 
@@ -165,6 +168,75 @@ class AuthController extends Controller
         
         return response()->json([
             'user' => $user,
+            'outlet_memberships' => $this->resolveOutletMemberships($user),
         ]);
+    }
+
+    /**
+     * Resolve which outlets this user is a member of (via outlet_users table),
+     * along with their role name and permissions in each outlet.
+     *
+     * Returns an array keyed by outlet_id:
+     * [
+     *   ['outlet_id' => 1, 'outlet_name' => 'Outlet A', 'schema' => 'outlet_1',
+     *    'role' => 'kasir', 'permissions' => ['view_pos', 'create_order', ...]]
+     * ]
+     */
+    private function resolveOutletMemberships(User $user): array
+    {
+        $memberships = [];
+
+        try {
+            $outlets = Outlet::where('is_active', true)->get();
+
+            foreach ($outlets as $outlet) {
+                try {
+                    DB::statement("SET search_path TO {$outlet->schema_name}, public");
+
+                    $outletUser = DB::table('outlet_users')
+                        ->where('email', strtolower($user->email))
+                        ->where('is_active', true)
+                        ->whereNull('deleted_at')
+                        ->first();
+
+                    if (!$outletUser) continue;
+
+                    // Get role(s) for this outlet_user
+                    $roles = DB::table('user_roles')
+                        ->join('roles', 'user_roles.role_id', '=', 'roles.id')
+                        ->where('user_roles.outlet_user_id', $outletUser->id)
+                        ->select('roles.id as role_id', 'roles.name', 'roles.display_name')
+                        ->get();
+
+                    $roleIds = $roles->pluck('role_id');
+
+                    // Get permissions for those roles
+                    $permissions = DB::table('role_permissions')
+                        ->join('permissions', 'role_permissions.permission_id', '=', 'permissions.id')
+                        ->whereIn('role_permissions.role_id', $roleIds)
+                        ->pluck('permissions.name')
+                        ->unique()
+                        ->values()
+                        ->all();
+
+                    $memberships[] = [
+                        'outlet_id'   => $outlet->id,
+                        'outlet_name' => $outlet->name,
+                        'schema'      => $outlet->schema_name,
+                        'roles'       => $roles->map(fn($r) => ['name' => $r->name, 'display_name' => $r->display_name])->values(),
+                        'permissions' => $permissions,
+                    ];
+                } catch (\Throwable $e) {
+                    // Schema may not exist yet — skip silently
+                    continue;
+                }
+            }
+        } catch (\Throwable $e) {
+            // Non-fatal — frontend falls back to empty memberships
+        } finally {
+            DB::statement('SET search_path TO public');
+        }
+
+        return $memberships;
     }
 }
