@@ -211,7 +211,15 @@ services:
       WHATSAPP_SWAGGER_USERNAME: "${WAHA_SWAGGER_USERNAME:-}"
       WHATSAPP_SWAGGER_PASSWORD: "${WAHA_SWAGGER_PASSWORD:-}"
       WHATSAPP_API_HOSTNAME: "${WAHA_PUBLIC_HOSTNAME:-waha.ourtestcloud.my.id}"
-      WHATSAPP_API_PORT: "${WAHA_PUBLIC_PORT:-443}"
+      # WHATSAPP_API_PORT is the port WAHA binds to INSIDE the container.
+      # It must match the container-side port in the host:container mapping
+      # above (3000). Setting this to 443 (the public Cloudflare port) makes
+      # WAHA try to listen on 443 inside the container and the dashboard
+      # becomes unreachable ("connection reset by peer" from the host bind).
+      # The public-facing port/schema are advertised via WAHA_PUBLIC_SCHEMA
+      # and the WAHA_PUBLIC_HOSTNAME above; no port suffix is needed when
+      # the tunnel terminates TLS on 443.
+      WHATSAPP_API_PORT: "3000"
       WHATSAPP_API_SCHEMA: "${WAHA_PUBLIC_SCHEMA:-https}"
       WHATSAPP_DEFAULT_ENGINE: ${WAHA_ENGINE:-WEBJS}
       WAHA_PRINT_QR: "false"

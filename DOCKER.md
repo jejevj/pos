@@ -218,7 +218,7 @@ docker compose down -v   # also drops postgres, redis, waha sessions
 | `WAHA_BASE_URL` | `https://waha.ourtestcloud.my.id` | Public Cloudflare-tunneled hostname by default. Override to `http://waha:3000` for in-cluster calls. |
 | `WAHA_DASHBOARD_USERNAME` / `WAHA_DASHBOARD_PASSWORD` | empty | Basic-auth for the WAHA dashboard. Set before exposing WAHA publicly. |
 | `WAHA_SWAGGER_USERNAME` / `WAHA_SWAGGER_PASSWORD` | empty | Basic-auth for WAHA's Swagger UI. |
-| `WAHA_PUBLIC_HOSTNAME` / `WAHA_PUBLIC_PORT` / `WAHA_PUBLIC_SCHEMA` | `waha.ourtestcloud.my.id` / `443` / `https` | What WAHA advertises about itself in webhooks/Swagger. Match the tunnel hostname. |
+| `WAHA_PUBLIC_HOSTNAME` / `WAHA_PUBLIC_SCHEMA` | `waha.ourtestcloud.my.id` / `https` | What WAHA advertises about itself in webhooks/Swagger. Match the tunnel hostname. The internal listen port (`WHATSAPP_API_PORT`) is pinned at `3000` and is **not** the public port — don't override it to 443. |
 | `WAHA_ENGINE` | `WEBJS` | `WEBJS`, `NOWEB`, or `GOWS`. |
 | `VITE_WAHA_ENABLED` | `false` | Frontend-side opt-in. When `false` or `VITE_WAHA_API_KEY` is empty/placeholder, the SPA does NOT open the WAHA WebSocket or call the WAHA REST API, and the WhatsApp view shows an "unconfigured" banner. Baked at build time — change requires `docker compose build frontend`. |
 | `VITE_WAHA_API_KEY` | empty | Must be a real, non-placeholder key (NOT `change-me`) for the frontend to talk to WAHA. Baked at build time. |
@@ -322,10 +322,11 @@ WAHA_DASHBOARD_PASSWORD=<strong random>
 WAHA_SWAGGER_USERNAME=<pick one>
 WAHA_SWAGGER_PASSWORD=<strong random>
 WAHA_PUBLIC_HOSTNAME=waha.ourtestcloud.my.id
-WAHA_PUBLIC_PORT=443
 WAHA_PUBLIC_SCHEMA=https
 WAHA_ENGINE=WEBJS
 ```
+
+> ⚠️ Do **not** set `WHATSAPP_API_PORT=443` in your `.env.docker` (or anywhere else WAHA reads its env from). That variable is WAHA's **internal listen port** and must stay `3000` — the container-side of the `127.0.0.1:${WAHA_PORT:-9081}:3000` mapping. The public port (443) is already implied by `WAHA_PUBLIC_SCHEMA=https` and the Cloudflare Tunnel that fronts WAHA.
 
 > Do NOT commit real API keys or dashboard credentials. The example file ships with blanks.
 
@@ -390,6 +391,37 @@ SANCTUM_STATEFUL_DOMAINS=pos.your-domain.tld
 Frontend `VITE_API_URL` stays relative (`/api`) — same-origin POS API. `VITE_WAHA_URL` is the WAHA tunnel hostname (cross-origin, but WAHA handles CORS itself).
 
 ## Troubleshooting
+
+### WAHA `curl http://127.0.0.1:9081/dashboard` → `Connection reset by peer`
+
+Symptom: `docker compose ps waha` shows the container running, but every request to `http://127.0.0.1:9081/dashboard` or `http://127.0.0.1:9081/api/server/status` is reset immediately. `docker exec waha env | grep WHATSAPP_API_PORT` prints `443`.
+
+Cause: `WHATSAPP_API_PORT` is WAHA's **internal listen port**, not an advertisement-only value. Older copies of `.env.docker` (and an earlier version of this compose file) set `WHATSAPP_API_PORT=443` thinking it was the public-facing port. WAHA then tries to bind 443 inside the container, fails (or binds the wrong port), and the `127.0.0.1:9081 → container:3000` host mapping has nothing to forward to — the kernel RSTs the connection.
+
+Fix:
+
+```bash
+# 1. Edit /path/to/pos/.env.docker (and /path/to/pos/.env if you copied it) —
+#    remove WAHA_PUBLIC_PORT entirely, and make sure WHATSAPP_API_PORT is
+#    NOT pinned to 443 anywhere. Or just recopy the fresh example:
+cp .env.docker.example .env.docker
+cp .env.docker.example .env
+# (then re-paste your real WAHA_API_KEY / dashboard credentials)
+
+# 2. Ensure the override is gone for the running container.
+#    If you must set it explicitly, set it to 3000:
+#      WHATSAPP_API_PORT=3000
+
+# 3. Recreate just the WAHA container so it picks up the new env.
+docker compose up -d --force-recreate waha
+
+# 4. Verify WAHA is now listening on container port 3000 and the host bind works.
+docker compose exec waha sh -c 'wget -qO- http://127.0.0.1:3000/api/server/status || echo INTERNAL_FAIL'
+curl -sS http://127.0.0.1:9081/api/server/status
+curl -sSI http://127.0.0.1:9081/dashboard
+```
+
+Public access via the Cloudflare Tunnel keeps working unchanged: `waha.ourtestcloud.my.id` (https, 443) → `localhost:9081` → `waha:3000`. WAHA still advertises itself as `https://waha.ourtestcloud.my.id` because `WAHA_PUBLIC_HOSTNAME` and `WAHA_PUBLIC_SCHEMA=https` are unchanged.
 
 ### `failed to resolve source metadata for docker.io/docker/dockerfile:1.6` (or similar)
 
