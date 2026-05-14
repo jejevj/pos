@@ -289,31 +289,29 @@ class OrderController extends Controller
             ", [$order->id]);
 
             // Calculate processing durations per item
+            // All KDS timestamps (confirmed_at, preparing_at, ready_at, served_at) are stored in UTC.
+            // order->created_at may carry a timezone offset — normalize everything to UTC for correct diffs.
             foreach ($items as $item) {
+                $toUtc = fn($ts) => $ts ? \Carbon\Carbon::parse($ts)->utc() : null;
+
                 // prep_duration: preparing_at (or confirmed_at) → ready_at (seconds)
                 $item->prep_start = $item->preparing_at ?? $item->confirmed_at ?? null;
-                if ($item->prep_start && $item->ready_at) {
-                    $item->prep_duration = \Carbon\Carbon::parse($item->prep_start)
-                        ->diffInSeconds(\Carbon\Carbon::parse($item->ready_at));
-                } else {
-                    $item->prep_duration = null;
-                }
+                $prepStart = $toUtc($item->prep_start);
+                $readyAt   = $toUtc($item->ready_at);
+                $item->prep_duration = ($prepStart && $readyAt)
+                    ? (int) abs($prepStart->diffInSeconds($readyAt))
+                    : null;
 
                 // serve_duration: ready_at → served_at (seconds)
-                if ($item->ready_at && $item->served_at) {
-                    $item->serve_duration = \Carbon\Carbon::parse($item->ready_at)
-                        ->diffInSeconds(\Carbon\Carbon::parse($item->served_at));
-                } else {
-                    $item->serve_duration = null;
-                }
+                $servedAt = $toUtc($item->served_at);
+                $item->serve_duration = ($readyAt && $servedAt)
+                    ? (int) abs($readyAt->diffInSeconds($servedAt))
+                    : null;
 
-                // total_duration: preparing_at (or confirmed_at) → served_at (seconds)
-                if ($item->prep_start && $item->served_at) {
-                    $item->total_duration = \Carbon\Carbon::parse($item->prep_start)
-                        ->diffInSeconds(\Carbon\Carbon::parse($item->served_at));
-                } else {
-                    $item->total_duration = null;
-                }
+                // total_duration: prep_start → served_at (seconds)
+                $item->total_duration = ($prepStart && $servedAt)
+                    ? (int) abs($prepStart->diffInSeconds($servedAt))
+                    : null;
             }
 
             $order->setRelation('items', collect($items)->map(function($item) {
@@ -341,8 +339,9 @@ class OrderController extends Controller
                 $lastServedAt = $allItemsServed->max('served_at');
                 
                 // Calculate total time from order creation to last item served
-                $order->end_to_end_seconds = \Carbon\Carbon::parse($order->created_at)
-                    ->diffInSeconds(\Carbon\Carbon::parse($lastServedAt));
+                $orderCreatedUtc   = \Carbon\Carbon::parse($order->created_at)->utc();
+                $lastServedAtUtc   = \Carbon\Carbon::parse($lastServedAt)->utc();
+                $order->end_to_end_seconds = (int) abs($orderCreatedUtc->diffInSeconds($lastServedAtUtc));
                 
                 // Calculate detailed breakdown with station awareness
                 // Use preparing_at if set, otherwise fall back to confirmed_at
@@ -362,7 +361,7 @@ class OrderController extends Controller
                         'label' => 'Order → Mulai Proses',
                         'from' => $order->created_at,
                         'to' => $firstItemPreparingAt,
-                        'seconds' => \Carbon\Carbon::parse($order->created_at)->diffInSeconds(\Carbon\Carbon::parse($firstItemPreparingAt)),
+                        'seconds' => (int) abs(\Carbon\Carbon::parse($order->created_at)->utc()->diffInSeconds(\Carbon\Carbon::parse($firstItemPreparingAt)->utc())),
                     ];
                 }
                 
@@ -385,7 +384,7 @@ class OrderController extends Controller
                                 'station_color' => $stationItems->first()->station_color,
                                 'from' => $stationFirstPrep,
                                 'to' => $stationLastReady,
-                                'seconds' => \Carbon\Carbon::parse($stationFirstPrep)->diffInSeconds(\Carbon\Carbon::parse($stationLastReady)),
+                                'seconds' => (int) abs(\Carbon\Carbon::parse($stationFirstPrep)->utc()->diffInSeconds(\Carbon\Carbon::parse($stationLastReady)->utc())),
                                 'items_count' => $stationItems->count(),
                             ];
                         }
@@ -399,7 +398,7 @@ class OrderController extends Controller
                             'label' => 'Persiapan Item Pertama',
                             'from' => $firstItemPreparingAt,
                             'to' => $firstItemReadyAt,
-                            'seconds' => \Carbon\Carbon::parse($firstItemPreparingAt)->diffInSeconds(\Carbon\Carbon::parse($firstItemReadyAt)),
+                            'seconds' => (int) abs(\Carbon\Carbon::parse($firstItemPreparingAt)->utc()->diffInSeconds(\Carbon\Carbon::parse($firstItemReadyAt)->utc())),
                         ];
                     }
                     
@@ -409,7 +408,7 @@ class OrderController extends Controller
                             'step' => 'remaining_items_prep',
                             'from' => $firstItemReadyAt,
                             'to' => $lastItemReadyAt,
-                            'seconds' => \Carbon\Carbon::parse($firstItemReadyAt)->diffInSeconds(\Carbon\Carbon::parse($lastItemReadyAt)),
+                            'seconds' => (int) abs(\Carbon\Carbon::parse($firstItemReadyAt)->utc()->diffInSeconds(\Carbon\Carbon::parse($lastItemReadyAt)->utc())),
                         ];
                     }
                 }
@@ -420,7 +419,7 @@ class OrderController extends Controller
                         'step' => 'ready_to_served',
                         'from' => $lastItemReadyAt,
                         'to' => $lastServedAt,
-                        'seconds' => \Carbon\Carbon::parse($lastItemReadyAt)->diffInSeconds(\Carbon\Carbon::parse($lastServedAt)),
+                        'seconds' => (int) abs(\Carbon\Carbon::parse($lastItemReadyAt)->utc()->diffInSeconds(\Carbon\Carbon::parse($lastServedAt)->utc())),
                     ];
                 }
                 
