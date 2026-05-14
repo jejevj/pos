@@ -17,6 +17,9 @@ class AttendanceController extends Controller
         $outlet = Outlet::find($outletId);
         if (!$outlet) abort(404, 'Outlet not found');
         if (!$user->isSuperAdmin() && $outlet->user_id !== $user->id) abort(403, 'Unauthorized');
+        // Self-heal outlets created before HR provisioning was wired into
+        // Outlet::createSchema(). Idempotent — uses CREATE TABLE IF NOT EXISTS.
+        $outlet->ensureHRTables();
         return $outlet;
     }
 
