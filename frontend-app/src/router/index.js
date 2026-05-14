@@ -91,10 +91,20 @@ const router = createRouter({
           path: 'menus',
           name: 'menus',
           component: () => import('@/views/admin/MenusView.vue'),
-          meta: { 
+          meta: {
             requiresAuth: true,
             title: 'Menu Management',
             permission: 'menus.view'
+          }
+        },
+        {
+          path: 'admin/site-settings',
+          name: 'site-settings',
+          component: () => import('@/views/admin/SiteSettingsView.vue'),
+          meta: {
+            requiresAuth: true,
+            title: 'Pengaturan Situs',
+            superadminOnly: true,
           }
         },
         {

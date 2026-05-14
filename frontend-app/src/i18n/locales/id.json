@@ -1490,5 +1490,23 @@
       "out": "Keluar",
       "transfer": "Transfer"
     }
+  },
+  "siteSettings": {
+    "title": "Pengaturan Situs",
+    "general": "Umum",
+    "branding": "Branding",
+    "contact": "Kontak",
+    "social": "Sosial Media",
+    "siteName": "Nama Situs",
+    "tagline": "Tagline",
+    "description": "Deskripsi",
+    "logo": "Logo",
+    "logoDark": "Logo Dark Mode",
+    "favicon": "Favicon",
+    "primaryColor": "Warna Utama",
+    "footerText": "Teks Footer",
+    "uploadLogo": "Unggah Logo",
+    "uploadFavicon": "Unggah Favicon",
+    "saved": "Pengaturan berhasil disimpan"
   }
 }

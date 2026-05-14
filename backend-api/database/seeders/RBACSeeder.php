@@ -70,6 +70,7 @@ class RBACSeeder extends Seeder
             // Settings
             ['name' => 'settings.view', 'display_name' => 'View Settings', 'group' => 'settings'],
             ['name' => 'settings.edit', 'display_name' => 'Edit Settings', 'group' => 'settings'],
+            ['name' => 'settings.manage', 'display_name' => 'Manage Site Settings', 'group' => 'settings'],
         ];
 
         foreach ($permissions as $permission) {
@@ -245,7 +246,23 @@ class RBACSeeder extends Seeder
         );
         $settings->permissions()->sync(Permission::where('name', 'settings.view')->pluck('id'));
 
-        $this->command->info('✅ Menus created: 7');
+        // Site Settings (superadmin — Pengaturan Situs)
+        $siteSettings = Menu::firstOrCreate(
+            ['name' => 'site-settings'],
+            [
+                'title' => 'Pengaturan Situs',
+                'icon' => 'pi pi-globe',
+                'route' => '/admin/site-settings',
+                'url' => '/admin/site-settings',
+                'order' => 10,
+                'is_active' => true,
+            ]
+        );
+        $siteSettings->permissions()->sync(
+            Permission::whereIn('name', ['settings.manage', 'settings.edit'])->pluck('id')
+        );
+
+        $this->command->info('✅ Menus created: 8');
     }
 
     private function createUsers($roles)

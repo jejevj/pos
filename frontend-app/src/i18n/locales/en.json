@@ -1480,5 +1480,23 @@
       "out": "Out",
       "transfer": "Transfer"
     }
+  },
+  "siteSettings": {
+    "title": "Site Settings",
+    "general": "General",
+    "branding": "Branding",
+    "contact": "Contact",
+    "social": "Social Media",
+    "siteName": "Site Name",
+    "tagline": "Tagline",
+    "description": "Description",
+    "logo": "Logo",
+    "logoDark": "Dark Mode Logo",
+    "favicon": "Favicon",
+    "primaryColor": "Primary Color",
+    "footerText": "Footer Text",
+    "uploadLogo": "Upload Logo",
+    "uploadFavicon": "Upload Favicon",
+    "saved": "Settings saved successfully"
   }
 }

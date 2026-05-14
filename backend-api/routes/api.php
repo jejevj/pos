@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\Admin\UserController;
 use App\Http\Controllers\Api\Admin\RoleController;
 use App\Http\Controllers\Api\Admin\PermissionController;
 use App\Http\Controllers\Api\Admin\MenuController;
+use App\Http\Controllers\Api\Admin\SiteSettingController;
 use App\Http\Controllers\Api\OutletController;
 use App\Http\Controllers\Api\OutletUserController;
 use App\Http\Controllers\Api\Outlet\KategoriBahanBakuController;
@@ -17,6 +18,13 @@ use Illuminate\Support\Facades\Route;
 
 // ── Public order tracking (no auth required) ──────────────────────────────
 Route::get('/track/{outletId}/{orderCode}', [\App\Http\Controllers\Api\OrderTrackingController::class, 'show']);
+
+// ── Site Settings — public read so frontend can load branding ────────────
+Route::get('/site-settings', [SiteSettingController::class, 'index']);
+Route::middleware('auth:sanctum')->group(function () {
+    Route::put('/site-settings', [SiteSettingController::class, 'update']);
+    Route::post('/site-settings/upload', [SiteSettingController::class, 'uploadImage']);
+});
 
 
 Route::prefix('auth')->group(function () {
