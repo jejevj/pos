@@ -16,8 +16,7 @@
       <template #title>
         <div class="card-header">
           <span>{{ $t('kategoriMenu.menuCategories') }}</span>
-          <Button :label="$t('kategoriMenu.addCategory')" icon="pi pi-plus" @click="openDialog()"
-                  :style="{ backgroundColor: 'var(--sage-primary)', borderColor: 'var(--sage-primary)' }" />
+          <Button :label="$t('kategoriMenu.addCategory')" icon="pi pi-plus" @click="openDialog()" />
         </div>
       </template>
       <template #content>
@@ -31,6 +30,15 @@
           <Column field="nama" :header="$t('kategoriMenu.categoryName')" sortable />
           <Column field="deskripsi" :header="$t('kategoriMenu.description')" />
           <Column field="urutan" :header="$t('kategoriMenu.order')" sortable style="width: 100px" />
+          <Column header="Station Dapur" style="width: 160px">
+            <template #body="{ data }">
+              <div v-if="data.station" class="station-badge" :style="{ background: data.station.warna + '22', color: data.station.warna, borderColor: data.station.warna }">
+                <i :class="data.station.icon" style="font-size:0.8rem"></i>
+                {{ data.station.nama }}
+              </div>
+              <span v-else class="text-muted">—</span>
+            </template>
+          </Column>
           <Column field="menu_count" :header="$t('kategoriMenu.menuCount')" sortable style="width: 120px" />
           <Column field="is_active" :header="$t('common.status')" sortable style="width: 120px">
             <template #body="{ data }">
@@ -66,6 +74,37 @@
           <label>{{ $t('kategoriMenu.order') }}</label>
           <InputNumber v-model="form.urutan" style="width: 100%" />
         </div>
+
+        <!-- Station dapur -->
+        <div class="field">
+          <label>Station Dapur</label>
+          <small class="text-muted">Menu dalam kategori ini otomatis masuk ke station yang dipilih</small>
+          <Select
+            v-model="form.station_id"
+            :options="stations"
+            optionLabel="nama"
+            optionValue="id"
+            placeholder="Pilih station (opsional)"
+            showClear
+            style="width: 100%"
+          >
+            <template #option="{ option }">
+              <div class="station-option">
+                <span class="station-dot" :style="{ background: option.warna }"></span>
+                <i :class="option.icon" style="font-size:0.9rem"></i>
+                {{ option.nama }}
+              </div>
+            </template>
+            <template #value="{ value }">
+              <div v-if="value" class="station-option">
+                <span class="station-dot" :style="{ background: getStation(value)?.warna }"></span>
+                {{ getStation(value)?.nama }}
+              </div>
+              <span v-else class="text-muted">Pilih station (opsional)</span>
+            </template>
+          </Select>
+        </div>
+
         <div class="field">
           <div class="flex align-items-center gap-2">
             <Checkbox v-model="form.is_active" :binary="true" inputId="is_active" />
@@ -75,8 +114,7 @@
       </div>
       <template #footer>
         <Button :label="$t('common.cancel')" text @click="dialogVisible = false" />
-        <Button :label="$t('common.save')" @click="saveCategory" :loading="saving"
-                :style="{ backgroundColor: 'var(--sage-primary)', borderColor: 'var(--sage-primary)' }" />
+        <Button :label="$t('common.save')" @click="saveCategory" :loading="saving" />
       </template>
     </Dialog>
   </div>
@@ -100,6 +138,7 @@ import Checkbox from 'primevue/checkbox'
 import InputNumber from 'primevue/inputnumber'
 import Dialog from 'primevue/dialog'
 import Tag from 'primevue/tag'
+import Select from 'primevue/select'
 
 const route = useRoute()
 const toast = useToast()
@@ -115,43 +154,54 @@ const breadcrumbItems = computed(() => [
   { label: t('kategoriMenu.menuCategories') }
 ])
 
-const outlet = ref(null)
+const outlet     = ref(null)
 const categories = ref([])
-const loading = ref(false)
+const stations   = ref([])
+const loading    = ref(false)
 const dialogVisible = ref(false)
-const saving = ref(false)
-const isEdit = ref(false)
+const saving     = ref(false)
+const isEdit     = ref(false)
 
-const form = ref({ nama: '', deskripsi: '', urutan: 0, is_active: true })
+const form = ref({ nama: '', deskripsi: '', urutan: 0, station_id: null, is_active: true })
+
+const getStation = (id) => stations.value.find(s => s.id === id)
 
 const fetchOutlet = async () => {
   try {
-    const response = await api.get(`/outlets/${outletId}`)
-    outlet.value = response.data
-  } catch (error) {
-    console.error('Failed to fetch outlet:', error)
-  }
+    outlet.value = (await api.get(`/outlets/${outletId}`)).data
+  } catch {}
 }
 
 const fetchCategories = async () => {
   loading.value = true
   try {
-    const response = await api.get(`/outlets/${outletId}/kategori-menu`)
-    categories.value = response.data
-  } catch (error) {
-    toast.add({ severity: 'error', summary: t('messages.error'), detail: 'Failed to fetch categories', life: 3000 })
+    categories.value = (await api.get(`/outlets/${outletId}/kategori-menu`)).data
+  } catch {
+    toast.add({ severity: 'error', summary: t('messages.error'), detail: 'Gagal memuat kategori', life: 3000 })
   } finally {
     loading.value = false
   }
 }
 
+const fetchStations = async () => {
+  try {
+    stations.value = (await api.get(`/outlets/${outletId}/stations`)).data.filter(s => s.is_active)
+  } catch {}
+}
+
 const openDialog = (category = null) => {
   isEdit.value = !!category
-  form.value = category ? { ...category } : { nama: '', deskripsi: '', urutan: 0, is_active: true }
+  form.value = category
+    ? { nama: category.nama, deskripsi: category.deskripsi, urutan: category.urutan, station_id: category.station_id, is_active: category.is_active, id: category.id }
+    : { nama: '', deskripsi: '', urutan: 0, station_id: null, is_active: true }
   dialogVisible.value = true
 }
 
 const saveCategory = async () => {
+  if (!form.value.nama?.trim()) {
+    toast.add({ severity: 'warn', summary: 'Validasi', detail: 'Nama kategori wajib diisi', life: 3000 })
+    return
+  }
   saving.value = true
   try {
     if (isEdit.value) {
@@ -164,7 +214,7 @@ const saveCategory = async () => {
     dialogVisible.value = false
     fetchCategories()
   } catch (error) {
-    toast.add({ severity: 'error', summary: t('messages.error'), detail: error.response?.data?.message || 'Failed to save', life: 3000 })
+    toast.add({ severity: 'error', summary: t('messages.error'), detail: error.response?.data?.message || 'Gagal menyimpan', life: 3000 })
   } finally {
     saving.value = false
   }
@@ -194,6 +244,7 @@ const deleteCategory = async (id) => {
 onMounted(() => {
   fetchOutlet()
   fetchCategories()
+  fetchStations()
 })
 </script>
 
@@ -202,7 +253,30 @@ onMounted(() => {
 .card-header { display: flex; justify-content: space-between; align-items: center; width: 100%; }
 .action-buttons { display: flex; gap: 0.25rem; }
 .empty-state { display: flex; flex-direction: column; align-items: center; gap: 1rem; padding: 3rem; color: #6b7280; }
-.dialog-content { display: flex; flex-direction: column; gap: 1.5rem; padding: 1rem 0; }
-.field { display: flex; flex-direction: column; gap: 0.5rem; }
+.dialog-content { display: flex; flex-direction: column; gap: 1.25rem; padding: 1rem 0; }
+.field { display: flex; flex-direction: column; gap: 0.4rem; }
 .field label { font-weight: 600; color: #374151; }
+.text-muted { color: #9ca3af; font-size: 0.8rem; }
+
+.station-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.2rem 0.6rem;
+  border-radius: 6px;
+  border: 1px solid;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+.station-option {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.station-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
 </style>
