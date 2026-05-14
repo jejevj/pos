@@ -332,16 +332,26 @@ class OutletDefaultDataSeeder
 
     private function seedKategoriMenu(): void
     {
-        $now        = now();
+        $now = now();
+
+        // Ambil station Kitchen & Bar
+        $kitchen = DB::table('stations')->where('nama', 'Kitchen')->first();
+        $bar     = DB::table('stations')->where('nama', 'Bar')->first();
+
         $categories = [
-            ['nama' => 'Makanan', 'deskripsi' => 'Menu makanan berat dan ringan', 'urutan' => 1],
-            ['nama' => 'Minuman', 'deskripsi' => 'Minuman panas dan dingin',      'urutan' => 2],
-            ['nama' => 'Snack',   'deskripsi' => 'Cemilan dan jajanan',           'urutan' => 3],
+            ['nama' => 'Makanan', 'deskripsi' => 'Menu makanan berat dan ringan', 'urutan' => 1, 'station_id' => $kitchen?->id],
+            ['nama' => 'Minuman', 'deskripsi' => 'Minuman panas dan dingin',      'urutan' => 2, 'station_id' => $bar?->id],
+            ['nama' => 'Snack',   'deskripsi' => 'Cemilan dan jajanan',           'urutan' => 3, 'station_id' => $kitchen?->id],
         ];
 
         foreach ($categories as $cat) {
             $exists = DB::table('kategori_menu')->where('nama', $cat['nama'])->exists();
             if ($exists) {
+                // Update station_id kalau belum diset
+                DB::table('kategori_menu')
+                    ->where('nama', $cat['nama'])
+                    ->whereNull('station_id')
+                    ->update(['station_id' => $cat['station_id']]);
                 $this->stats['kategori_menu']['skipped']++;
                 continue;
             }
