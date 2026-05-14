@@ -290,9 +290,10 @@ class OrderController extends Controller
 
             // Calculate processing durations per item
             foreach ($items as $item) {
-                // prep_duration: preparing_at → ready_at (seconds)
-                if ($item->preparing_at && $item->ready_at) {
-                    $item->prep_duration = \Carbon\Carbon::parse($item->preparing_at)
+                // prep_duration: preparing_at (or confirmed_at) → ready_at (seconds)
+                $item->prep_start = $item->preparing_at ?? $item->confirmed_at ?? null;
+                if ($item->prep_start && $item->ready_at) {
+                    $item->prep_duration = \Carbon\Carbon::parse($item->prep_start)
                         ->diffInSeconds(\Carbon\Carbon::parse($item->ready_at));
                 } else {
                     $item->prep_duration = null;
@@ -306,9 +307,9 @@ class OrderController extends Controller
                     $item->serve_duration = null;
                 }
 
-                // total_duration: preparing_at → served_at (seconds)
-                if ($item->preparing_at && $item->served_at) {
-                    $item->total_duration = \Carbon\Carbon::parse($item->preparing_at)
+                // total_duration: preparing_at (or confirmed_at) → served_at (seconds)
+                if ($item->prep_start && $item->served_at) {
+                    $item->total_duration = \Carbon\Carbon::parse($item->prep_start)
                         ->diffInSeconds(\Carbon\Carbon::parse($item->served_at));
                 } else {
                     $item->total_duration = null;
@@ -344,7 +345,11 @@ class OrderController extends Controller
                     ->diffInSeconds(\Carbon\Carbon::parse($lastServedAt));
                 
                 // Calculate detailed breakdown with station awareness
-                $firstItemPreparingAt = collect($items)->filter(fn($i) => $i->preparing_at !== null)->min('preparing_at');
+                // Use preparing_at if set, otherwise fall back to confirmed_at
+                $firstItemPreparingAt = collect($items)->map(function($i) {
+                    $i->prep_start = $i->preparing_at ?? $i->confirmed_at ?? null;
+                    return $i;
+                })->filter(fn($i) => $i->prep_start !== null)->min('prep_start');
                 $firstItemReadyAt = collect($items)->filter(fn($i) => $i->ready_at !== null)->min('ready_at');
                 $lastItemReadyAt = collect($items)->filter(fn($i) => $i->ready_at !== null)->max('ready_at');
                 
@@ -354,6 +359,7 @@ class OrderController extends Controller
                 if ($firstItemPreparingAt) {
                     $breakdown[] = [
                         'step' => 'order_to_kitchen',
+                        'label' => 'Order → Mulai Proses',
                         'from' => $order->created_at,
                         'to' => $firstItemPreparingAt,
                         'seconds' => \Carbon\Carbon::parse($order->created_at)->diffInSeconds(\Carbon\Carbon::parse($firstItemPreparingAt)),
@@ -369,7 +375,7 @@ class OrderController extends Controller
                         $stationItems = collect($stationItems);
                         $stationName = $stationItems->first()->station_name ?? "Station {$stationId}";
                         
-                        $stationFirstPrep = $stationItems->filter(fn($i) => $i->preparing_at !== null)->min('preparing_at');
+                        $stationFirstPrep = $stationItems->map(fn($i) => tap($i, fn($x) => $x->prep_start = $x->preparing_at ?? $x->confirmed_at ?? null))->filter(fn($i) => $i->prep_start !== null)->min('prep_start');
                         $stationLastReady = $stationItems->filter(fn($i) => $i->ready_at !== null)->max('ready_at');
                         
                         if ($stationFirstPrep && $stationLastReady) {
@@ -390,6 +396,7 @@ class OrderController extends Controller
                     if ($firstItemPreparingAt && $firstItemReadyAt) {
                         $breakdown[] = [
                             'step' => 'first_item_prep',
+                            'label' => 'Persiapan Item Pertama',
                             'from' => $firstItemPreparingAt,
                             'to' => $firstItemReadyAt,
                             'seconds' => \Carbon\Carbon::parse($firstItemPreparingAt)->diffInSeconds(\Carbon\Carbon::parse($firstItemReadyAt)),
