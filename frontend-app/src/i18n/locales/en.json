@@ -590,7 +590,16 @@
     "pointsEarned": "points earned",
     "pointsRedeemedLabel": "points redeemed",
     "pointsRedeemed": "Redeem Points",
-    "pointsAfter": "Points balance"
+    "pointsAfter": "Points balance",
+    "noOrders": "No transactions found",
+    "status": "Status",
+    "qrTracking": "Order QR Tracking",
+    "scanQrHint": "Scan this QR code to track your order status in real-time",
+    "trackingUrl": "Tracking URL",
+    "openTracking": "Open Tracking Page",
+    "moreItems": "more items",
+    "bon": "Bill",
+    "statusBon": "Bill"
   },
   "member": {
     "title": "Membership",
@@ -1259,7 +1268,6 @@
     "inventoryReport": "Inventory Report",
     "expenseReport": "Expense Report",
     "salesTrend": "Sales Trend",
-    "salesByHour": "Sales by Hour",
     "paymentMethods": "Payment Methods",
     "topSellingMenu": "Top Selling Menu",
     "menuPerformance": "Menu Performance",
@@ -1275,7 +1283,6 @@
     "category": "Category",
     "quantitySold": "Quantity Sold",
     "revenue": "Revenue",
-    "condition": "Condition",
     "avgTemp": "Avg Temperature",
     "orders": "Orders",
     "temperature": "Temperature (°C)",
