@@ -28,9 +28,11 @@ export const useThemeStore = defineStore('theme', () => {
   // Terapkan class ke <html> agar CSS global dark-mode bisa bekerja
   function applyDark(val) {
     if (val) {
-      document.documentElement.classList.add('is-dark')
+      document.documentElement.classList.add('is-dark')    // VueroLayout & custom CSS
+      document.body.classList.add('dark-mode')             // legacy fallback
     } else {
       document.documentElement.classList.remove('is-dark')
+      document.body.classList.remove('dark-mode')
     }
   }
 

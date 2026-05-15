@@ -153,3 +153,189 @@ body {
 :deep(.p-menu .p-menuitem-link.p-menuitem-link-active) {
   color: var(--primary);
 }
+
+/* ═══════════════════════════════════════════════════════════════════
+   DARK MODE — semua CSS variables di-override di bawah html.is-dark
+   Komponen yang pakai var(--*) akan otomatis ikut tanpa perlu diubah
+   ═══════════════════════════════════════════════════════════════════ */
+html.is-dark {
+  /* Layout backgrounds */
+  --body-color:      #13131a;
+  --background-grey: #13131a;
+  --widget-grey:     #1e1e28;
+  --white:           #1e1e28;
+  --smoke-white:     #1e1e28;
+  --fade-grey:       #2a2a36;
+  --light-grey:      #2a2a36;
+  --medium-grey:     #2e2e3e;
+  --border:          #2e2e3e;
+
+  /* Text */
+  --dark-text:  #e4e4ef;
+  --light-text: #7a7a9a;
+  --muted-grey: #5a5a7a;
+
+  /* Shadows */
+  --base-shadow:       rgb(0 0 0 / 40%);
+  --light-box-shadow:  -1px 3px 10px 0 rgb(0 0 0 / 30%);
+  --light-box-shadow-md:-1px 3px 10px 0 rgb(0 0 0 / 40%);
+}
+
+/* Body background */
+html.is-dark body {
+  background: var(--background-grey);
+  color: var(--dark-text);
+}
+
+/* ── Outlet views — card & panel overrides ─────────────────────── */
+/* Semua card/panel yang pakai background putih atau abu terang */
+html.is-dark .kpi-card,
+html.is-dark .menu-card,
+html.is-dark .info-card,
+html.is-dark .stat-card,
+html.is-dark .dashboard-card,
+html.is-dark .order-card,
+html.is-dark .product-card,
+html.is-dark .modal-card,
+html.is-dark .list-card,
+html.is-dark .detail-card,
+html.is-dark .outlet-card {
+  background: #1e1e28 !important;
+  border-color: #2e2e3e !important;
+  color: var(--dark-text) !important;
+}
+
+/* Section / container backgrounds */
+html.is-dark .section-header,
+html.is-dark .filter-bar,
+html.is-dark .table-toolbar,
+html.is-dark .page-header,
+html.is-dark .search-bar {
+  background: #1e1e28 !important;
+  border-color: #2e2e3e !important;
+}
+
+/* Text color override untuk hardcode warna teks */
+html.is-dark .text-gray-900,
+html.is-dark .text-gray-800,
+html.is-dark .text-gray-700,
+html.is-dark [class*="text-gray-9"],
+html.is-dark [class*="text-gray-8"],
+html.is-dark [class*="text-gray-7"] {
+  color: #d0d0e8 !important;
+}
+
+html.is-dark .text-gray-600,
+html.is-dark .text-gray-500,
+html.is-dark [class*="text-gray-6"],
+html.is-dark [class*="text-gray-5"] {
+  color: #9090b0 !important;
+}
+
+/* Background override untuk hardcode bg abu/putih */
+html.is-dark [style*="background: #f9fafb"],
+html.is-dark [style*="background:#f9fafb"],
+html.is-dark [style*="background: #f3f4f6"],
+html.is-dark [style*="background:#f3f4f6"],
+html.is-dark [style*="background: #ffffff"],
+html.is-dark [style*="background:#ffffff"],
+html.is-dark [style*="background: white"],
+html.is-dark [style*="background:white"] {
+  background: #1e1e28 !important;
+}
+
+html.is-dark [style*="background: #eff6ff"],
+html.is-dark [style*="background:#eff6ff"],
+html.is-dark [style*="background: #f0fdf4"],
+html.is-dark [style*="background:#f0fdf4"],
+html.is-dark [style*="background: #fef3c7"],
+html.is-dark [style*="background:#fef3c7"],
+html.is-dark [style*="background: #fdf2f8"],
+html.is-dark [style*="background:#fdf2f8"] {
+  background: #2a2a36 !important;
+}
+
+/* ── PrimeVue component overrides dalam dark mode ─────────────── */
+html.is-dark .p-card,
+html.is-dark .p-panel,
+html.is-dark .p-dialog,
+html.is-dark .p-sidebar {
+  background: #1e1e28;
+  border-color: #2e2e3e;
+  color: var(--dark-text);
+}
+
+html.is-dark .p-datatable .p-datatable-tbody > tr {
+  background: #1e1e28;
+  color: var(--dark-text);
+  border-color: #2e2e3e;
+}
+
+html.is-dark .p-datatable .p-datatable-tbody > tr:nth-child(even) {
+  background: #232330;
+}
+
+html.is-dark .p-datatable .p-datatable-tbody > tr:hover {
+  background: #2a2a3a !important;
+}
+
+html.is-dark .p-datatable .p-datatable-thead > tr > th {
+  background: #232330;
+  border-color: #2e2e3e;
+  color: var(--light-text);
+}
+
+html.is-dark .p-inputtext,
+html.is-dark .p-dropdown,
+html.is-dark .p-multiselect,
+html.is-dark .p-inputnumber-input,
+html.is-dark .p-textarea,
+html.is-dark .p-select {
+  background: #232330 !important;
+  border-color: #3a3a50 !important;
+  color: var(--dark-text) !important;
+}
+
+html.is-dark .p-dropdown-panel,
+html.is-dark .p-multiselect-panel,
+html.is-dark .p-select-overlay {
+  background: #1e1e28;
+  border-color: #2e2e3e;
+}
+
+html.is-dark .p-dropdown-item,
+html.is-dark .p-multiselect-item,
+html.is-dark .p-select-option {
+  color: var(--dark-text);
+}
+
+html.is-dark .p-dropdown-item:hover,
+html.is-dark .p-select-option:hover {
+  background: #2a2a3a !important;
+}
+
+html.is-dark .p-menu,
+html.is-dark .p-menubar,
+html.is-dark .p-tieredmenu {
+  background: #1e1e28;
+  border-color: #2e2e3e;
+}
+
+html.is-dark .p-menuitem-link:hover {
+  background: #2a2a3a !important;
+}
+
+html.is-dark .p-tag {
+  color: var(--dark-text);
+}
+
+html.is-dark .p-divider-horizontal::before {
+  border-color: #2e2e3e;
+}
+
+html.is-dark .p-skeleton {
+  background: #2a2a36;
+}
+html.is-dark .p-skeleton::after {
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.04), transparent);
+}
