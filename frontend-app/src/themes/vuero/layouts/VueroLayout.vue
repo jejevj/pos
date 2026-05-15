@@ -464,14 +464,60 @@ defineExpose({ isDesktopOpen, isMobileOpen })
    Dark mode stubs
 ───────────────────────────────────────────────────────────────── */
 .is-dark .sidebar-block {
-  background: #2a2a2d;
-  border-color: #2a2a2d;
+  background: #1e1e24;
+  border-color: #2e2e36;
+}
+.is-dark .sidebar-block-header {
+  border-color: #2e2e36;
+}
+.is-dark .sidebar-block-footer {
+  border-color: #2e2e36;
 }
 .is-dark .page-title {
-  background: #1e1e21;
-  border-color: #2a2a2d;
+  background: #18181f;
+  border-color: #2e2e36;
 }
 .is-dark .title-wrap .title {
-  color: #e2e2e4;
+  color: #e4e4ef;
+}
+.is-dark .view-wrapper {
+  background: #13131a;
+}
+.is-dark .page-content {
+  background: #13131a;
+}
+/* Single link text dalam dark mode */
+.is-dark :deep(.single-link) {
+  color: #9f9fbb;
+}
+.is-dark :deep(.single-link:hover),
+.is-dark :deep(.single-link.is-active) {
+  background: rgba(255,255,255,0.06);
+  color: #fff;
+}
+.is-dark :deep(.single-link.is-active .icon i) {
+  color: var(--primary, #41b3a3);
+}
+/* Toolbar dark */
+.is-dark :deep(.toolbar-btn) {
+  color: #9f9fbb;
+}
+.is-dark :deep(.toolbar-btn:hover) {
+  background: rgba(255,255,255,0.08);
+  color: #fff;
+}
+/* Submenu dark */
+.is-dark :deep(.is-submenu) {
+  color: #7a7a9a;
+}
+.is-dark :deep(.is-submenu:hover),
+.is-dark :deep(.is-submenu.is-active) {
+  background: rgba(255,255,255,0.06);
+  color: #fff;
+}
+/* Mobile navbar dark */
+.is-dark .mobile-navbar {
+  background: #1e1e24;
+  border-color: #2e2e36;
 }
 </style>

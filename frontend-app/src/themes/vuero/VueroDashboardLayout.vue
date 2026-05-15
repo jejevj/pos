@@ -5,6 +5,7 @@
     :theme="vueroTheme"
     :show-sidebar="showSidebar"
     :open-on-mounted="showSidebar"
+    :is-dark="themeStore.isDark"
   >
     <!-- Logo slot -->
     <template #logo>
@@ -22,6 +23,11 @@
         {{ currentLanguage.flag }}
       </button>
       <Menu ref="languageMenu" :model="languageMenuItems" popup />
+
+      <!-- Dark mode toggle -->
+      <button class="toolbar-btn" @click="themeStore.toggleDark" :title="themeStore.isDark ? 'Light Mode' : 'Dark Mode'">
+        <i :class="themeStore.isDark ? 'pi pi-sun' : 'pi pi-moon'" />
+      </button>
 
       <!-- WA badge (outlet only) -->
       <button
@@ -84,10 +90,12 @@ import { useWahaSocket, clearWahaUnread } from '@/composables/useWahaSocket'
 import { useI18n } from 'vue-i18n'
 import Menu from 'primevue/menu'
 import VueroLayout from './layouts/VueroLayout.vue'
+import { useThemeStore } from '@/stores/theme'
 import { useSiteSettings } from '@/stores/siteSettings'
 import VueroNavItem from './layouts/VueroNavItem.vue'
 
 const router    = useRouter()
+const themeStore = useThemeStore()
 const site      = useSiteSettings()
 const route     = useRoute()
 const authStore = useAuthStore()
