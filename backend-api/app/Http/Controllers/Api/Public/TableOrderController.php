@@ -51,12 +51,43 @@ class TableOrderController extends Controller
 
             $table = DB::table('tables')
                 ->where('qr_token', $token)
-                ->where('is_active', true)
+                ->whereNull('deleted_at')
                 ->first();
 
             if (!$table) {
                 $this->resetSchema();
-                return response()->json(['message' => 'Meja tidak ditemukan atau tidak aktif'], 404);
+                return response()->json(['message' => 'Meja tidak ditemukan'], 404);
+            }
+
+            // Table is "orderable" only when active AND status = 'available'.
+            // Token itself stays valid (static/reusable) — only the order form
+            // is gated by current table status so a single QR can be scanned
+            // again next visit without regeneration.
+            $isOrderable = ((bool) $table->is_active) && ($table->status === 'available');
+
+            if (!$isOrderable) {
+                $this->resetSchema();
+                return response()->json([
+                    'outlet' => [
+                        'id'      => $outlet->id,
+                        'name'    => $outlet->name,
+                        'slug'    => $outlet->slug,
+                        'logo'    => $outlet->logo,
+                        'address' => $outlet->address,
+                    ],
+                    'table' => [
+                        'id'           => $table->id,
+                        'table_number' => $table->table_number,
+                        'area'         => $table->area,
+                        'qr_token'     => $table->qr_token,
+                        'status'       => $table->status,
+                        'is_active'    => (bool) $table->is_active,
+                    ],
+                    'is_orderable' => false,
+                    'unavailable_reason' => !$table->is_active
+                        ? 'inactive'
+                        : ($table->status ?: 'unavailable'),
+                ], 200);
             }
 
             // Categories
@@ -98,7 +129,10 @@ class TableOrderController extends Controller
                     'table_number' => $table->table_number,
                     'area'         => $table->area,
                     'qr_token'     => $table->qr_token,
+                    'status'       => $table->status,
+                    'is_active'    => (bool) $table->is_active,
                 ],
+                'is_orderable' => true,
                 'categories' => $categories,
                 'menu' => $menu,
                 'settings' => [
@@ -147,12 +181,19 @@ class TableOrderController extends Controller
 
             $table = DB::table('tables')
                 ->where('qr_token', $token)
-                ->where('is_active', true)
+                ->whereNull('deleted_at')
                 ->first();
             if (!$table) {
                 DB::rollBack();
                 $this->resetSchema();
                 return response()->json(['message' => 'Meja tidak ditemukan'], 404);
+            }
+            if (!$table->is_active || $table->status !== 'available') {
+                DB::rollBack();
+                $this->resetSchema();
+                return response()->json([
+                    'message' => 'Meja sedang tidak tersedia untuk pemesanan',
+                ], 409);
             }
 
             // Optional member lookup (if customer logged-in via member_card)

@@ -1588,7 +1588,7 @@
     "phone": "Phone",
     "phonePh": "Phone number",
     "email": "Email",
-    "emailPh": "email@example.com",
+    "emailPh": "email{'@'}example.com",
     "memberCardOptional": "Member Card (optional)",
     "memberCardPh": "e.g. MBR202612345",
     "memberHint": "Fill if you are a registered member of this outlet.",
@@ -1613,7 +1613,12 @@
     "approvedMessage": "Your order is being prepared. Thank you!",
     "rejectedMessage": "Sorry, your order could not be processed.",
     "seconds": "s",
-    "statusHint": "This page refreshes automatically."
+    "statusHint": "This page refreshes automatically.",
+    "unavailableTitle": "Table Unavailable",
+    "unavailableOccupied": "This table is currently in use. Please contact the cashier or try again after the table is cleared.",
+    "unavailableReserved": "This table is reserved. Please contact the cashier for more information.",
+    "unavailableInactive": "This table is inactive. Please choose another table or contact the cashier.",
+    "unavailableGeneric": "This table cannot accept orders right now. Please contact the cashier."
   },
   "tableQr": {
     "qrCode": "QR Code",

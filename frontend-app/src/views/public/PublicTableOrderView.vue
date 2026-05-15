@@ -13,6 +13,17 @@
       <p>{{ loadError }}</p>
     </div>
 
+    <!-- Unavailable: table exists but cannot accept orders right now -->
+    <div v-else-if="!isOrderable" class="state unavailable">
+      <i class="pi pi-info-circle"></i>
+      <h2>{{ t('publicOrder.unavailableTitle') }}</h2>
+      <p>{{ unavailableMessage }}</p>
+      <div class="unavailable-meta" v-if="outlet.name">
+        <strong>{{ outlet.name }}</strong>
+        <span v-if="table.table_number"> · {{ t('publicOrder.table') }} {{ table.table_number }}</span>
+      </div>
+    </div>
+
     <template v-else>
       <!-- Header -->
       <header class="pto-header">
@@ -250,6 +261,8 @@ const tableToken = route.params.tableToken
 
 const loading = ref(true)
 const loadError = ref('')
+const isOrderable = ref(true)
+const unavailableReason = ref('')
 const outlet = ref({})
 const table = ref({})
 const categories = ref([])
@@ -280,17 +293,29 @@ const form = ref({
 onMounted(async () => {
   try {
     const res = await api.get(`/public/outlet/${outletSlug}/table/${tableToken}`)
-    outlet.value = res.data.outlet
-    table.value = res.data.table
+    outlet.value = res.data.outlet || {}
+    table.value = res.data.table || {}
     categories.value = res.data.categories || []
     menu.value = res.data.menu || []
     settings.value = { ...settings.value, ...(res.data.settings || {}) }
-    document.title = `${outlet.value.name} • Meja ${table.value.table_number}`
+    isOrderable.value = res.data.is_orderable !== false
+    unavailableReason.value = res.data.unavailable_reason || ''
+    if (outlet.value.name) {
+      document.title = `${outlet.value.name} • Meja ${table.value.table_number || ''}`
+    }
   } catch (e) {
     loadError.value = e.response?.data?.message || 'Halaman tidak ditemukan'
   } finally {
     loading.value = false
   }
+})
+
+const unavailableMessage = computed(() => {
+  const reason = unavailableReason.value
+  if (reason === 'occupied') return t('publicOrder.unavailableOccupied')
+  if (reason === 'reserved') return t('publicOrder.unavailableReserved')
+  if (reason === 'inactive') return t('publicOrder.unavailableInactive')
+  return t('publicOrder.unavailableGeneric')
 })
 
 const filteredMenu = computed(() => {
@@ -440,6 +465,18 @@ async function submitOrder() {
 .state.error i {
   font-size: 48px;
   color: #f87171;
+}
+.state.unavailable i {
+  font-size: 48px;
+  color: #f59e0b;
+}
+.state.unavailable h2 {
+  margin: 12px 0 6px;
+}
+.unavailable-meta {
+  margin-top: 12px;
+  color: #6b7280;
+  font-size: 14px;
 }
 .spinner {
   width: 36px;

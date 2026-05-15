@@ -1587,7 +1587,7 @@
     "phone": "Nomor HP",
     "phonePh": "08xxxxxxxxxx",
     "email": "Email",
-    "emailPh": "email@contoh.com",
+    "emailPh": "email{'@'}contoh.com",
     "memberCardOptional": "Nomor Member (opsional)",
     "memberCardPh": "Mis. MBR202612345",
     "memberHint": "Isi jika Anda sudah terdaftar sebagai member di outlet ini.",
@@ -1612,7 +1612,12 @@
     "approvedMessage": "Pesanan Anda sedang diproses oleh dapur. Terima kasih!",
     "rejectedMessage": "Mohon maaf, pesanan Anda tidak dapat diproses.",
     "seconds": "detik",
-    "statusHint": "Halaman ini akan diperbarui otomatis."
+    "statusHint": "Halaman ini akan diperbarui otomatis.",
+    "unavailableTitle": "Meja Tidak Tersedia",
+    "unavailableOccupied": "Meja ini sedang digunakan. Silakan hubungi kasir atau coba kembali setelah meja dibersihkan.",
+    "unavailableReserved": "Meja ini sudah dipesan. Silakan hubungi kasir untuk informasi lebih lanjut.",
+    "unavailableInactive": "Meja ini sedang tidak aktif. Silakan pilih meja lain atau hubungi kasir.",
+    "unavailableGeneric": "Meja ini sedang tidak dapat menerima pesanan. Silakan hubungi kasir."
   },
   "tableQr": {
     "qrCode": "QR Code",
