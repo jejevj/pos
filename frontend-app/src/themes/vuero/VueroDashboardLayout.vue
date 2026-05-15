@@ -68,7 +68,7 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useLanguage } from '@/composables/useLanguage'
@@ -94,8 +94,8 @@ const outletId = computed(() => route.params.outletId)
 // ─── Computed ────────────────────────────────────────────────────
 const pageTitle = computed(() => route.meta.title || t('common.dashboard'))
 
-/** Outlet users never have a sidebar */
-const showSidebar = computed(() => false)
+/** Superadmin tetap tampilkan sidebar saat masuk halaman outlet */
+const showSidebar = computed(() => authStore.isSuperAdmin)
 
 const userInitial = computed(() => {
   const name = authStore.user?.name || ''
@@ -112,8 +112,24 @@ const currentLanguage = computed(() =>
   availableLocales.find(l => l.code === locale.value) || availableLocales[0]
 )
 
-/** Outlet users have no global nav links */
-const navLinks = computed(() => [])
+/** Superadmin tetap dapat nav links global saat di halaman outlet */
+const navLinks = computed(() => {
+  if (authStore.isSuperAdmin) {
+    return (authStore.menus || []).map(menu => {
+      if (menu.children?.length) {
+        return {
+          id:       menu.id,
+          type:     'collapse',
+          label:    menu.title,
+          icon:     menu.icon,
+          children: menu.children.map(c => ({ label: c.title, to: c.url, icon: c.icon })),
+        }
+      }
+      return { id: menu.id, type: 'link', label: menu.title, icon: menu.icon, to: menu.url }
+    })
+  }
+  return []
+})
 
 const languageMenuItems = computed(() =>
   availableLocales.map(lang => ({
@@ -139,6 +155,14 @@ const userMenuItems = computed(() => [
     },
   },
 ])
+
+// ─── Lifecycle ───────────────────────────────────────────────────
+onMounted(async () => {
+  // Jika superadmin belum punya menus (misal langsung buka URL outlet), fetch sekarang
+  if (authStore.isSuperAdmin && authStore.menus.length === 0) {
+    await authStore.fetchMenus()
+  }
+})
 
 // ─── Methods ─────────────────────────────────────────────────────
 const toggleUserMenu     = (e) => userMenu.value.toggle(e)
