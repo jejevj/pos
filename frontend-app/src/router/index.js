@@ -395,6 +395,14 @@ const router = createRouter({
       component: () => import('@/views/outlet/KitchenOrderView.vue'),
       meta: { requiresAuth: true, title: 'Kitchen Display', standalone: true }
     },
+    // Legacy admin URL redirects (menu URLs di DB masih pakai path lama sebelum prefix /admin)
+    { path: '/users',       redirect: '/admin/users' },
+    { path: '/roles',       redirect: '/admin/roles' },
+    { path: '/permissions', redirect: '/admin/permissions' },
+    { path: '/menus',       redirect: '/admin/menus' },
+    { path: '/reports',     redirect: '/admin/reports' },
+    { path: '/settings',    redirect: '/admin/settings' },
+    { path: '/dashboard',   redirect: '/admin/dashboard' },
     {
       path: '/unauthorized',
       name: 'unauthorized',
