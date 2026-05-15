@@ -527,3 +527,78 @@ html.is-dark [style*="color: #9ca3af"],
 html.is-dark [style*="color:#9ca3af"] {
   color: #7a7a9a !important;
 }
+
+/* ── AttendanceView dark mode overrides ──────────────────────────────────────
+   Scoped CSS pakai var(--p-surface-*) tapi PrimeVue inject dark tokens ke
+   html.is-dark {} sedangkan scoped style resolve dari :root → perlu override
+   ───────────────────────────────────────────────────────────────────────── */
+html.is-dark .attendance-view .page-header h2,
+html.is-dark .attendance-view .status-value,
+html.is-dark .attendance-view .location-header h4,
+html.is-dark .attendance-view .coord-val,
+html.is-dark .attendance-view .card-header h3,
+html.is-dark .attendance-view .permission-item h4,
+html.is-dark .attendance-view .location-value {
+  color: #e4e4ef !important;
+}
+
+html.is-dark .attendance-view .text-muted,
+html.is-dark .attendance-view .status-label,
+html.is-dark .attendance-view .location-label,
+html.is-dark .attendance-view .location-label,
+html.is-dark .attendance-view .coord-label,
+html.is-dark .attendance-view .accuracy-row,
+html.is-dark .attendance-view .permission-item p,
+html.is-dark .attendance-view .location-value.detecting,
+html.is-dark .attendance-view .location-value.muted {
+  color: #7a7a9a !important;
+}
+
+/* Location section background + border */
+html.is-dark .attendance-view .location-section {
+  background: #1a1a24 !important;
+  border-color: #2a2a38 !important;
+}
+
+/* Card header border */
+html.is-dark .attendance-view .card-header {
+  border-bottom-color: #2a2a38 !important;
+}
+
+/* Status card */
+html.is-dark .attendance-view .status-card,
+html.is-dark .attendance-view .action-card,
+html.is-dark .attendance-view .history-card {
+  background: #1e1e28 !important;
+}
+
+/* Distance warning & ok — sudah pakai rgba, cukup pastikan teks kontras */
+html.is-dark .attendance-view .distance-warning {
+  background: rgba(239, 68, 68, 0.12) !important;
+  border-color: rgba(239, 68, 68, 0.3) !important;
+  color: #f87171 !important;
+}
+html.is-dark .attendance-view .distance-ok {
+  background: rgba(19, 222, 185, 0.1) !important;
+  border-color: rgba(19, 222, 185, 0.3) !important;
+  color: #2dd4bf !important;
+}
+
+/* GPS badge */
+html.is-dark .attendance-view .gps-badge.ready {
+  background: rgba(19, 222, 185, 0.15) !important;
+  color: #2dd4bf !important;
+}
+html.is-dark .attendance-view .gps-badge.detecting {
+  background: rgba(59, 130, 246, 0.15) !important;
+  color: #60a5fa !important;
+}
+html.is-dark .attendance-view .gps-badge.error {
+  background: rgba(239, 68, 68, 0.15) !important;
+  color: #f87171 !important;
+}
+
+/* Location error text */
+html.is-dark .attendance-view .location-value.error {
+  color: #f87171 !important;
+}
