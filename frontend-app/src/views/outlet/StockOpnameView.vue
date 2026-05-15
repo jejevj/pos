@@ -249,7 +249,17 @@
         </div>
         <div class="form-field full-width">
           <label>{{ $t('stockOpname.picName') }} *</label>
-          <InputText v-model="formData.pic_name" :placeholder="$t('stockOpname.picNameHelp')" fluid />
+          <Select
+            v-model="formData.pic_user_id"
+            :options="picOptions"
+            optionLabel="name"
+            optionValue="id"
+            :placeholder="$t('stockOpname.picNameHelp')"
+            :loading="loadingPicOptions"
+            :emptyMessage="$t('stockOpname.noPicAvailable')"
+            filter
+            fluid
+          />
         </div>
         <div class="form-field full-width">
           <label>{{ $t('common.notes') }}</label>
@@ -282,6 +292,7 @@ import Textarea from 'primevue/textarea'
 import Tag from 'primevue/tag'
 import Dialog from 'primevue/dialog'
 import DatePicker from 'primevue/datepicker'
+import Select from 'primevue/select'
 
 const route = useRoute()
 const router = useRouter()
@@ -313,9 +324,30 @@ const approvalNotes = ref('')
 const formData = ref({
   tanggal_mulai: null,
   tanggal_selesai: null,
-  pic_name: '',
+  pic_user_id: null,
   notes: ''
 })
+
+const picOptions = ref([])
+const loadingPicOptions = ref(false)
+
+const fetchPicOptions = async () => {
+  loadingPicOptions.value = true
+  try {
+    const response = await api.get(`/outlets/${outletId}/stock-opname/pic-options`)
+    picOptions.value = Array.isArray(response.data) ? response.data : []
+  } catch (error) {
+    picOptions.value = []
+    toast.add({
+      severity: 'error',
+      summary: t('messages.error'),
+      detail: error.response?.data?.message || 'Failed to fetch PIC options',
+      life: 3000
+    })
+  } finally {
+    loadingPicOptions.value = false
+  }
+}
 
 const fetchOutlet = async () => {
   try {
@@ -342,19 +374,42 @@ const showCreateDialog = () => {
   formData.value = {
     tanggal_mulai: null,
     tanggal_selesai: null,
-    pic_name: '',
+    pic_user_id: null,
     notes: ''
   }
   createDialogVisible.value = true
+  if (picOptions.value.length === 0) {
+    fetchPicOptions()
+  }
 }
 
 const createSchedule = async () => {
+  if (!formData.value.pic_user_id) {
+    toast.add({
+      severity: 'warn',
+      summary: t('messages.warning'),
+      detail: t('stockOpname.picRequired'),
+      life: 3000
+    })
+    return
+  }
+  const selectedPic = picOptions.value.find(u => u.id === formData.value.pic_user_id)
+  if (!selectedPic) {
+    toast.add({
+      severity: 'warn',
+      summary: t('messages.warning'),
+      detail: t('stockOpname.picRequired'),
+      life: 3000
+    })
+    return
+  }
   creating.value = true
   try {
     const payload = {
       tanggal_mulai: formatDateForAPI(formData.value.tanggal_mulai),
       tanggal_selesai: formatDateForAPI(formData.value.tanggal_selesai),
-      pic_name: formData.value.pic_name,
+      pic_user_id: selectedPic.id,
+      pic_name: selectedPic.name,
       notes: formData.value.notes
     }
     await api.post(`/outlets/${outletId}/stock-opname`, payload)
