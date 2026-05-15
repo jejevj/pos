@@ -10,12 +10,20 @@ use Illuminate\Support\Facades\DB;
 /**
  * Public order tracking — no authentication required.
  * Accessible via: GET /api/track/{outletId}/{orderCode}
+ *
+ * outletId can be either a numeric DB id or the 8-char hex hash
+ * produced by frontend-app/src/utils/outletId.js (XOR-encoded).
  */
 class OrderTrackingController extends Controller
 {
+    /** Must match SEED in frontend-app/src/utils/outletId.js */
+    private const OUTLET_ID_SEED = 0x504F5300;
+
     public function show(Request $request, $outletId, $orderCode)
     {
-        $outlet = Outlet::find($outletId);
+        $numericId = $this->resolveOutletId($outletId);
+        $outlet = $numericId ? Outlet::find($numericId) : null;
+
         if (!$outlet) {
             return response()->json(['message' => 'Outlet not found'], 404);
         }
@@ -38,7 +46,9 @@ class OrderTrackingController extends Controller
                 SELECT
                     oi.id,
                     oi.menu_name,
+                    oi.menu_price,
                     oi.quantity,
+                    oi.subtotal,
                     oi.notes,
                     oi.status,
                     oi.preparing_at,
@@ -61,7 +71,17 @@ class OrderTrackingController extends Controller
                 $table = DB::table('tables')->find($order->table_id);
             }
 
+            // Receipt / transaction settings (per-outlet)
+            $rs = DB::table('transaction_settings')->first();
+
             DB::statement("SET search_path TO public");
+
+            // Cashier name (public schema)
+            $cashierName = null;
+            if (!empty($order->cashier_id)) {
+                $cashier = DB::table('users')->where('id', $order->cashier_id)->first();
+                $cashierName = $cashier->name ?? null;
+            }
 
             // Build status timeline
             $timeline = $this->buildTimeline($order, $items);
@@ -82,7 +102,9 @@ class OrderTrackingController extends Controller
                 $byStation[$key]['items'][] = [
                     'id'          => $item->id,
                     'menu_name'   => $item->menu_name,
-                    'quantity'    => $item->quantity,
+                    'menu_price'  => (float) ($item->menu_price ?? 0),
+                    'quantity'    => (int) $item->quantity,
+                    'subtotal'    => (float) ($item->subtotal ?? 0),
                     'notes'       => $item->notes,
                     'status'      => $item->status ?? 'pending',
                     'preparing_at'=> $item->preparing_at,
@@ -91,10 +113,38 @@ class OrderTrackingController extends Controller
                 ];
             }
 
+            $taxEnabled            = $rs ? (bool) ($rs->tax_enabled ?? true) : true;
+            $taxLabel              = $rs ? ($rs->tax_label ?? 'PPN') : 'PPN';
+            $taxPercentage         = $rs ? (float) ($rs->tax_percentage ?? 0) : 0;
+            $serviceChargeEnabled  = $rs ? (bool) ($rs->service_charge_enabled ?? false) : false;
+            $serviceChargeLabel    = $rs ? ($rs->service_charge_label ?? 'Service Charge') : 'Service Charge';
+            $serviceChargePct      = $rs ? (float) ($rs->service_charge_percentage ?? 0) : 0;
+
+            $receiptSettings = [
+                'receipt_header'        => $rs ? ($rs->receipt_header ?? '') : '',
+                'receipt_footer'        => $rs ? ($rs->receipt_footer ?? '') : '',
+                'receipt_show_qr'       => $rs ? (bool) ($rs->receipt_show_qr ?? true) : true,
+                'receipt_wifi_enabled'  => $rs ? (bool) ($rs->receipt_wifi_enabled ?? false) : false,
+                'receipt_wifi_ssid'     => $rs ? ($rs->receipt_wifi_ssid ?? '') : '',
+                'receipt_wifi_password' => $rs ? ($rs->receipt_wifi_password ?? '') : '',
+                'receipt_logo_enabled'  => $rs ? (bool) ($rs->receipt_logo_enabled ?? true) : true,
+                'receipt_show_cashier'  => $rs ? (bool) ($rs->receipt_show_cashier ?? true) : true,
+                'receipt_show_table'    => $rs ? (bool) ($rs->receipt_show_table ?? true) : true,
+                'tax_enabled'           => $taxEnabled,
+                'tax_label'             => $taxLabel,
+                'tax_percentage'        => $taxPercentage,
+                'service_charge_enabled'=> $serviceChargeEnabled,
+                'service_charge_label'  => $serviceChargeLabel,
+                'service_charge_percentage' => $serviceChargePct,
+            ];
+
             return response()->json([
                 'outlet' => [
-                    'id'   => $outlet->id,
-                    'name' => $outlet->name,
+                    'id'      => $outlet->id,
+                    'name'    => $outlet->name,
+                    'address' => $outlet->address,
+                    'phone'   => $outlet->phone,
+                    'logo'    => $outlet->logo,
                 ],
                 'order' => [
                     'id'             => $order->id,
@@ -105,16 +155,48 @@ class OrderTrackingController extends Controller
                     'status'         => $order->status,
                     'kitchen_status' => $order->kitchen_status ?? 'pending',
                     'notes'          => $order->notes,
+                    'subtotal'                  => (float) ($order->subtotal ?? 0),
+                    'discount_amount'           => (float) ($order->discount_amount ?? 0),
+                    'tax_percentage'            => (float) ($order->tax_percentage ?? 0),
+                    'tax_amount'                => (float) ($order->tax_amount ?? 0),
+                    'service_charge_percentage' => (float) ($order->service_charge_percentage ?? 0),
+                    'service_charge_amount'     => (float) ($order->service_charge_amount ?? 0),
+                    'total_amount'              => (float) ($order->total_amount ?? 0),
+                    'cashier_name'   => $cashierName,
                     'created_at'     => $order->created_at,
                     'paid_at'        => $order->paid_at,
                 ],
-                'stations' => array_values($byStation),
-                'timeline' => $timeline,
+                'stations'         => array_values($byStation),
+                'timeline'         => $timeline,
+                'receipt_settings' => $receiptSettings,
             ]);
         } catch (\Exception $e) {
             DB::statement("SET search_path TO public");
             return response()->json(['message' => $e->getMessage()], 500);
         }
+    }
+
+    /**
+     * Decode an outlet ID that may be:
+     *   - a plain numeric DB id ("1"), or
+     *   - an 8-char hex XOR-encoded hash ("504f5301") produced by the frontend.
+     * Returns null if neither form yields a positive integer.
+     */
+    private function resolveOutletId($raw): ?int
+    {
+        if ($raw === null || $raw === '') return null;
+
+        if (is_string($raw) && preg_match('/^[0-9a-fA-F]{8}$/', $raw)) {
+            $n = (hexdec($raw) ^ self::OUTLET_ID_SEED) & 0xFFFFFFFF;
+            return $n > 0 ? (int) $n : null;
+        }
+
+        if (is_numeric($raw)) {
+            $n = (int) $raw;
+            return $n > 0 ? $n : null;
+        }
+
+        return null;
     }
 
     private function buildTimeline($order, array $items): array

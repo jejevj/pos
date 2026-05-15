@@ -809,3 +809,33 @@ html.is-dark .utilities-view .form-actions {
 html.is-dark .utilities-view .page-header h2 {
   color: var(--p-text-color, #e4e4ef) !important;
 }
+
+/* ── Tracking page dark mode ─────────────────────────────── */
+html.is-dark .track-page {
+  --track-page-bg:      #13131a;
+  --track-receipt-bg:   #1e1e28;
+  --track-text:         #e4e4ef;
+  --track-muted:        #9090b0;
+  --track-icon-bg:      #2a2a36;
+  --track-divider:      #3a3a4a;
+  --track-divider-soft: #2e2e3e;
+}
+html.is-dark .track-page .receipt {
+  box-shadow: 0 4px 24px rgba(0,0,0,0.5);
+}
+html.is-dark .track-page .status-pending   { background: #3a2e10; color: #fcd34d; border-color: #66501a; }
+html.is-dark .track-page .status-preparing { background: #102040; color: #93c5fd; border-color: #1e4080; }
+html.is-dark .track-page .status-ready     { background: #103025; color: #6ee7b7; border-color: #1e6048; }
+html.is-dark .track-page .status-served    { background: #103a20; color: #86efac; border-color: #1f7038; }
+html.is-dark .track-page .status-cancelled { background: #3a1212; color: #fca5a5; border-color: #802424; }
+html.is-dark .track-page .dot-pending   { background: #3a2e10; color: #fcd34d; }
+html.is-dark .track-page .dot-preparing { background: #102040; color: #93c5fd; }
+html.is-dark .track-page .dot-ready     { background: #103025; color: #6ee7b7; }
+html.is-dark .track-page .dot-served    { background: #103a20; color: #86efac; }
+html.is-dark .track-page .skeleton-line {
+  background: linear-gradient(90deg, #2a2a36 25%, #3a3a4a 50%, #2a2a36 75%);
+  background-size: 200% 100%;
+}
+html.is-dark .track-page .qr-img {
+  background: #fff;
+}

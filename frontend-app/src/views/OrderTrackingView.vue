@@ -1,9 +1,9 @@
 <template>
-  <div class="tracking-page">
+  <div class="track-page">
     <!-- Loading -->
     <div v-if="loading" class="receipt-wrap">
       <div class="receipt">
-        <div class="receipt-header">
+        <div class="receipt-section center">
           <div class="skeleton-line w-40 mx-auto mb-2"></div>
           <div class="skeleton-line w-28 mx-auto"></div>
         </div>
@@ -18,18 +18,17 @@
     <!-- Error -->
     <div v-else-if="error" class="receipt-wrap">
       <div class="receipt">
-        <div class="receipt-header">
+        <div class="receipt-section center">
           <div class="brand-icon">
             <i class="pi pi-times-circle" style="font-size:2rem;color:#FA896B"></i>
           </div>
           <h2 class="outlet-name">Pesanan Tidak Ditemukan</h2>
-          <p class="order-code">{{ error }}</p>
+          <p class="muted">{{ error }}</p>
         </div>
         <div class="receipt-divider"></div>
-        <p class="text-center text-muted" style="padding:1rem 0">
+        <p class="muted center" style="padding:1rem 0">
           Pastikan kode pesanan Anda benar, atau hubungi kasir.
         </p>
-        <div class="receipt-bottom-cut"></div>
       </div>
     </div>
 
@@ -37,96 +36,172 @@
     <div v-else-if="data" class="receipt-wrap">
       <div class="receipt">
 
-        <!-- Header -->
-        <div class="receipt-header">
-          <div class="brand-icon">
-            <i class="pi pi-shop"></i>
-          </div>
+        <!-- Outlet header -->
+        <div class="receipt-section center">
+          <img
+            v-if="data.outlet.logo"
+            :src="data.outlet.logo"
+            :alt="data.outlet.name"
+            class="outlet-logo"
+            @error="$event.target.style.display='none'"
+          />
+          <div v-else class="brand-icon"><i class="pi pi-shop"></i></div>
           <h1 class="outlet-name">{{ data.outlet.name }}</h1>
-          <p class="order-code"># {{ data.order.kode }}</p>
-          <p class="order-date">{{ formatDate(data.order.created_at) }}</p>
+          <p v-if="data.outlet.address" class="outlet-meta">{{ data.outlet.address }}</p>
+          <p v-if="data.outlet.phone" class="outlet-meta">{{ data.outlet.phone }}</p>
         </div>
 
-        <!-- Customer & table info -->
-        <div class="receipt-divider dashed"></div>
-        <div class="info-row" v-if="data.order.customer_name">
-          <span class="info-label">Pelanggan</span>
-          <span class="info-value">{{ data.order.customer_name }}</span>
-        </div>
-        <div class="info-row" v-if="data.order.table_number">
-          <span class="info-label">Meja</span>
-          <span class="info-value">{{ data.order.table_number }}</span>
-        </div>
-        <div class="info-row">
-          <span class="info-label">Tipe</span>
-          <span class="info-value">{{ formatOrderType(data.order.order_type) }}</span>
-        </div>
-        <div class="info-row" v-if="data.order.notes">
-          <span class="info-label">Catatan</span>
-          <span class="info-value note-text">{{ data.order.notes }}</span>
-        </div>
+        <!-- Custom receipt header -->
+        <template v-if="receipt.receipt_header">
+          <div class="receipt-divider"></div>
+          <div class="receipt-section center custom-text">
+            <p v-for="(line, i) in headerLines" :key="'h'+i">{{ line }}</p>
+          </div>
+        </template>
 
-        <!-- Status badge -->
-        <div class="receipt-divider dashed"></div>
-        <div class="status-section">
+        <!-- Status -->
+        <div class="receipt-divider"></div>
+        <div class="receipt-section center">
+          <p class="section-title">STATUS PESANAN</p>
           <div class="status-badge" :class="statusClass(data.order.kitchen_status)">
             <i :class="statusIcon(data.order.kitchen_status)"></i>
             {{ statusLabel(data.order.kitchen_status) }}
           </div>
         </div>
 
-        <!-- Timeline -->
+        <!-- Order info -->
         <div class="receipt-divider dashed"></div>
-        <div class="timeline">
-          <div
-            v-for="step in data.timeline"
-            :key="step.key"
-            class="timeline-step"
-            :class="{ done: step.done }"
-          >
-            <div class="timeline-dot" :style="step.done ? `background:${step.color}` : ''">
-              <i :class="step.icon"></i>
-            </div>
-            <div class="timeline-body">
-              <span class="timeline-label">{{ step.label }}</span>
-              <span class="timeline-time" v-if="step.time">{{ formatTime(step.time) }}</span>
-            </div>
+        <div class="receipt-section">
+          <div class="info-row">
+            <span class="info-label">No. Pesanan</span>
+            <span class="info-value">{{ data.order.kode }}</span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">Tanggal</span>
+            <span class="info-value">{{ formatDate(data.order.created_at) }}</span>
+          </div>
+          <div class="info-row" v-if="data.order.cashier_name && receipt.receipt_show_cashier !== false">
+            <span class="info-label">Kasir</span>
+            <span class="info-value">{{ data.order.cashier_name }}</span>
+          </div>
+          <div class="info-row" v-if="data.order.table_number && receipt.receipt_show_table !== false">
+            <span class="info-label">Meja</span>
+            <span class="info-value">{{ data.order.table_number }}</span>
+          </div>
+          <div class="info-row" v-if="data.order.customer_name">
+            <span class="info-label">Pelanggan</span>
+            <span class="info-value">{{ data.order.customer_name }}</span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">Tipe</span>
+            <span class="info-value">{{ formatOrderType(data.order.order_type) }}</span>
+          </div>
+          <div class="info-row" v-if="data.order.notes">
+            <span class="info-label">Catatan</span>
+            <span class="info-value note-text">{{ data.order.notes }}</span>
           </div>
         </div>
 
         <!-- Items -->
         <div class="receipt-divider"></div>
-        <p class="section-title">DAFTAR PESANAN</p>
-
-        <div
-          v-for="item in allItems"
-          :key="item.id"
-          class="item-row"
-        >
-          <div class="item-main">
-            <span class="item-qty">{{ item.quantity }}x</span>
-            <span class="item-name">{{ item.menu_name }}</span>
-            <span class="item-status-dot" :class="itemStatusClass(item.status)">
-              {{ itemStatusLabel(item.status) }}
-            </span>
-          </div>
-          <div v-if="item.notes" class="item-notes">
-            <i class="pi pi-comment"></i> {{ item.notes }}
+        <p class="section-title center">DETAIL PESANAN</p>
+        <div class="receipt-section">
+          <div v-for="item in allItems" :key="item.id" class="item-row">
+            <div class="item-main">
+              <span class="item-name">{{ item.menu_name }}</span>
+              <span class="item-qty">x{{ item.quantity }}</span>
+              <span class="item-price">{{ formatCurrency(item.subtotal || (item.menu_price * item.quantity)) }}</span>
+            </div>
+            <div v-if="item.notes" class="item-notes">
+              <i class="pi pi-comment"></i> {{ item.notes }}
+            </div>
+            <div class="item-status-line">
+              <span class="item-status-dot" :class="itemStatusClass(item.status)">
+                {{ itemStatusLabel(item.status) }}
+              </span>
+            </div>
           </div>
         </div>
 
-        <!-- Footer -->
+        <!-- Totals -->
         <div class="receipt-divider dashed"></div>
-        <div class="receipt-footer">
-          <p class="footer-text">Terima kasih atas pesanan Anda!</p>
-          <p class="footer-subtext">Halaman ini otomatis diperbarui setiap 15 detik</p>
+        <div class="receipt-section">
+          <div class="info-row">
+            <span class="info-label">Subtotal</span>
+            <span class="info-value">{{ formatCurrency(data.order.subtotal) }}</span>
+          </div>
+          <div class="info-row" v-if="receipt.tax_enabled && data.order.tax_amount > 0">
+            <span class="info-label">{{ receipt.tax_label || 'PPN' }}
+              <span v-if="data.order.tax_percentage">({{ data.order.tax_percentage }}%)</span>
+            </span>
+            <span class="info-value">{{ formatCurrency(data.order.tax_amount) }}</span>
+          </div>
+          <div class="info-row" v-if="receipt.service_charge_enabled && data.order.service_charge_amount > 0">
+            <span class="info-label">{{ receipt.service_charge_label || 'Service Charge' }}
+              <span v-if="data.order.service_charge_percentage">({{ data.order.service_charge_percentage }}%)</span>
+            </span>
+            <span class="info-value">{{ formatCurrency(data.order.service_charge_amount) }}</span>
+          </div>
+          <div class="info-row" v-if="data.order.discount_amount > 0">
+            <span class="info-label">Diskon</span>
+            <span class="info-value">-{{ formatCurrency(data.order.discount_amount) }}</span>
+          </div>
+        </div>
+
+        <div class="receipt-divider"></div>
+        <div class="receipt-section">
+          <div class="info-row total-row">
+            <span class="info-label">TOTAL</span>
+            <span class="info-value">{{ formatCurrency(data.order.total_amount) }}</span>
+          </div>
+        </div>
+
+        <!-- Tracking QR -->
+        <template v-if="receipt.receipt_show_qr">
+          <div class="receipt-divider"></div>
+          <div class="receipt-section center">
+            <img :src="qrUrl" alt="Tracking QR" class="qr-img" />
+            <p class="muted small">Scan untuk tracking pesanan</p>
+          </div>
+        </template>
+
+        <!-- WiFi -->
+        <template v-if="receipt.receipt_wifi_enabled && receipt.receipt_wifi_ssid">
+          <div class="receipt-divider dashed"></div>
+          <div class="receipt-section center">
+            <p class="section-title">WIFI GRATIS</p>
+            <img :src="wifiQrUrl" alt="WiFi QR" class="qr-img small" />
+            <div class="info-row inline">
+              <span class="info-label">SSID</span>
+              <span class="info-value">{{ receipt.receipt_wifi_ssid }}</span>
+            </div>
+            <div class="info-row inline" v-if="receipt.receipt_wifi_password">
+              <span class="info-label">Password</span>
+              <span class="info-value">{{ receipt.receipt_wifi_password }}</span>
+            </div>
+          </div>
+        </template>
+
+        <!-- Custom footer -->
+        <template v-if="receipt.receipt_footer">
+          <div class="receipt-divider"></div>
+          <div class="receipt-section center custom-text">
+            <p v-for="(line, i) in footerLines" :key="'f'+i">{{ line }}</p>
+          </div>
+        </template>
+
+        <!-- Closing -->
+        <div class="receipt-divider dashed"></div>
+        <div class="receipt-section center">
+          <p class="thanks-text">Terima kasih atas kunjungan Anda</p>
           <div class="refresh-indicator">
             <i class="pi pi-refresh" :class="{ spinning: refreshing }"></i>
             <span>{{ lastUpdated }}</span>
           </div>
+          <p class="muted small">Halaman ini otomatis diperbarui setiap 15 detik</p>
         </div>
 
-        <!-- Thermal cut effect -->
+        <!-- Thermal cut -->
         <div class="receipt-cut">
           <div class="cut-line"></div>
           <div class="cut-circles">
@@ -142,6 +217,7 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
 import axios from 'axios'
+import { decodeOutletId } from '@/utils/outletId'
 
 const route   = useRoute()
 const loading = ref(true)
@@ -151,13 +227,32 @@ const refreshing = ref(false)
 const lastUpdated = ref('')
 let timer = null
 
-const outletId  = route.params.outletId
+// route param may be the encoded hash; decode to numeric ID for backend
+const rawOutletParam = route.params.outletId
+const numericOutletId = decodeOutletId(rawOutletParam) || rawOutletParam
 const orderCode = route.params.orderCode
 
 // ── Computed ────────────────────────────────────────────────
 const allItems = computed(() => {
   if (!data.value) return []
   return data.value.stations.flatMap(s => s.items)
+})
+const receipt = computed(() => data.value?.receipt_settings || {})
+const headerLines = computed(() =>
+  (receipt.value.receipt_header || '').split('\n').map(s => s.trim()).filter(Boolean)
+)
+const footerLines = computed(() =>
+  (receipt.value.receipt_footer || '').split('\n').map(s => s.trim()).filter(Boolean)
+)
+const qrUrl = computed(() => {
+  const url = encodeURIComponent(window.location.href)
+  return `https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${url}`
+})
+const wifiQrUrl = computed(() => {
+  const ssid = receipt.value.receipt_wifi_ssid || ''
+  const pass = receipt.value.receipt_wifi_password || ''
+  const payload = encodeURIComponent(`WIFI:T:WPA;S:${ssid};P:${pass};H:false;;`)
+  return `https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${payload}`
 })
 
 // ── Fetch ───────────────────────────────────────────────────
@@ -167,7 +262,7 @@ const fetchOrder = async (silent = false) => {
 
   try {
     const base = import.meta.env.VITE_API_URL || '/api'
-    const res  = await axios.get(`${base}/track/${outletId}/${orderCode}`)
+    const res  = await axios.get(`${base}/track/${numericOutletId}/${orderCode}`)
     data.value  = res.data
     error.value = null
     lastUpdated.value = 'Diperbarui ' + new Date().toLocaleTimeString('id-ID')
@@ -181,7 +276,6 @@ const fetchOrder = async (silent = false) => {
   }
 }
 
-// ── Auto refresh ────────────────────────────────────────────
 onMounted(() => {
   fetchOrder()
   timer = setInterval(() => fetchOrder(true), 15000)
@@ -196,9 +290,9 @@ const formatDate = (dt) => {
     hour: '2-digit', minute: '2-digit'
   })
 }
-const formatTime = (dt) => {
-  if (!dt) return ''
-  return new Date(dt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })
+const formatCurrency = (n) => {
+  const v = Number(n || 0)
+  return 'Rp ' + v.toLocaleString('id-ID', { maximumFractionDigits: 0 })
 }
 const formatOrderType = (t) => ({
   dine_in: 'Makan di Tempat', takeaway: 'Bawa Pulang', delivery: 'Delivery'
@@ -206,28 +300,37 @@ const formatOrderType = (t) => ({
 
 // ── Status helpers ───────────────────────────────────────────
 const statusLabel = (s) => ({
-  pending:   'Menunggu Diproses',
-  preparing: 'Sedang Dimasak',
-  ready:     'Siap Disajikan',
-  served:    'Sudah Disajikan',
-  cancelled: 'Dibatalkan',
-}[s] || s)
+  pending:    'Menunggu',
+  processing: 'Sedang Diproses',
+  preparing:  'Sedang Diproses',
+  ready:      'Siap Diambil',
+  served:     'Selesai',
+  completed:  'Selesai',
+  paid:       'Selesai',
+  cancelled:  'Dibatalkan',
+}[s] || s || 'Menunggu')
 
 const statusIcon = (s) => ({
-  pending:   'pi pi-clock',
-  preparing: 'pi pi-spin pi-cog',
-  ready:     'pi pi-bell',
-  served:    'pi pi-check-circle',
-  cancelled: 'pi pi-times-circle',
+  pending:    'pi pi-clock',
+  processing: 'pi pi-spin pi-cog',
+  preparing:  'pi pi-spin pi-cog',
+  ready:      'pi pi-bell',
+  served:     'pi pi-check-circle',
+  completed:  'pi pi-check-circle',
+  paid:       'pi pi-check-circle',
+  cancelled:  'pi pi-times-circle',
 }[s] || 'pi pi-info-circle')
 
 const statusClass = (s) => ({
-  pending:   'status-pending',
-  preparing: 'status-preparing',
-  ready:     'status-ready',
-  served:    'status-served',
-  cancelled: 'status-cancelled',
-}[s] || '')
+  pending:    'status-pending',
+  processing: 'status-preparing',
+  preparing:  'status-preparing',
+  ready:      'status-ready',
+  served:     'status-served',
+  completed:  'status-served',
+  paid:       'status-served',
+  cancelled:  'status-cancelled',
+}[s] || 'status-pending')
 
 const itemStatusLabel = (s) => ({
   pending:   'Antrian',
@@ -246,9 +349,9 @@ const itemStatusClass = (s) => ({
 
 <style scoped>
 /* ── Page ───────────────────────────────────────────────── */
-.tracking-page {
+.track-page {
   min-height: 100vh;
-  background: #f0f0f0;
+  background: var(--track-page-bg, #f0f0f0);
   display: flex;
   align-items: flex-start;
   justify-content: center;
@@ -256,37 +359,46 @@ const itemStatusClass = (s) => ({
   font-family: 'Courier New', 'Courier', monospace;
 }
 
-/* ── Receipt wrapper ────────────────────────────────────── */
 .receipt-wrap {
   width: 100%;
-  max-width: 380px;
+  max-width: 420px;
 }
 
 .receipt {
-  background: #fff;
-  border-radius: 4px 4px 0 0;
+  background: var(--track-receipt-bg, #fff);
+  color: var(--track-text, #111);
+  border-radius: 6px 6px 0 0;
   box-shadow: 0 4px 24px rgba(0,0,0,0.13);
   position: relative;
   overflow: hidden;
 }
 
-/* ── Header ─────────────────────────────────────────────── */
-.receipt-header {
-  text-align: center;
-  padding: 2rem 1.5rem 1.2rem;
+/* ── Section wrappers ───────────────────────────────────── */
+.receipt-section {
+  padding: 0.9rem 1.4rem;
 }
+.receipt-section.center { text-align: center; }
 
+/* ── Outlet header ──────────────────────────────────────── */
+.outlet-logo {
+  width: 70px;
+  height: 70px;
+  object-fit: contain;
+  border-radius: 8px;
+  margin: 0 auto 0.6rem;
+  display: block;
+}
 .brand-icon {
   width: 56px;
   height: 56px;
   border-radius: 50%;
-  background: #f4f4f4;
+  background: var(--track-icon-bg, #f4f4f4);
   display: flex;
   align-items: center;
   justify-content: center;
   margin: 0 auto 0.75rem;
   font-size: 1.6rem;
-  color: #333;
+  color: var(--track-text, #333);
 }
 
 .outlet-name {
@@ -295,70 +407,50 @@ const itemStatusClass = (s) => ({
   letter-spacing: 0.08em;
   text-transform: uppercase;
   margin: 0 0 0.3rem;
-  color: #111;
+  color: var(--track-text, #111);
 }
-
-.order-code {
-  font-size: 0.95rem;
-  font-weight: 700;
-  color: #333;
-  letter-spacing: 0.05em;
-  margin: 0 0 0.15rem;
-}
-
-.order-date {
+.outlet-meta {
   font-size: 0.78rem;
-  color: #888;
-  margin: 0;
+  color: var(--track-muted, #666);
+  margin: 0.1rem 0;
+}
+.custom-text p {
+  font-size: 0.82rem;
+  color: var(--track-text, #222);
+  margin: 0.1rem 0;
 }
 
 /* ── Dividers ───────────────────────────────────────────── */
 .receipt-divider {
   height: 1px;
-  background: #333;
+  background: var(--track-divider, #333);
   margin: 0;
 }
 .receipt-divider.dashed {
   background: none;
-  border-top: 1.5px dashed #ccc;
+  border-top: 1.5px dashed var(--track-divider-soft, #ccc);
 }
 
-/* ── Info rows ──────────────────────────────────────────── */
-.info-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  padding: 0.3rem 1.5rem;
-  font-size: 0.82rem;
+/* ── Section title ──────────────────────────────────────── */
+.section-title {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: var(--track-muted, #888);
+  margin: 0 0 0.5rem;
 }
-.info-label {
-  color: #888;
-  flex-shrink: 0;
-  margin-right: 1rem;
-}
-.info-value {
-  color: #222;
-  font-weight: 600;
-  text-align: right;
-}
-.note-text {
-  font-style: italic;
-  font-weight: 400;
-  color: #555;
-}
+.center { text-align: center; }
+.muted { color: var(--track-muted, #888); }
+.muted.small { font-size: 0.72rem; }
 
 /* ── Status badge ───────────────────────────────────────── */
-.status-section {
-  padding: 0.75rem 1.5rem;
-  text-align: center;
-}
 .status-badge {
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
-  padding: 0.5rem 1.2rem;
+  padding: 0.55rem 1.3rem;
   border-radius: 999px;
-  font-size: 0.85rem;
+  font-size: 0.9rem;
   font-weight: 700;
   letter-spacing: 0.03em;
 }
@@ -368,134 +460,127 @@ const itemStatusClass = (s) => ({
 .status-served    { background: #f0fdf4; color: #166534; border: 1.5px solid #86efac; }
 .status-cancelled { background: #fef2f2; color: #991b1b; border: 1.5px solid #fca5a5; }
 
-/* ── Timeline ───────────────────────────────────────────── */
-.timeline {
-  padding: 0.75rem 1.5rem;
+/* ── Info rows ──────────────────────────────────────────── */
+.info-row {
   display: flex;
-  flex-direction: column;
-  gap: 0;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 0.25rem 0;
+  font-size: 0.85rem;
 }
-.timeline-step {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 0.4rem 0;
-  opacity: 0.35;
-  transition: opacity 0.3s;
-}
-.timeline-step.done { opacity: 1; }
-
-.timeline-dot {
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  background: #e5e7eb;
-  display: flex;
-  align-items: center;
+.info-row.inline {
   justify-content: center;
-  font-size: 0.75rem;
+  gap: 0.5rem;
+}
+.info-label {
+  color: var(--track-muted, #666);
   flex-shrink: 0;
-  color: #fff;
-  transition: background 0.3s;
+  margin-right: 1rem;
 }
-.timeline-step:not(.done) .timeline-dot { color: #aaa; }
-
-.timeline-body {
-  display: flex;
-  flex-direction: column;
-}
-.timeline-label {
-  font-size: 0.82rem;
+.info-value {
+  color: var(--track-text, #111);
   font-weight: 600;
-  color: #222;
+  text-align: right;
 }
-.timeline-time {
-  font-size: 0.72rem;
-  color: #888;
+.note-text {
+  font-style: italic;
+  font-weight: 400;
+  color: var(--track-muted, #555);
 }
-
-/* ── Section title ──────────────────────────────────────── */
-.section-title {
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  color: #888;
-  text-align: center;
-  margin: 0.6rem 0 0.2rem;
+.total-row {
+  font-size: 1rem;
+  font-weight: 800;
+}
+.total-row .info-label,
+.total-row .info-value {
+  color: var(--track-text, #111);
+  font-weight: 800;
+  letter-spacing: 0.05em;
 }
 
 /* ── Items ──────────────────────────────────────────────── */
 .item-row {
-  padding: 0.45rem 1.5rem;
-  border-bottom: 1px dashed #eee;
+  padding: 0.5rem 0;
+  border-bottom: 1px dashed var(--track-divider-soft, #eee);
 }
+.item-row:last-child { border-bottom: none; }
 .item-main {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-}
-.item-qty {
-  font-weight: 700;
   font-size: 0.88rem;
-  color: #333;
-  min-width: 28px;
 }
 .item-name {
   flex: 1;
-  font-size: 0.88rem;
-  color: #111;
+  color: var(--track-text, #111);
   font-weight: 600;
+}
+.item-qty {
+  font-weight: 700;
+  color: var(--track-muted, #555);
+  min-width: 28px;
+  text-align: right;
+}
+.item-price {
+  font-weight: 700;
+  color: var(--track-text, #111);
+  min-width: 70px;
+  text-align: right;
 }
 .item-notes {
   font-size: 0.75rem;
-  color: #888;
-  padding-left: 36px;
+  color: var(--track-muted, #888);
   margin-top: 0.15rem;
   font-style: italic;
 }
-
-/* Item status dots */
+.item-status-line {
+  margin-top: 0.3rem;
+}
 .item-status-dot {
+  display: inline-block;
   font-size: 0.68rem;
   font-weight: 700;
   padding: 0.15rem 0.5rem;
   border-radius: 999px;
-  flex-shrink: 0;
 }
 .dot-pending   { background: #fef9c3; color: #713f12; }
 .dot-preparing { background: #dbeafe; color: #1e40af; }
 .dot-ready     { background: #dcfce7; color: #166534; }
 .dot-served    { background: #f0fdf4; color: #15803d; }
 
-/* ── Footer ─────────────────────────────────────────────── */
-.receipt-footer {
-  text-align: center;
-  padding: 1rem 1.5rem 0.5rem;
+/* ── QR ─────────────────────────────────────────────────── */
+.qr-img {
+  width: 120px;
+  height: 120px;
+  margin: 0.4rem auto;
+  display: block;
+  background: #fff;
+  padding: 4px;
+  border-radius: 4px;
 }
-.footer-text {
-  font-size: 0.85rem;
+.qr-img.small {
+  width: 100px;
+  height: 100px;
+}
+
+/* ── Footer ─────────────────────────────────────────────── */
+.thanks-text {
+  font-size: 0.9rem;
   font-weight: 700;
-  color: #333;
-  margin: 0 0 0.2rem;
+  color: var(--track-text, #333);
+  margin: 0 0 0.5rem;
   text-transform: uppercase;
   letter-spacing: 0.06em;
 }
-.footer-subtext {
-  font-size: 0.72rem;
-  color: #aaa;
-  margin: 0 0 0.5rem;
-}
 .refresh-indicator {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  justify-content: center;
   gap: 0.4rem;
   font-size: 0.72rem;
-  color: #bbb;
+  color: var(--track-muted, #aaa);
+  margin-bottom: 0.3rem;
 }
-.pi-refresh.spinning {
-  animation: spin 1s linear infinite;
-}
+.pi-refresh.spinning { animation: spin 1s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
 /* ── Thermal cut ────────────────────────────────────────── */
@@ -510,7 +595,7 @@ const itemStatusClass = (s) => ({
   left: 0;
   right: 0;
   height: 1px;
-  border-top: 2px dashed #ccc;
+  border-top: 2px dashed var(--track-divider-soft, #ccc);
 }
 .cut-circles {
   position: absolute;
@@ -520,13 +605,12 @@ const itemStatusClass = (s) => ({
   right: 0;
   display: flex;
   justify-content: space-between;
-  padding: 0 0;
 }
 .cut-circle {
   width: 14px;
   height: 14px;
   border-radius: 50%;
-  background: #f0f0f0;
+  background: var(--track-page-bg, #f0f0f0);
   flex-shrink: 0;
   margin: 0 -7px;
 }
@@ -548,8 +632,6 @@ const itemStatusClass = (s) => ({
 .mx-auto { margin-left: auto; margin-right: auto; }
 .mb-2 { margin-bottom: 0.5rem; }
 .mb-1 { margin-bottom: 0.25rem; }
-.text-center { text-align: center; }
-.text-muted { color: #aaa; font-size: 0.85rem; }
 
 @keyframes shimmer {
   0%   { background-position: 200% 0; }
