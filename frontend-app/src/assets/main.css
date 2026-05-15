@@ -255,6 +255,80 @@ html.is-dark [style*="background:#fdf2f8"] {
   background: #2a2a36 !important;
 }
 
+/* ── POS View dark mode overrides ───────────────────────────────── */
+html.is-dark .pos-container {
+  background: #13131a !important;
+  color: #e4e4ef !important;
+}
+html.is-dark .pos-header,
+html.is-dark .menu-section,
+html.is-dark .cart-section {
+  background: #1e1e28 !important;
+  border-color: #2e2e3e !important;
+  color: #e4e4ef !important;
+}
+html.is-dark .pos-header h2,
+html.is-dark .menu-name,
+html.is-dark .item-name,
+html.is-dark .promo-option-name,
+html.is-dark .promo-label,
+html.is-dark .order-header h3,
+html.is-dark .table-number,
+html.is-dark .form-field label,
+html.is-dark .points-redeem-row label {
+  color: #e4e4ef !important;
+}
+html.is-dark .pos-container .menu-card,
+html.is-dark .pos-container .cart-item,
+html.is-dark .pos-container .table-card {
+  background: #232330 !important;
+  border-color: #2e2e3e !important;
+  color: #e4e4ef !important;
+}
+html.is-dark .pos-container .menu-image {
+  background: #2a2a36 !important;
+}
+html.is-dark .pos-container .applied-promo-item {
+  background: #1a3a2a !important;
+  color: #86efac !important;
+}
+html.is-dark .pos-container .selected-member {
+  background: #1a3a2a !important;
+  border-color: #2e6e4e !important;
+}
+html.is-dark .pos-container .selected-member .member-name {
+  color: #86efac !important;
+}
+html.is-dark .pos-container .promo-info {
+  background: #1a2a3a !important;
+  border-color: #2e4e6e !important;
+  color: #93c5fd !important;
+}
+html.is-dark .pos-container .promo-error {
+  background: #3a1a1a !important;
+  border-color: #6e2e2e !important;
+  color: #fca5a5 !important;
+}
+html.is-dark .pos-container .payment-total,
+html.is-dark .pos-container .payment-change {
+  background: #2a2a36 !important;
+}
+html.is-dark .pos-container .member-points-section {
+  background: #3a2e1a !important;
+  border-color: #6e5a2e !important;
+}
+html.is-dark .pos-container .member-dropdown {
+  background: #232330 !important;
+  border-color: #2e2e3e !important;
+  color: #e4e4ef !important;
+}
+html.is-dark .pos-container .member-dropdown-item {
+  border-bottom-color: #2e2e3e !important;
+}
+html.is-dark .pos-container .member-dropdown-item:hover {
+  background: #2a2a36 !important;
+}
+
 
 /* ── PrimeVue CSS vars override langsung (lebih reliable dari definePreset) ─
    PrimeVue v4 inject vars via :root {} di <style> tag runtime.

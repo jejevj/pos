@@ -122,7 +122,7 @@
           <!-- Cart Items -->
           <div class="cart-items">
             <div v-if="cartItems.length === 0" class="empty-cart">
-              <i class="pi pi-shopping-cart" style="font-size: 3rem; color: #9ca3af;"></i>
+              <i class="pi pi-shopping-cart" style="font-size: 3rem; color: var(--p-text-muted-color, #9ca3af);"></i>
               <p>{{ $t('pos.emptyCart') }}</p>
             </div>
             <div v-else>
@@ -211,9 +211,16 @@
               <span>{{ $t('pos.discount') }}:</span>
               <span>- Rp {{ formatNumber(orderTotals.discount) }}</span>
             </div>
-            <div class="total-row">
-              <span>{{ $t('pos.tax') }} (11%):</span>
+            <div v-if="txSettings.tax_enabled && !txSettings.tax_inclusive" class="total-row">
+              <span>{{ txSettings.tax_label }} ({{ txSettings.tax_percentage }}%):</span>
               <span>Rp {{ formatNumber(orderTotals.tax) }}</span>
+            </div>
+            <div v-if="txSettings.service_charge_enabled" class="total-row">
+              <span>{{ txSettings.service_charge_label }} ({{ txSettings.service_charge_percentage }}%):</span>
+              <span>Rp {{ formatNumber(orderTotals.serviceCharge) }}</span>
+            </div>
+            <div v-if="txSettings.tax_enabled && txSettings.tax_inclusive" class="total-row tax-inclusive-note">
+              <small><i class="pi pi-info-circle"></i> {{ $t('pos.taxInclusiveNote') || 'Sudah termasuk pajak' }}</small>
             </div>
             <div class="total-row grand">
               <span>{{ $t('pos.total') }}:</span>
@@ -365,6 +372,7 @@ import { useToast } from 'primevue/usetoast'
 import { useConfirm } from 'primevue/useconfirm'
 import { useI18n } from 'vue-i18n'
 import api from '@/services/api'
+import { decodeOutletId } from '@/utils/outletId'
 import { useThermalPrinter } from '@/composables/useThermalPrinter'
 import PrinterSettingsDialog from '@/components/PrinterSettingsDialog.vue'
 import Card from 'primevue/card'
@@ -385,6 +393,7 @@ const confirm = useConfirm()
 const { t } = useI18n()
 
 const outletId = route.params.outletId
+const numericOutletId = decodeOutletId(outletId) || outletId
 
 const printer = useThermalPrinter(outletId)
 const printerSettingsVisible = ref(false)
@@ -409,6 +418,17 @@ const showCleanupDialog = ref(false)
 const processing = ref(false)
 const selectedArea = ref(null)
 const promoRefreshInterval = ref(null)
+
+// Transaction settings (tax/service charge) from outlet config
+const txSettings = ref({
+  tax_enabled: true,
+  tax_percentage: 11,
+  tax_label: 'PPN',
+  tax_inclusive: false,
+  service_charge_enabled: false,
+  service_charge_percentage: 0,
+  service_charge_label: 'Service Charge',
+})
 
 // Member state
 const selectedMember = ref(null)
@@ -490,10 +510,17 @@ const orderTotals = computed(() => {
   discount = Math.min(discount, subtotal)
   
   const subtotalAfterDiscount = Math.max(0, subtotal - discount)
-  const tax = subtotalAfterDiscount * 0.11
-  const total = subtotalAfterDiscount + tax
-  
-  return { subtotal, discount, tax, total }
+
+  const ts = txSettings.value
+  const taxRate = (ts.tax_enabled && !ts.tax_inclusive) ? (parseFloat(ts.tax_percentage) || 0) / 100 : 0
+  const tax = subtotalAfterDiscount * taxRate
+
+  const scRate = ts.service_charge_enabled ? (parseFloat(ts.service_charge_percentage) || 0) / 100 : 0
+  const serviceCharge = subtotalAfterDiscount * scRate
+
+  const total = subtotalAfterDiscount + tax + serviceCharge
+
+  return { subtotal, discount, tax, serviceCharge, total }
 })
 
 const pointsRedeemValue = computed(() => {
@@ -605,6 +632,25 @@ const fetchApplicablePromos = async () => {
   } catch (error) {
     console.error('Failed to fetch applicable promos:', error)
     applicablePromos.value = []
+  }
+}
+
+const fetchTxSettings = async () => {
+  if (!numericOutletId) return
+  try {
+    const res = await api.get(`/outlets/${numericOutletId}/transaction-settings`)
+    const d = res.data || {}
+    txSettings.value = {
+      tax_enabled:               d.tax_enabled !== undefined ? Boolean(d.tax_enabled) : true,
+      tax_percentage:            parseFloat(d.tax_percentage) || 11,
+      tax_label:                 d.tax_label || 'PPN',
+      tax_inclusive:             Boolean(d.tax_inclusive),
+      service_charge_enabled:    Boolean(d.service_charge_enabled),
+      service_charge_percentage: parseFloat(d.service_charge_percentage) || 0,
+      service_charge_label:      d.service_charge_label || 'Service Charge',
+    }
+  } catch (e) {
+    console.error('Failed to fetch transaction settings:', e)
   }
 }
 
@@ -984,6 +1030,7 @@ onMounted(() => {
   fetchPaymentMethods()
   fetchAvailablePromos()
   fetchMembershipSettings()
+  fetchTxSettings()
   
   // Refresh applicable promos every minute to handle time-based promos
   promoRefreshInterval.value = setInterval(() => {
@@ -1005,7 +1052,8 @@ onBeforeUnmount(() => {
   height: 100vh;
   display: flex;
   flex-direction: column;
-  background: #f5f5f5;
+  background: var(--p-surface-50, #f5f5f5);
+  color: var(--p-text-color, #111827);
 }
 
 .pos-header {
@@ -1013,17 +1061,18 @@ onBeforeUnmount(() => {
   justify-content: space-between;
   align-items: center;
   padding: 1rem 2rem;
-  background: white;
-  border-bottom: 1px solid #e5e7eb;
+  background: var(--p-content-background, white);
+  border-bottom: 1px solid var(--p-content-border-color, #e5e7eb);
 }
 
 .pos-header h2 {
   margin: 0;
   font-size: 1.5rem;
+  color: var(--p-text-color, inherit);
 }
 
 .text-muted {
-  color: #6b7280;
+  color: var(--p-text-muted-color, #6b7280);
   font-size: 0.875rem;
   margin: 0;
 }
@@ -1039,13 +1088,13 @@ onBeforeUnmount(() => {
 .menu-section {
   display: flex;
   flex-direction: column;
-  background: white;
-  border-right: 1px solid #e5e7eb;
+  background: var(--p-content-background, white);
+  border-right: 1px solid var(--p-content-border-color, #e5e7eb);
 }
 
 .menu-header {
   padding: 1rem;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid var(--p-content-border-color, #e5e7eb);
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
@@ -1083,16 +1132,17 @@ onBeforeUnmount(() => {
 }
 
 .menu-card {
-  background: white;
-  border: 1px solid #e5e7eb;
+  background: var(--p-content-background, white);
+  border: 1px solid var(--p-content-border-color, #e5e7eb);
   border-radius: 8px;
   padding: 0.75rem;
   cursor: pointer;
   transition: all 0.2s;
+  color: var(--p-text-color, inherit);
 }
 
 .menu-card:hover {
-  border-color: #3b82f6;
+  border-color: var(--p-primary-color, #3b82f6);
   box-shadow: 0 2px 8px rgba(59, 130, 246, 0.2);
 }
 
@@ -1102,7 +1152,7 @@ onBeforeUnmount(() => {
   border-radius: 6px;
   overflow: hidden;
   margin-bottom: 0.5rem;
-  background: #f3f4f6;
+  background: var(--p-surface-100, #f3f4f6);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1117,7 +1167,7 @@ onBeforeUnmount(() => {
 .menu-initials {
   font-size: 2rem;
   font-weight: bold;
-  color: #9ca3af;
+  color: var(--p-text-muted-color, #9ca3af);
 }
 
 .menu-info {
@@ -1131,7 +1181,7 @@ onBeforeUnmount(() => {
 }
 
 .menu-price {
-  color: #3b82f6;
+  color: var(--p-primary-color, #3b82f6);
   font-weight: 700;
   margin-bottom: 0.5rem;
 }
@@ -1139,13 +1189,14 @@ onBeforeUnmount(() => {
 .cart-section {
   display: flex;
   flex-direction: column;
-  background: white;
+  background: var(--p-content-background, white);
   overflow-y: auto;
+  color: var(--p-text-color, inherit);
 }
 
 .cleanup-section {
   padding: 1rem;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid var(--p-content-border-color, #e5e7eb);
 }
 
 .order-type-selection {
@@ -1171,7 +1222,7 @@ onBeforeUnmount(() => {
   justify-content: space-between;
   align-items: center;
   padding: 1rem;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid var(--p-content-border-color, #e5e7eb);
 }
 
 .order-header h3 {
@@ -1180,7 +1231,7 @@ onBeforeUnmount(() => {
 
 .order-info {
   padding: 1rem;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid var(--p-content-border-color, #e5e7eb);
 }
 
 .info-row {
@@ -1197,14 +1248,14 @@ onBeforeUnmount(() => {
 
 .promo-section {
   padding: 1rem;
-  border-top: 1px solid #e5e7eb;
-  border-bottom: 1px solid #e5e7eb;
+  border-top: 1px solid var(--p-content-border-color, #e5e7eb);
+  border-bottom: 1px solid var(--p-content-border-color, #e5e7eb);
 }
 
 .promo-label {
   display: block;
   font-weight: 600;
-  color: #374151;
+  color: var(--p-text-color, #374151);
   font-size: 0.875rem;
   margin-bottom: 0.5rem;
 }
@@ -1233,12 +1284,12 @@ onBeforeUnmount(() => {
 
 .promo-option-name {
   font-weight: 600;
-  color: #111827;
+  color: var(--p-text-color, #111827);
 }
 
 .promo-option-desc {
   font-size: 0.75rem;
-  color: #6b7280;
+  color: var(--p-text-muted-color, #6b7280);
   margin-bottom: 0.25rem;
   margin-left: 0;
 }
@@ -1331,17 +1382,18 @@ onBeforeUnmount(() => {
   align-items: center;
   justify-content: center;
   height: 100%;
-  color: #9ca3af;
+  color: var(--p-text-muted-color, #9ca3af);
 }
 
 .cart-item {
   padding: 0.75rem;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--p-content-border-color, #e5e7eb);
   border-radius: 6px;
   margin-bottom: 0.5rem;
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
+  background: var(--p-content-background, transparent);
 }
 
 .item-row {
@@ -1363,7 +1415,7 @@ onBeforeUnmount(() => {
 
 .item-price {
   font-size: 0.875rem;
-  color: #6b7280;
+  color: var(--p-text-muted-color, #6b7280);
 }
 
 .item-controls {
@@ -1381,7 +1433,7 @@ onBeforeUnmount(() => {
 .item-subtotal {
   text-align: right;
   font-weight: 700;
-  color: #3b82f6;
+  color: var(--p-primary-color, #3b82f6);
   min-width: 100px;
 }
 
@@ -1390,11 +1442,11 @@ onBeforeUnmount(() => {
   align-items: center;
   gap: 0.5rem;
   padding-top: 0.5rem;
-  border-top: 1px dashed #e5e7eb;
+  border-top: 1px dashed var(--p-content-border-color, #e5e7eb);
 }
 
 .item-notes-icon {
-  color: #9ca3af;
+  color: var(--p-text-muted-color, #9ca3af);
   font-size: 0.875rem;
 }
 
@@ -1407,13 +1459,13 @@ onBeforeUnmount(() => {
   padding: 0.4rem 0.6rem;
   font-size: 0.875rem;
   font-style: italic;
-  color: #6b7280;
+  color: var(--p-text-muted-color, #6b7280);
 }
 
 .order-totals {
   padding: 1rem;
-  border-top: 1px solid #e5e7eb;
-  border-bottom: 1px solid #e5e7eb;
+  border-top: 1px solid var(--p-content-border-color, #e5e7eb);
+  border-bottom: 1px solid var(--p-content-border-color, #e5e7eb);
 }
 
 .total-row {
@@ -1430,10 +1482,22 @@ onBeforeUnmount(() => {
 .total-row.grand {
   font-size: 1.25rem;
   font-weight: 700;
-  color: #3b82f6;
-  border-top: 2px solid #e5e7eb;
+  color: var(--p-primary-color, #3b82f6);
+  border-top: 2px solid var(--p-content-border-color, #e5e7eb);
   padding-top: 0.5rem;
   margin-top: 0.5rem;
+}
+
+.total-row.tax-inclusive-note {
+  color: var(--p-text-muted-color, #6b7280);
+  font-size: 0.75rem;
+  font-style: italic;
+}
+
+.total-row.tax-inclusive-note small {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
 }
 
 .order-actions {
@@ -1451,21 +1515,21 @@ onBeforeUnmount(() => {
 .payment-total {
   text-align: center;
   padding: 1rem;
-  background: #f3f4f6;
+  background: var(--p-surface-100, #f3f4f6);
   border-radius: 8px;
 }
 
 .total-amount {
   font-size: 2rem;
   font-weight: 700;
-  color: #3b82f6;
+  color: var(--p-primary-color, #3b82f6);
   margin-top: 0.5rem;
 }
 
 .payment-change {
   text-align: center;
   padding: 1rem;
-  background: #f0fdf4;
+  background: var(--p-surface-100, #f0fdf4);
   border-radius: 8px;
 }
 
@@ -1510,16 +1574,18 @@ onBeforeUnmount(() => {
 
 .table-card {
   padding: 1rem;
-  border: 2px solid #e5e7eb;
+  border: 2px solid var(--p-content-border-color, #e5e7eb);
   border-radius: 8px;
   text-align: center;
   cursor: pointer;
   transition: all 0.2s;
+  background: var(--p-content-background, transparent);
+  color: var(--p-text-color, inherit);
 }
 
 .table-card:hover:not(.occupied) {
-  border-color: #3b82f6;
-  background: #eff6ff;
+  border-color: var(--p-primary-color, #3b82f6);
+  background: var(--p-content-hover-background, #eff6ff);
 }
 
 .table-card.occupied {
@@ -1535,7 +1601,7 @@ onBeforeUnmount(() => {
 
 .table-capacity {
   font-size: 0.875rem;
-  color: #6b7280;
+  color: var(--p-text-muted-color, #6b7280);
   margin-top: 0.5rem;
 }
 
@@ -1592,7 +1658,7 @@ onBeforeUnmount(() => {
 
 .member-points {
   font-size: 0.75rem;
-  color: #6b7280;
+  color: var(--p-text-muted-color, #6b7280);
   font-weight: 500;
 }
 
@@ -1605,24 +1671,25 @@ onBeforeUnmount(() => {
   top: 100%;
   left: 0;
   right: 0;
-  background: white;
-  border: 1px solid #e5e7eb;
+  background: var(--p-content-background, white);
+  border: 1px solid var(--p-content-border-color, #e5e7eb);
   border-radius: 6px;
   box-shadow: 0 4px 12px rgba(0,0,0,0.1);
   z-index: 100;
   max-height: 200px;
   overflow-y: auto;
+  color: var(--p-text-color, inherit);
 }
 
 .member-dropdown-item {
   padding: 0.75rem;
   cursor: pointer;
-  border-bottom: 1px solid #f3f4f6;
+  border-bottom: 1px solid var(--p-content-border-color, #f3f4f6);
   transition: background 0.15s;
 }
 
 .member-dropdown-item:hover {
-  background: #f9fafb;
+  background: var(--p-content-hover-background, #f9fafb);
 }
 
 .member-dropdown-item:last-child {
@@ -1640,11 +1707,11 @@ onBeforeUnmount(() => {
   align-items: center;
   gap: 0.5rem;
   font-size: 0.75rem;
-  color: #6b7280;
+  color: var(--p-text-muted-color, #6b7280);
 }
 
 .member-phone {
-  color: #9ca3af;
+  color: var(--p-text-muted-color, #9ca3af);
 }
 
 /* Payment member points */
