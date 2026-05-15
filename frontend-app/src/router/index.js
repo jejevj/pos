@@ -27,6 +27,20 @@ const router = createRouter({
       component: () => import('@/views/public/MembershipRegisterView.vue'),
       meta: { public: true }
     },
+    // Public table-order — customer scans QR, lands here
+    {
+      path: '/o/:outletSlug/t/:tableToken',
+      name: 'public-table-order',
+      component: () => import('@/views/public/PublicTableOrderView.vue'),
+      meta: { public: true }
+    },
+    // Public order status — waiting + confirmation page
+    {
+      path: '/o/:outletSlug/order/:orderCode',
+      name: 'public-order-status',
+      component: () => import('@/views/public/PublicOrderStatusView.vue'),
+      meta: { public: true }
+    },
     {
       path: '/register',
       name: 'register',

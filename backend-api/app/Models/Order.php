@@ -46,6 +46,15 @@ class Order extends Model
         'cancelled_at',
         'cancelled_by',
         'cancellation_reason',
+        // Public table-order flow
+        'source',              // 'pos' | 'public'
+        'approval_status',     // null (POS), 'pending' | 'approved' | 'rejected'
+        'approved_by',
+        'approved_at',
+        'rejected_by',
+        'rejected_at',
+        'rejection_reason',
+        'customer_email',
     ];
 
     protected $casts = [
@@ -65,6 +74,8 @@ class Order extends Model
         'paid_at' => 'datetime',
         'cancelled_at' => 'datetime',
         'applied_promos' => 'array',
+        'approved_at' => 'datetime',
+        'rejected_at' => 'datetime',
     ];
 
     protected $appends = ['status_label', 'order_type_label'];

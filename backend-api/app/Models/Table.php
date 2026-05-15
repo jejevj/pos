@@ -17,6 +17,7 @@ class Table extends Model
         'area',
         'status',
         'is_active',
+        'qr_token',
     ];
 
     protected $casts = [

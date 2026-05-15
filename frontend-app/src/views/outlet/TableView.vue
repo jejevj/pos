@@ -31,16 +31,48 @@
                :severity="data.is_active ? 'success' : 'danger'" />
         </template>
       </Column>
-      <Column :header="$t('common.actions')" style="width: 200px">
+      <Column :header="$t('common.actions')" style="width: 260px">
         <template #body="{ data }">
+          <Button icon="pi pi-qrcode" text rounded severity="info" @click="openQrDialog(data)"
+                  v-tooltip.top="$t('tableQr.showQr')" />
           <Button icon="pi pi-pencil" text rounded @click="openDialog(data)" v-tooltip.top="$t('common.edit')" />
-          <Button icon="pi pi-trash" text rounded severity="danger" @click="confirmDelete(data)" 
+          <Button icon="pi pi-trash" text rounded severity="danger" @click="confirmDelete(data)"
                   v-tooltip.top="$t('common.delete')" />
-          <Button v-if="data.status === 'occupied'" icon="pi pi-broom" text rounded severity="warning" 
+          <Button v-if="data.status === 'occupied'" icon="pi pi-broom" text rounded severity="warning"
                   @click="confirmCleanup(data)" v-tooltip.top="$t('table.cleanup')" />
         </template>
       </Column>
     </DataTable>
+
+    <!-- QR Code Dialog -->
+    <Dialog v-model:visible="qrDialogVisible" :header="$t('tableQr.qrCode')" modal :style="{ width: '420px' }">
+      <div v-if="qrTable" style="text-align: center; padding: 10px;">
+        <p style="margin-bottom: 6px;">
+          <strong>{{ $t('table.tableNumber') }}:</strong> {{ qrTable.table_number }}
+        </p>
+        <p style="font-size: 12px; color: #666; word-break: break-all; margin: 0 0 12px;">
+          {{ qrPublicUrl }}
+        </p>
+        <div style="background: #fff; padding: 16px; display: inline-block; border-radius: 12px; border: 1px solid #eee;">
+          <img v-if="qrImageData" :src="qrImageData" alt="QR" style="width: 240px; height: 240px;" />
+          <div v-else style="width: 240px; height: 240px; display: flex; align-items: center; justify-content: center; color: #999;">
+            ...
+          </div>
+        </div>
+        <p style="margin-top: 12px; font-size: 13px; color: #555;">
+          <i class="pi pi-info-circle"></i> {{ $t('tableQr.scanToOrder') }}
+        </p>
+        <div style="display: flex; gap: 8px; margin-top: 14px; justify-content: center; flex-wrap: wrap;">
+          <Button :label="$t('tableQr.copyLink')" icon="pi pi-copy" outlined size="small" @click="copyQrLink" />
+          <Button :label="$t('tableQr.downloadQr')" icon="pi pi-download" outlined size="small" @click="downloadQr" />
+          <Button :label="$t('tableQr.regenerate')" icon="pi pi-refresh" outlined severity="warning" size="small"
+                  @click="regenerateToken(qrTable)" :loading="regenerating" />
+        </div>
+      </div>
+      <template #footer>
+        <Button :label="$t('common.close')" text @click="qrDialogVisible = false" />
+      </template>
+    </Dialog>
 
     <!-- Create/Edit Dialog -->
     <Dialog v-model:visible="dialogVisible" :header="isEdit ? $t('table.editTable') : $t('table.addTable')" 
@@ -85,11 +117,12 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useToast } from 'primevue/usetoast'
 import { useConfirm } from 'primevue/useconfirm'
 import { useI18n } from 'vue-i18n'
+import QRCode from 'qrcode'
 import api from '@/services/api'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
@@ -245,8 +278,107 @@ const getStatusSeverity = (status) => {
   return severities[status] || 'info'
 }
 
+// QR code state
+const qrDialogVisible = ref(false)
+const qrTable = ref(null)
+const qrImageData = ref('')
+const regenerating = ref(false)
+const outletSlug = ref('')
+
+const qrPublicUrl = computed(() => {
+  if (!qrTable.value || !outletSlug.value) return ''
+  const origin = window.location.origin
+  return `${origin}/o/${outletSlug.value}/t/${qrTable.value.qr_token}`
+})
+
+async function fetchOutletSlug () {
+  try {
+    const res = await api.get(`/outlets/${outletId}`)
+    outletSlug.value = res.data?.slug || res.data?.data?.slug || ''
+  } catch (e) {
+    // ignore
+  }
+}
+
+async function generateQrImage () {
+  qrImageData.value = ''
+  if (!qrPublicUrl.value) return
+  try {
+    qrImageData.value = await QRCode.toDataURL(qrPublicUrl.value, {
+      errorCorrectionLevel: 'M',
+      margin: 2,
+      width: 480,
+    })
+  } catch (e) {
+    qrImageData.value = ''
+  }
+}
+
+watch(qrPublicUrl, () => { generateQrImage() })
+
+function openQrDialog (table) {
+  qrTable.value = table
+  qrDialogVisible.value = true
+  generateQrImage()
+}
+
+async function copyQrLink () {
+  if (!qrPublicUrl.value) return
+  try {
+    await navigator.clipboard.writeText(qrPublicUrl.value)
+    toast.add({ severity: 'success', summary: '', detail: t('tableQr.linkCopied'), life: 2500 })
+  } catch (e) {
+    // fallback
+    const ta = document.createElement('textarea')
+    ta.value = qrPublicUrl.value
+    document.body.appendChild(ta)
+    ta.select()
+    document.execCommand('copy')
+    document.body.removeChild(ta)
+    toast.add({ severity: 'success', summary: '', detail: t('tableQr.linkCopied'), life: 2500 })
+  }
+}
+
+function downloadQr () {
+  if (!qrImageData.value || !qrTable.value) return
+  const a = document.createElement('a')
+  a.href = qrImageData.value
+  a.download = `table-${qrTable.value.table_number || 'qr'}.png`
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+}
+
+async function regenerateToken (table) {
+  if (!table) return
+  if (!window.confirm(t('tableQr.regenerateConfirm'))) return
+  regenerating.value = true
+  try {
+    const res = await api.post(`/outlets/${outletId}/tables/${table.id}/regenerate-token`)
+    const fresh = res.data?.data || res.data
+    if (fresh) {
+      qrTable.value = fresh
+      // replace in list
+      const idx = tables.value.findIndex((x) => x.id === fresh.id)
+      if (idx !== -1) tables.value[idx] = fresh
+    }
+    await generateQrImage()
+    toast.add({ severity: 'success', summary: t('messages.success'), detail: 'OK', life: 2500 })
+  } catch (e) {
+    toast.add({
+      severity: 'error',
+      summary: t('messages.error'),
+      detail: e.response?.data?.message || 'Failed',
+      life: 3000,
+    })
+  } finally {
+    regenerating.value = false
+  }
+}
+
 onMounted(() => {
   fetchTables()
+  fetchOutletSlug()
 })
 </script>
 

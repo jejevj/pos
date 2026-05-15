@@ -40,7 +40,15 @@ class OrderController extends Controller
             DB::statement("SET search_path TO {$outlet->schema_name}, public");
             
             $query = Order::query();
-            
+
+            // Hide public orders that haven't been approved yet from the
+            // generic order list (POS/bon list). They have a dedicated UI.
+            $query->where(function ($q) {
+                $q->whereNull('source')
+                  ->orWhere('source', 'pos')
+                  ->orWhere('approval_status', 'approved');
+            });
+
             if ($request->has('status')) {
                 $query->where('status', $request->status);
             }
@@ -1107,6 +1115,100 @@ class OrderController extends Controller
             DB::statement("SET search_path TO public");
             
             return response()->json(['message' => 'Order cancelled successfully', 'data' => $order]);
+        } catch (\Exception $e) {
+            DB::statement("SET search_path TO public");
+            return response()->json(['message' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * List public table orders pending cashier approval.
+     */
+    public function pendingPublic(Request $request, $outletId)
+    {
+        $outlet = $this->authorizeOutlet($outletId);
+        try {
+            DB::statement("SET search_path TO {$outlet->schema_name}, public");
+            $orders = Order::with(['items', 'table'])
+                ->where('source', 'public')
+                ->where('approval_status', 'pending')
+                ->whereNull('deleted_at')
+                ->orderBy('created_at', 'asc')
+                ->get();
+            DB::statement("SET search_path TO public");
+            return response()->json($orders);
+        } catch (\Exception $e) {
+            DB::statement("SET search_path TO public");
+            return response()->json(['message' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Approve a pending public table order. Marks the order as approved
+     * (so it flows into the normal station / kitchen pipeline) and assigns
+     * a cashier_id so existing KDS queries treat it like any draft order.
+     */
+    public function approvePublic(Request $request, $outletId, $id)
+    {
+        $outlet = $this->authorizeOutlet($outletId);
+        try {
+            DB::statement("SET search_path TO {$outlet->schema_name}, public");
+            $order = Order::findOrFail($id);
+            if ($order->source !== 'public') {
+                DB::statement("SET search_path TO public");
+                return response()->json(['message' => 'Pesanan ini bukan pesanan publik'], 422);
+            }
+            if ($order->approval_status !== 'pending') {
+                DB::statement("SET search_path TO public");
+                return response()->json(['message' => 'Pesanan sudah diproses'], 409);
+            }
+            $order->approval_status = 'approved';
+            $order->approved_by     = Auth::id();
+            $order->approved_at     = now();
+            $order->cashier_id      = Auth::id();
+            $order->save();
+
+            // Mark table occupied (same effect as POS dine-in store)
+            if ($order->table_id && $order->table) {
+                $order->table->markAsOccupied();
+            }
+            DB::statement("SET search_path TO public");
+            return response()->json(['message' => 'Pesanan disetujui', 'data' => $order]);
+        } catch (\Exception $e) {
+            DB::statement("SET search_path TO public");
+            return response()->json(['message' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Reject a pending public table order with optional reason.
+     */
+    public function rejectPublic(Request $request, $outletId, $id)
+    {
+        $outlet = $this->authorizeOutlet($outletId);
+        $reason = (string) $request->input('reason', '');
+        try {
+            DB::statement("SET search_path TO {$outlet->schema_name}, public");
+            $order = Order::findOrFail($id);
+            if ($order->source !== 'public') {
+                DB::statement("SET search_path TO public");
+                return response()->json(['message' => 'Pesanan ini bukan pesanan publik'], 422);
+            }
+            if ($order->approval_status !== 'pending') {
+                DB::statement("SET search_path TO public");
+                return response()->json(['message' => 'Pesanan sudah diproses'], 409);
+            }
+            $order->approval_status   = 'rejected';
+            $order->rejected_by       = Auth::id();
+            $order->rejected_at       = now();
+            $order->rejection_reason  = $reason;
+            $order->status            = 'cancelled';
+            $order->cancelled_at      = now();
+            $order->cancelled_by      = Auth::id();
+            $order->cancellation_reason = $reason ?: 'Ditolak oleh kasir';
+            $order->save();
+            DB::statement("SET search_path TO public");
+            return response()->json(['message' => 'Pesanan ditolak', 'data' => $order]);
         } catch (\Exception $e) {
             DB::statement("SET search_path TO public");
             return response()->json(['message' => $e->getMessage()], 500);

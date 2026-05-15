@@ -38,9 +38,17 @@ class TableController extends Controller
             }
             
             $tables = $query->orderBy('table_number')->get();
-            
+
+            // Backfill qr_token for any rows that don't have one yet
+            foreach ($tables as $t) {
+                if (empty($t->qr_token)) {
+                    $t->qr_token = $this->generateUniqueToken();
+                    $t->save();
+                }
+            }
+
             DB::statement("SET search_path TO public");
-            
+
             return response()->json($tables);
         } catch (\Exception $e) {
             DB::statement("SET search_path TO public");
@@ -64,17 +72,18 @@ class TableController extends Controller
 
         try {
             DB::statement("SET search_path TO {$outlet->schema_name}, public");
-            
+
             $table = Table::create([
                 'table_number' => $request->table_number,
                 'capacity' => $request->capacity,
                 'area' => $request->area,
                 'status' => 'available',
                 'is_active' => true,
+                'qr_token' => $this->generateUniqueToken(),
             ]);
-            
+
             DB::statement("SET search_path TO public");
-            
+
             return response()->json(['message' => 'Table created successfully', 'data' => $table], 201);
         } catch (\Exception $e) {
             DB::statement("SET search_path TO public");
@@ -148,6 +157,36 @@ class TableController extends Controller
             DB::statement("SET search_path TO public");
             return response()->json(['message' => $e->getMessage()], 500);
         }
+    }
+
+    /**
+     * Regenerate the QR token for a table, invalidating the previous QR link.
+     */
+    public function regenerateToken($outletId, $id)
+    {
+        $outlet = $this->authorizeOutlet($outletId);
+        try {
+            DB::statement("SET search_path TO {$outlet->schema_name}, public");
+            $table = Table::findOrFail($id);
+            $table->qr_token = $this->generateUniqueToken();
+            $table->save();
+            DB::statement("SET search_path TO public");
+            return response()->json(['message' => 'QR token regenerated', 'data' => $table]);
+        } catch (\Exception $e) {
+            DB::statement("SET search_path TO public");
+            return response()->json(['message' => $e->getMessage()], 500);
+        }
+    }
+
+    private function generateUniqueToken(): string
+    {
+        for ($i = 0; $i < 5; $i++) {
+            $token = bin2hex(random_bytes(16));
+            if (!Table::where('qr_token', $token)->exists()) {
+                return $token;
+            }
+        }
+        return bin2hex(random_bytes(24));
     }
 
     /**

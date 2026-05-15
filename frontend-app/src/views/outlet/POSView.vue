@@ -63,6 +63,10 @@
             <Button :label="$t('pos.takeaway')" icon="pi pi-shopping-bag" @click="startOrder('takeaway')" class="p-button-lg" />
             <Button label="Daftar Bon" icon="pi pi-receipt" severity="warning" outlined
                     @click="showBonList = true" class="p-button-lg" />
+            <Button :label="$t('pos.publicOrders.title')" icon="pi pi-qrcode"
+                    :severity="pendingPublicOrders.length > 0 ? 'help' : 'secondary'"
+                    :badge="pendingPublicOrders.length > 0 ? String(pendingPublicOrders.length) : null"
+                    outlined @click="showPublicOrdersList = true" class="p-button-lg" />
           </div>
         </div>
 
@@ -395,6 +399,58 @@
       </template>
     </Dialog>
 
+    <!-- Public Table Orders (Pending Approval) Dialog -->
+    <Dialog v-model:visible="showPublicOrdersList"
+            :header="$t('pos.publicOrders.title')"
+            :style="{ width: '560px' }" modal>
+      <div v-if="pendingPublicOrders.length === 0" class="bon-empty">
+        <i class="pi pi-check-circle"></i>
+        <p>{{ $t('pos.publicOrders.empty') }}</p>
+      </div>
+
+      <div v-else class="bon-list public-pending-list">
+        <div v-for="order in pendingPublicOrders" :key="order.id" class="bon-item public-pending-item">
+          <div class="bon-item-header">
+            <span class="bon-order-code">{{ order.kode }}</span>
+            <span class="bon-table"><i class="pi pi-th-large"></i> {{ order.table_number || '-' }}</span>
+            <span class="bon-time">{{ formatBonTime(order.created_at) }}</span>
+          </div>
+          <div class="bon-item-body" style="flex-direction: column; align-items: flex-start; gap: 6px;">
+            <div style="font-size: 12px; color: #666;">
+              <i class="pi pi-user"></i> {{ order.customer_name || '-' }}
+              · <i class="pi pi-phone"></i> {{ order.customer_phone || '-' }}
+              <span v-if="order.customer_email"> · {{ order.customer_email }}</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; width: 100%; align-items: center;">
+              <span class="bon-items-summary">{{ (order.items && order.items.length) || 0 }} item</span>
+              <span class="bon-total">Rp {{ formatNumber(order.total_amount || 0) }}</span>
+            </div>
+            <ul v-if="order.items && order.items.length" style="margin: 4px 0 0; padding-left: 16px; font-size: 12px; color: #444;">
+              <li v-for="it in order.items.slice(0, 3)" :key="it.id">
+                {{ it.quantity }}× {{ it.menu_name }}
+              </li>
+              <li v-if="order.items.length > 3" style="color: #888;">
+                +{{ order.items.length - 3 }} item lainnya
+              </li>
+            </ul>
+          </div>
+          <div class="bon-item-actions">
+            <Button :label="$t('pos.publicOrders.approve')" icon="pi pi-check" severity="success" size="small"
+                    :loading="processingPublicId === order.id"
+                    @click="approvePublicOrder(order)" />
+            <Button :label="$t('pos.publicOrders.reject')" icon="pi pi-times" severity="danger" size="small" outlined
+                    :loading="processingPublicId === order.id"
+                    @click="rejectPublicOrder(order)" />
+          </div>
+        </div>
+      </div>
+
+      <template #footer>
+        <Button :label="$t('common.close')" severity="secondary" outlined @click="showPublicOrdersList = false" />
+        <Button :label="$t('common.refresh') || 'Refresh'" icon="pi pi-refresh" outlined @click="loadPendingPublicOrders" />
+      </template>
+    </Dialog>
+
     <!-- Payment Confirmation Dialog -->
     <Dialog v-model:visible="showPayConfirm" header="Konfirmasi Pembayaran" :style="{ width: '360px' }" modal>
       <div v-if="selectedBonOrder" class="pay-confirm-content">
@@ -476,6 +532,12 @@ const showBonList = ref(false)
 const showPayConfirm = ref(false)
 const bonOrders = ref([])
 const selectedBonOrder = ref(null)
+
+// Public table orders (pending approval) state
+const showPublicOrdersList = ref(false)
+const pendingPublicOrders = ref([])
+const processingPublicId = ref(null)
+const publicOrdersPollTimer = ref(null)
 const processingPayment = ref(false)
 
 // Transaction settings (tax/service charge) from outlet config
@@ -1137,6 +1199,44 @@ const cleanupTable = async (table) => {
   })
 }
 
+async function loadPendingPublicOrders () {
+  try {
+    const res = await api.get(`/outlets/${outletId}/public-orders/pending`)
+    pendingPublicOrders.value = res.data || []
+  } catch (e) {
+    // Silent for background poll
+  }
+}
+
+async function approvePublicOrder (order) {
+  if (!order || !order.id) return
+  processingPublicId.value = order.id
+  try {
+    await api.post(`/outlets/${outletId}/public-orders/${order.id}/approve`)
+    toast.add({ severity: 'success', summary: 'OK', detail: 'Pesanan disetujui', life: 2500 })
+    await loadPendingPublicOrders()
+  } catch (e) {
+    toast.add({ severity: 'error', summary: 'Gagal', detail: e.response?.data?.message || e.message, life: 3500 })
+  } finally {
+    processingPublicId.value = null
+  }
+}
+
+async function rejectPublicOrder (order) {
+  if (!order || !order.id) return
+  const reason = window.prompt('Alasan penolakan (opsional):', '') || ''
+  processingPublicId.value = order.id
+  try {
+    await api.post(`/outlets/${outletId}/public-orders/${order.id}/reject`, { reason })
+    toast.add({ severity: 'info', summary: 'OK', detail: 'Pesanan ditolak', life: 2500 })
+    await loadPendingPublicOrders()
+  } catch (e) {
+    toast.add({ severity: 'error', summary: 'Gagal', detail: e.response?.data?.message || e.message, life: 3500 })
+  } finally {
+    processingPublicId.value = null
+  }
+}
+
 onMounted(() => {
   fetchOutlet()
   fetchMenus()
@@ -1146,18 +1246,27 @@ onMounted(() => {
   fetchAvailablePromos()
   fetchMembershipSettings()
   fetchTxSettings()
-  
+  loadPendingPublicOrders()
+
   // Refresh applicable promos every minute to handle time-based promos
   promoRefreshInterval.value = setInterval(() => {
     if (cartItems.value.length > 0) {
       fetchApplicablePromos()
     }
   }, 60000) // 60 seconds
+
+  // Poll pending public-orders every 15s so cashier sees new ones quickly
+  publicOrdersPollTimer.value = setInterval(() => {
+    loadPendingPublicOrders()
+  }, 15000)
 })
 
 onBeforeUnmount(() => {
   if (promoRefreshInterval.value) {
     clearInterval(promoRefreshInterval.value)
+  }
+  if (publicOrdersPollTimer.value) {
+    clearInterval(publicOrdersPollTimer.value)
   }
 })
 </script>

@@ -23,6 +23,14 @@ Route::get('/track/{outletId}/{orderCode}', [\App\Http\Controllers\Api\OrderTrac
 Route::get('/public/membership/{outletSlug}',          [\App\Http\Controllers\Api\Public\MembershipController::class, 'show']);
 Route::post('/public/membership/{outletSlug}/register', [\App\Http\Controllers\Api\Public\MembershipController::class, 'register']);
 
+// ── Public table-ordering (no auth required, rate-limited) ───────────────
+Route::middleware('throttle:60,1')->group(function () {
+    Route::get('/public/outlet/{outletSlug}/table/{token}',         [\App\Http\Controllers\Api\Public\TableOrderController::class, 'show']);
+    Route::post('/public/outlet/{outletSlug}/table/{token}/order',  [\App\Http\Controllers\Api\Public\TableOrderController::class, 'store']);
+    Route::get('/public/outlet/{outletSlug}/order/{orderCode}',     [\App\Http\Controllers\Api\Public\TableOrderController::class, 'status']);
+    Route::put('/public/outlet/{outletSlug}/order/{orderCode}',     [\App\Http\Controllers\Api\Public\TableOrderController::class, 'update']);
+});
+
 // ── Site Settings — public read so frontend can load branding ────────────
 Route::get('/site-settings', [SiteSettingController::class, 'index']);
 Route::middleware('auth:sanctum')->group(function () {
@@ -159,6 +167,12 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('outlets/{outlet}/tables/{id}', [\App\Http\Controllers\Api\Outlet\TableController::class, 'update']);
     Route::delete('outlets/{outlet}/tables/{id}', [\App\Http\Controllers\Api\Outlet\TableController::class, 'destroy']);
     Route::post('outlets/{outlet}/tables/{id}/cleanup', [\App\Http\Controllers\Api\Outlet\TableController::class, 'cleanup']);
+    Route::post('outlets/{outlet}/tables/{id}/regenerate-token', [\App\Http\Controllers\Api\Outlet\TableController::class, 'regenerateToken']);
+
+    // Public table orders (cashier approval)
+    Route::get('outlets/{outlet}/public-orders/pending',       [\App\Http\Controllers\Api\Outlet\OrderController::class, 'pendingPublic']);
+    Route::post('outlets/{outlet}/public-orders/{id}/approve', [\App\Http\Controllers\Api\Outlet\OrderController::class, 'approvePublic']);
+    Route::post('outlets/{outlet}/public-orders/{id}/reject',  [\App\Http\Controllers\Api\Outlet\OrderController::class, 'rejectPublic']);
 
     // Payment Methods
     Route::get('outlets/{outlet}/payment-methods', [\App\Http\Controllers\Api\Outlet\PaymentMethodController::class, 'index']);

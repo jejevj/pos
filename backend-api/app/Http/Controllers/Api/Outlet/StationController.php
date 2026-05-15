@@ -113,6 +113,10 @@ class StationController extends Controller
               AND o.status IN ('draft', 'paid', 'bon')
               AND o.deleted_at IS NULL
               AND oi.status IN ('pending', 'preparing', 'ready')
+              AND (
+                    COALESCE(o.source, 'pos') = 'pos'
+                 OR o.approval_status = 'approved'
+              )
             ORDER BY o.created_at ASC
         ", [$id]);
 
