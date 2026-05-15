@@ -39,16 +39,27 @@
         <!-- Outlet header -->
         <div class="receipt-section center">
           <img
-            v-if="data.outlet.logo"
-            :src="data.outlet.logo"
-            :alt="data.outlet.name"
+            v-if="headerLogo && !logoFailed"
+            :src="headerLogo"
+            :alt="data.outlet.name || 'Logo'"
             class="outlet-logo"
-            @error="$event.target.style.display='none'"
+            @error="logoFailed = true"
           />
-          <div v-else class="brand-icon"><i class="pi pi-shop"></i></div>
-          <h1 class="outlet-name">{{ data.outlet.name }}</h1>
-          <p v-if="data.outlet.address" class="outlet-meta">{{ data.outlet.address }}</p>
-          <p v-if="data.outlet.phone" class="outlet-meta">{{ data.outlet.phone }}</p>
+          <div v-else class="brand-icon">
+            <span v-if="outletInitials" class="outlet-initials">{{ outletInitials }}</span>
+            <i v-else class="pi pi-shop"></i>
+          </div>
+          <h1 class="outlet-name">{{ data.outlet.name || data.site?.name || 'Outlet' }}</h1>
+          <p v-if="data.outlet.address" class="outlet-meta">
+            <i class="pi pi-map-marker" style="font-size:0.7rem;margin-right:0.2rem"></i>{{ data.outlet.address }}
+          </p>
+          <p v-if="data.outlet.phone" class="outlet-meta">
+            <i class="pi pi-phone" style="font-size:0.7rem;margin-right:0.2rem"></i>
+            <a :href="`tel:${data.outlet.phone}`" class="phone-link">{{ data.outlet.phone }}</a>
+          </p>
+          <p v-if="data.outlet.description || data.site?.tagline" class="outlet-tagline">
+            {{ data.outlet.description || data.site?.tagline }}
+          </p>
         </div>
 
         <!-- Custom receipt header -->
@@ -66,6 +77,32 @@
           <div class="status-badge" :class="statusClass(data.order.kitchen_status)">
             <i :class="statusIcon(data.order.kitchen_status)"></i>
             {{ statusLabel(data.order.kitchen_status) }}
+          </div>
+        </div>
+
+        <!-- Timeline -->
+        <div class="receipt-divider dashed"></div>
+        <div class="receipt-section">
+          <p class="section-title center">PERJALANAN PESANAN</p>
+          <div class="order-timeline">
+            <template v-for="(step, idx) in timelineSteps" :key="step.key">
+              <div class="timeline-step" :class="step.state">
+                <div class="step-icon">
+                  <i v-if="step.state === 'completed'" class="pi pi-check"></i>
+                  <i v-else-if="step.state === 'active'" class="pi pi-spin pi-cog"></i>
+                  <span v-else>○</span>
+                </div>
+                <div class="step-body">
+                  <div class="step-label">{{ step.label }}</div>
+                  <div class="step-time">{{ step.time ? formatTime(step.time) : '-' }}</div>
+                </div>
+              </div>
+              <div
+                v-if="idx < timelineSteps.length - 1"
+                class="timeline-connector"
+                :class="step.state === 'completed' ? 'completed' : 'pending'"
+              ></div>
+            </template>
           </div>
         </div>
 
@@ -198,7 +235,7 @@
             <i class="pi pi-refresh" :class="{ spinning: refreshing }"></i>
             <span>{{ lastUpdated }}</span>
           </div>
-          <p class="muted small">Halaman ini otomatis diperbarui setiap 15 detik</p>
+          <p class="muted small">Halaman ini otomatis diperbarui setiap 30 detik</p>
         </div>
 
         <!-- Thermal cut -->
@@ -225,6 +262,7 @@ const error   = ref(null)
 const data    = ref(null)
 const refreshing = ref(false)
 const lastUpdated = ref('')
+const logoFailed = ref(false)
 let timer = null
 
 // route param may be the encoded hash; decode to numeric ID for backend
@@ -255,6 +293,94 @@ const wifiQrUrl = computed(() => {
   return `https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${payload}`
 })
 
+// Outlet identity helpers (with site_settings fallback)
+const headerLogo = computed(() => {
+  return data.value?.outlet?.logo || data.value?.site?.logo || ''
+})
+const outletInitials = computed(() => {
+  const name = data.value?.outlet?.name || data.value?.site?.name || ''
+  if (!name) return ''
+  return name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map(w => w[0].toUpperCase())
+    .join('')
+})
+
+// Build visual timeline steps from order + backend timeline
+const timelineSteps = computed(() => {
+  const order = data.value?.order || {}
+  const ks = order.kitchen_status || 'pending'
+
+  // Precedence order — what step the order is currently at
+  const order_progress = ['pending', 'preparing', 'ready', 'served']
+  const currentIdx = order_progress.indexOf(ks)
+
+  // Pick timestamp: prefer top-level order field, fallback to backend timeline payload
+  const tl = data.value?.timeline || []
+  const tlMap = {}
+  tl.forEach(s => { if (s.time) tlMap[s.key] = s.time })
+
+  const steps = [
+    {
+      key: 'ordered',
+      label: 'Pesanan Diterima',
+      time: order.created_at || tlMap.ordered,
+      reachedIdx: 0,
+    },
+    {
+      key: 'preparing',
+      label: 'Diproses Dapur',
+      time: order.preparing_at || order.confirmed_at || tlMap.preparing,
+      reachedIdx: 1,
+    },
+    {
+      key: 'ready',
+      label: 'Siap Disajikan',
+      time: order.ready_at || tlMap.ready,
+      reachedIdx: 2,
+    },
+    {
+      key: 'served',
+      label: 'Tersaji / Selesai',
+      time: order.served_at || order.completed_at || tlMap.served,
+      reachedIdx: 3,
+    },
+  ]
+
+  // Cancelled — mark all remaining as pending, no active spinner
+  if (ks === 'cancelled') {
+    return steps.map((s, i) => ({
+      ...s,
+      state: s.time ? 'completed' : 'pending',
+    }))
+  }
+
+  return steps.map((s, i) => {
+    let state
+    if (s.time || i < currentIdx) {
+      state = 'completed'
+    } else if (i === currentIdx) {
+      state = 'active'
+    } else {
+      state = 'pending'
+    }
+    // If step.time exists but it's the current step, still mark active so spinner shows
+    if (i === currentIdx && currentIdx !== order_progress.length - 1) {
+      state = 'active'
+    }
+    return { ...s, state }
+  })
+})
+
+const formatTime = (dt) => {
+  if (!dt) return ''
+  return new Date(dt).toLocaleTimeString('id-ID', {
+    hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Jakarta'
+  }) + ' WIB'
+}
+
 // ── Fetch ───────────────────────────────────────────────────
 const fetchOrder = async (silent = false) => {
   if (!silent) loading.value = true
@@ -265,6 +391,7 @@ const fetchOrder = async (silent = false) => {
     const res  = await axios.get(`${base}/track/${numericOutletId}/${orderCode}`)
     data.value  = res.data
     error.value = null
+    logoFailed.value = false
     lastUpdated.value = 'Diperbarui ' + new Date().toLocaleTimeString('id-ID', { timeZone: 'Asia/Jakarta' })
   } catch (e) {
     if (!silent) {
@@ -278,7 +405,7 @@ const fetchOrder = async (silent = false) => {
 
 onMounted(() => {
   fetchOrder()
-  timer = setInterval(() => fetchOrder(true), 15000)
+  timer = setInterval(() => fetchOrder(true), 30000)
 })
 onUnmounted(() => clearInterval(timer))
 
@@ -418,6 +545,83 @@ const itemStatusClass = (s) => ({
   font-size: 0.82rem;
   color: var(--track-text, #222);
   margin: 0.1rem 0;
+}
+.outlet-initials {
+  font-size: 1.4rem;
+  font-weight: 800;
+  color: var(--track-text, #333);
+  letter-spacing: 0.05em;
+}
+.phone-link {
+  color: inherit;
+  text-decoration: none;
+  border-bottom: 1px dotted currentColor;
+}
+.outlet-tagline {
+  font-size: 0.78rem;
+  font-style: italic;
+  color: var(--track-muted, #666);
+  margin: 0.4rem 0 0;
+}
+
+/* ── Order timeline ─────────────────────────────────────── */
+.order-timeline {
+  padding: 0.5rem 0 0.25rem;
+}
+.timeline-step {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+.step-icon {
+  width: 32px; height: 32px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.9rem;
+  flex-shrink: 0;
+  border: 2px solid transparent;
+}
+.timeline-step.completed .step-icon {
+  background: #22c55e; color: white;
+}
+.timeline-step.active .step-icon {
+  background: #3b82f6; color: white;
+  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.18);
+}
+.timeline-step.pending .step-icon {
+  background: var(--track-icon-bg, #e5e7eb);
+  color: var(--track-muted, #9ca3af);
+  border-color: var(--track-divider-soft, #d1d5db);
+}
+.step-body {
+  flex: 1;
+  padding: 0.35rem 0;
+}
+.step-label {
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: var(--track-text, #111);
+}
+.timeline-step.pending .step-label {
+  color: var(--track-muted, #888);
+  font-weight: 500;
+}
+.step-time {
+  font-size: 0.75rem;
+  color: var(--track-muted, #888);
+  margin-top: 0.1rem;
+}
+.timeline-connector {
+  width: 2px;
+  height: 18px;
+  margin-left: 15px;
+}
+.timeline-connector.completed {
+  background: #22c55e;
+}
+.timeline-connector.pending {
+  background: transparent;
+  border-left: 2px dashed var(--track-divider-soft, #d1d5db);
+  width: 0;
 }
 
 /* ── Dividers ───────────────────────────────────────────── */

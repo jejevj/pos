@@ -83,6 +83,19 @@ class OrderTrackingController extends Controller
                 $cashierName = $cashier->name ?? null;
             }
 
+            // Site-level identity (fallback for missing outlet logo/name)
+            $siteSettings = [];
+            try {
+                $rows = DB::table('site_settings')
+                    ->whereIn('key', ['site_name', 'site_tagline', 'site_logo', 'site_logo_dark', 'primary_color'])
+                    ->get(['key', 'value']);
+                foreach ($rows as $r) {
+                    $siteSettings[$r->key] = $r->value;
+                }
+            } catch (\Exception $e) {
+                // site_settings table may not exist yet — ignore
+            }
+
             // Build status timeline
             $timeline = $this->buildTimeline($order, $items);
 
@@ -145,6 +158,14 @@ class OrderTrackingController extends Controller
                     'address' => $outlet->address,
                     'phone'   => $outlet->phone,
                     'logo'    => $outlet->logo,
+                    'description' => $outlet->description ?? null,
+                ],
+                'site' => [
+                    'name'     => $siteSettings['site_name'] ?? null,
+                    'tagline'  => $siteSettings['site_tagline'] ?? null,
+                    'logo'     => $siteSettings['site_logo'] ?? null,
+                    'logo_dark'=> $siteSettings['site_logo_dark'] ?? null,
+                    'primary_color' => $siteSettings['primary_color'] ?? null,
                 ],
                 'order' => [
                     'id'             => $order->id,
@@ -165,6 +186,11 @@ class OrderTrackingController extends Controller
                     'cashier_name'   => $cashierName,
                     'created_at'     => $order->created_at,
                     'paid_at'        => $order->paid_at,
+                    'confirmed_at'   => $order->confirmed_at ?? null,
+                    'preparing_at'   => $order->preparing_at ?? null,
+                    'ready_at'       => $order->ready_at ?? null,
+                    'served_at'      => $order->served_at ?? null,
+                    'completed_at'   => $order->completed_at ?? null,
                 ],
                 'stations'         => array_values($byStation),
                 'timeline'         => $timeline,
