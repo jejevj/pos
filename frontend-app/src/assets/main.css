@@ -360,3 +360,170 @@ html.is-dark input::placeholder,
 html.is-dark textarea::placeholder {
   color: #5a5a7a !important;
 }
+
+/* ── OutletDashboardView --mod-* CSS vars dark override ─────────────
+   Component pakai scoped var(--mod-*), di-override dari luar via html.is-dark
+   ──────────────────────────────────────────────────────────────────── */
+html.is-dark .mod-dashboard {
+  --mod-text:       #e4e4ef;
+  --mod-text-light: #7a7a9a;
+  --mod-border:     #2e2e3e;
+  --mod-bg:         #13131a;
+  background: var(--mod-bg);
+  color: var(--mod-text);
+}
+
+/* Semua card/panel di mod-dashboard yang pakai background: white di scoped CSS */
+html.is-dark .mod-dashboard .page-header,
+html.is-dark .mod-dashboard .kpi-card,
+html.is-dark .mod-dashboard .quick-access-panel,
+html.is-dark .mod-dashboard .panel-header,
+html.is-dark .mod-dashboard .menu-card,
+html.is-dark .mod-dashboard .info-card,
+html.is-dark .mod-dashboard .info-card-header,
+html.is-dark .mod-dashboard .summary-card,
+html.is-dark .mod-dashboard .summary-card-header {
+  background: #1e1e28 !important;
+  border-color: #2e2e3e !important;
+  color: #e4e4ef !important;
+}
+
+/* Menu card hover override */
+html.is-dark .mod-dashboard .menu-card:hover {
+  background: #252535 !important;
+  border-color: var(--primary) !important;
+}
+
+/* KPI icon pastel bg — ganti ke dark version (tetap warna tapi lebih gelap) */
+html.is-dark .mod-dashboard .kpi-icon[style*="background:#ECF2FF"],
+html.is-dark .mod-dashboard .kpi-icon[style*="background: #ECF2FF"] {
+  background: rgba(93, 135, 255, 0.15) !important;
+}
+html.is-dark .mod-dashboard .kpi-icon[style*="background:#E6FFFA"],
+html.is-dark .mod-dashboard .kpi-icon[style*="background: #E6FFFA"] {
+  background: rgba(19, 222, 185, 0.12) !important;
+}
+html.is-dark .mod-dashboard .kpi-icon[style*="background:#FEF5E5"],
+html.is-dark .mod-dashboard .kpi-icon[style*="background: #FEF5E5"] {
+  background: rgba(255, 174, 31, 0.12) !important;
+}
+html.is-dark .mod-dashboard .kpi-icon[style*="background:#FDEDE8"],
+html.is-dark .mod-dashboard .kpi-icon[style*="background: #FDEDE8"] {
+  background: rgba(250, 137, 107, 0.12) !important;
+}
+
+/* Summary icon pastel bg dark override */
+html.is-dark .mod-dashboard .summary-icon[style*="background:#E6FFFA"],
+html.is-dark .mod-dashboard .summary-icon[style*="background: #E6FFFA"] {
+  background: rgba(19, 222, 185, 0.12) !important;
+}
+html.is-dark .mod-dashboard .summary-icon[style*="background:#ECF2FF"],
+html.is-dark .mod-dashboard .summary-icon[style*="background: #ECF2FF"] {
+  background: rgba(93, 135, 255, 0.15) !important;
+}
+html.is-dark .mod-dashboard .summary-icon[style*="background:#FEF5E5"],
+html.is-dark .mod-dashboard .summary-icon[style*="background: #FEF5E5"] {
+  background: rgba(255, 174, 31, 0.12) !important;
+}
+
+/* KPI trend badges */
+html.is-dark .mod-dashboard .kpi-trend.up {
+  background: rgba(19, 222, 185, 0.12) !important;
+  color: #13DEB9 !important;
+}
+html.is-dark .mod-dashboard .kpi-trend.down {
+  background: rgba(250, 137, 107, 0.12) !important;
+  color: #FA896B !important;
+}
+
+/* Clock badge */
+html.is-dark .mod-dashboard .clock-badge {
+  background: rgba(93, 135, 255, 0.15) !important;
+  color: #8ab4ff !important;
+}
+
+/* Stock bar track */
+html.is-dark .mod-dashboard .stock-bar-track {
+  background: #2a2a36 !important;
+}
+
+/* ── DashboardView.vue hardcoded colors fix ─────────────────────── */
+html.is-dark .stat-value {
+  color: #e4e4ef !important;
+}
+html.is-dark .stat-label {
+  color: #7a7a9a !important;
+}
+html.is-dark .stat-card {
+  border-color: #2e2e3e !important;
+}
+html.is-dark .info-section :deep(.p-card-title),
+html.is-dark .p-card-title {
+  color: #e4e4ef !important;
+}
+html.is-dark .permission-chip {
+  background-color: #252535 !important;
+  border-color: #3a3a50 !important;
+  color: #b0d0ff !important;
+}
+html.is-dark .permissions-list::-webkit-scrollbar-track {
+  background: #1e1e28 !important;
+}
+
+/* ── Breadcrumb dark override (PrimeVue rendered element) ────────── */
+html.is-dark .p-breadcrumb {
+  background: #1e1e28 !important;
+  border-color: #2e2e3e !important;
+}
+html.is-dark .p-breadcrumb-list li .p-breadcrumb-item-link,
+html.is-dark .p-breadcrumb-list li span {
+  color: #9090b0 !important;
+}
+html.is-dark .p-breadcrumb-list li:last-child .p-breadcrumb-item-link,
+html.is-dark .p-breadcrumb-list li:last-child span {
+  color: #e4e4ef !important;
+}
+html.is-dark .p-breadcrumb-separator {
+  color: #5a5a7a !important;
+}
+
+/* ── DataTable lebih lengkap ─────────────────────────────────────── */
+html.is-dark .p-datatable-table-container,
+html.is-dark .p-datatable-thead > tr > th,
+html.is-dark .p-datatable-tbody > tr,
+html.is-dark .p-datatable-tfoot > tr > td {
+  background: #1e1e28 !important;
+  border-color: #2e2e3e !important;
+  color: #e4e4ef !important;
+}
+html.is-dark .p-datatable-tbody > tr:nth-child(even) {
+  background: #212130 !important;
+}
+html.is-dark .p-datatable-tbody > tr:hover {
+  background: #252535 !important;
+}
+html.is-dark .p-datatable-sort-icon {
+  color: #7a7a9a !important;
+}
+
+/* ── PrimeVue Tag / Badge ────────────────────────────────────────── */
+html.is-dark .p-tag.p-tag-secondary {
+  background: #2a2a3a !important;
+  color: #b0b0cc !important;
+}
+
+/* ── General hardcoded text colors (many views use inline or scoped #1f2937 etc) */
+html.is-dark [style*="color: #1f2937"],
+html.is-dark [style*="color:#1f2937"],
+html.is-dark [style*="color: #111827"],
+html.is-dark [style*="color:#111827"],
+html.is-dark [style*="color: #374151"],
+html.is-dark [style*="color:#374151"] {
+  color: #e4e4ef !important;
+}
+html.is-dark [style*="color: #6b7280"],
+html.is-dark [style*="color:#6b7280"],
+html.is-dark [style*="color: #9ca3af"],
+html.is-dark [style*="color:#9ca3af"] {
+  color: #7a7a9a !important;
+}
