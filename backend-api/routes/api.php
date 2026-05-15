@@ -29,6 +29,12 @@ Route::middleware('throttle:60,1')->group(function () {
     Route::post('/public/outlet/{outletSlug}/table/{token}/order',  [\App\Http\Controllers\Api\Public\TableOrderController::class, 'store']);
     Route::get('/public/outlet/{outletSlug}/order/{orderCode}',     [\App\Http\Controllers\Api\Public\TableOrderController::class, 'status']);
     Route::put('/public/outlet/{outletSlug}/order/{orderCode}',     [\App\Http\Controllers\Api\Public\TableOrderController::class, 'update']);
+    // Replace / upload payment proof for a still-pending public order.
+    Route::post('/public/outlet/{outletSlug}/order/{orderCode}/proof', [\App\Http\Controllers\Api\Public\TableOrderController::class, 'uploadProof']);
+
+    // Public takeaway-ordering: one URL per outlet, no table token.
+    Route::get('/public/outlet/{outletSlug}/takeaway',        [\App\Http\Controllers\Api\Public\TakeawayOrderController::class, 'show']);
+    Route::post('/public/outlet/{outletSlug}/takeaway/order', [\App\Http\Controllers\Api\Public\TakeawayOrderController::class, 'store']);
 });
 
 // ── Site Settings — public read so frontend can load branding ────────────

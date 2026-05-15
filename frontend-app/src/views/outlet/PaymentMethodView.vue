@@ -35,6 +35,16 @@
             <Tag v-else :value="$t('paymentMethod.immediate')" severity="success" />
           </template>
         </Column>
+        <Column field="is_online_orderable" :header="$t('paymentMethod.onlineOrderable')">
+          <template #body="{ data }">
+            <Tag
+              v-if="data.is_online_orderable"
+              :value="$t('paymentMethod.online')"
+              severity="info"
+            />
+            <Tag v-else :value="$t('paymentMethod.posOnly')" severity="secondary" />
+          </template>
+        </Column>
         <Column field="is_active" :header="$t('common.status')">
           <template #body="{ data }">
             <Tag :value="data.is_active ? $t('common.active') : $t('common.inactive')"
@@ -118,6 +128,13 @@
           </div>
         </div>
         <div class="form-field full-width">
+          <label>{{ $t('paymentMethod.onlineOrderable') }}</label>
+          <div class="toggle-row">
+            <ToggleSwitch v-model="form.is_online_orderable" />
+            <span>{{ $t('paymentMethod.onlineOrderableHint') }}</span>
+          </div>
+        </div>
+        <div class="form-field full-width">
           <label>{{ $t('common.status') }}</label>
           <div class="toggle-row">
             <ToggleSwitch v-model="form.is_active" />
@@ -172,7 +189,7 @@ const dialogVisible = ref(false)
 const editItem      = ref(null)
 const form = ref({
   name: '', code: '', icon: '', display_order: 99,
-  defers_stock: false, is_active: true
+  defers_stock: false, is_active: true, is_online_orderable: false
 })
 
 const fetchMethods = async () => {
@@ -207,8 +224,8 @@ const fetchBon = async () => {
 const openDialog = (item = null) => {
   editItem.value = item
   form.value = item
-    ? { name: item.name, code: item.code, icon: item.icon || '', display_order: item.display_order, defers_stock: !!item.defers_stock, is_active: !!item.is_active }
-    : { name: '', code: '', icon: '', display_order: 99, defers_stock: false, is_active: true }
+    ? { name: item.name, code: item.code, icon: item.icon || '', display_order: item.display_order, defers_stock: !!item.defers_stock, is_active: !!item.is_active, is_online_orderable: !!item.is_online_orderable }
+    : { name: '', code: '', icon: '', display_order: 99, defers_stock: false, is_active: true, is_online_orderable: false }
   dialogVisible.value = true
 }
 

@@ -19,6 +19,7 @@ class PaymentMethod extends Model
         'display_order',
         'defers_stock',   // if true, stock is NOT reduced until bon is settled
         'requires_settlement', // alias for defers_stock — same concept
+        'is_online_orderable', // available for public table/takeaway online orders
     ];
 
     protected $casts = [
@@ -26,6 +27,7 @@ class PaymentMethod extends Model
         'display_order'        => 'integer',
         'defers_stock'         => 'boolean',
         'requires_settlement'  => 'boolean',
+        'is_online_orderable'  => 'boolean',
     ];
 
     public function scopeActive($query)
@@ -36,5 +38,10 @@ class PaymentMethod extends Model
     public function scopeOrdered($query)
     {
         return $query->orderBy('display_order');
+    }
+
+    public function scopeOnlineOrderable($query)
+    {
+        return $query->where('is_online_orderable', true);
     }
 }

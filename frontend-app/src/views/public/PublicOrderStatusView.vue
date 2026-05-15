@@ -76,9 +76,20 @@
       </section>
 
       <section class="card">
-        <div class="row"><span>{{ t('publicOrder.table') }}</span><span>{{ order.table_number }}</span></div>
+        <div v-if="order.order_type === 'takeaway'" class="row">
+          <span>{{ t('publicOrder.takeaway') }}</span><span>—</span>
+        </div>
+        <div v-else class="row">
+          <span>{{ t('publicOrder.table') }}</span><span>{{ order.table_number }}</span>
+        </div>
         <div class="row"><span>{{ t('publicOrder.phone') }}</span><span>{{ order.customer_phone }}</span></div>
         <div class="row"><span>{{ t('publicOrder.email') }}</span><span>{{ order.customer_email }}</span></div>
+        <div v-if="paymentProofUrl" class="row">
+          <span>{{ t('publicOrder.paymentProof') }}</span>
+          <a :href="paymentProofUrl" target="_blank" rel="noopener" style="color:#6366f1; font-weight:600;">
+            <i class="pi pi-image"></i>
+          </a>
+        </div>
       </section>
 
       <p class="hint">
@@ -104,6 +115,7 @@ const loading = ref(true)
 const loadError = ref('')
 const order = ref({})
 const items = ref([])
+const paymentProofUrl = ref('')
 const elapsed = ref(0)
 
 let pollTimer = null
@@ -114,6 +126,7 @@ async function load() {
     const res = await api.get(`/public/outlet/${outletSlug}/order/${orderCode}`)
     order.value = res.data.order || {}
     items.value = res.data.items || []
+    paymentProofUrl.value = res.data.payment_proof_url || ''
     if (order.value.created_at) {
       const created = new Date(order.value.created_at).getTime()
       elapsed.value = Math.floor((Date.now() - created) / 1000)

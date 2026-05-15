@@ -41,6 +41,13 @@ const router = createRouter({
       component: () => import('@/views/public/PublicOrderStatusView.vue'),
       meta: { public: true }
     },
+    // Public takeaway order — one URL per outlet, no table token
+    {
+      path: '/o/:outletSlug/takeaway',
+      name: 'public-takeaway-order',
+      component: () => import('@/views/public/PublicTakeawayOrderView.vue'),
+      meta: { public: true }
+    },
     {
       path: '/register',
       name: 'register',

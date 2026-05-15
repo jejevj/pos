@@ -15,39 +15,29 @@ use Illuminate\Support\Facades\Validator;
  *   POST /api/public/outlet/{outletSlug}/table/{token}/order
  *   GET  /api/public/outlet/{outletSlug}/order/{orderCode}
  *   PUT  /api/public/outlet/{outletSlug}/order/{orderCode}        (only while approval_status = 'pending')
+ *   POST /api/public/outlet/{outletSlug}/order/{orderCode}/proof  (upload/replace payment proof)
  *
  * Outlet is resolved by outlets.slug; table by tables.qr_token (per-outlet schema).
  * Order code returned on create is the same kode used by the existing tracking page.
  */
 class TableOrderController extends Controller
 {
-    private function resolveOutlet(string $slug): ?Outlet
-    {
-        return Outlet::where('slug', $slug)->first();
-    }
-
-    private function setSchema(string $schema): void
-    {
-        DB::statement("SET search_path TO {$schema}, public");
-    }
-
-    private function resetSchema(): void
-    {
-        DB::statement("SET search_path TO public");
-    }
+    use PublicOrderingHelpers;
 
     /**
-     * Initial page payload — outlet info, table info, menu list, categories.
+     * Initial page payload — outlet info, table info, menu list, categories,
+     * available online-orderable payment methods.
      */
     public function show(Request $request, string $outletSlug, string $token)
     {
-        $outlet = $this->resolveOutlet($outletSlug);
+        $outlet = $this->resolveOutletBySlug($outletSlug);
         if (!$outlet) {
             return response()->json(['message' => 'Outlet tidak ditemukan'], 404);
         }
 
         try {
-            $this->setSchema($outlet->schema_name);
+            $this->useSchema($outlet->schema_name);
+            $this->healOnlineOrderColumns();
 
             $table = DB::table('tables')
                 ->where('qr_token', $token)
@@ -90,14 +80,12 @@ class TableOrderController extends Controller
                 ], 200);
             }
 
-            // Categories
             $categories = DB::table('kategori_menu')
                 ->where('is_active', true)
                 ->orderBy('urutan')
                 ->orderBy('nama')
                 ->get(['id', 'nama', 'urutan']);
 
-            // Menu items (available only)
             $menu = DB::table('menu')
                 ->where('is_active', true)
                 ->where('is_available', true)
@@ -107,12 +95,10 @@ class TableOrderController extends Controller
                     'gambar_url', 'deskripsi', 'station_id',
                 ]);
 
-            // Transaction settings for tax/service display
             $tx = DB::table('transaction_settings')->first();
-
-            // Public member registration availability (optional login)
             $member = DB::table('membership_settings')->first();
             $registrationOpen = $member ? (bool) ($member->registration_open ?? false) : false;
+            $paymentMethods = $this->onlineOrderablePaymentMethods();
 
             $this->resetSchema();
 
@@ -135,6 +121,7 @@ class TableOrderController extends Controller
                 'is_orderable' => true,
                 'categories' => $categories,
                 'menu' => $menu,
+                'payment_methods' => $paymentMethods,
                 'settings' => [
                     'tax_enabled'              => $tx ? (bool) $tx->tax_enabled : false,
                     'tax_percentage'           => $tx ? (float) $tx->tax_percentage : 0,
@@ -151,10 +138,11 @@ class TableOrderController extends Controller
 
     /**
      * Create a new public order pending cashier approval.
+     * Requires payment_method_id and a payment_proof file.
      */
     public function store(Request $request, string $outletSlug, string $token)
     {
-        $outlet = $this->resolveOutlet($outletSlug);
+        $outlet = $this->resolveOutletBySlug($outletSlug);
         if (!$outlet) {
             return response()->json(['message' => 'Outlet tidak ditemukan'], 404);
         }
@@ -165,18 +153,31 @@ class TableOrderController extends Controller
             'customer_email' => 'required|email|max:255',
             'notes'          => 'nullable|string|max:500',
             'member_card'    => 'nullable|string|max:50',
-            'items'                => 'required|array|min:1',
-            'items.*.menu_id'      => 'required|integer',
-            'items.*.quantity'     => 'required|integer|min:1|max:50',
-            'items.*.notes'        => 'nullable|string|max:255',
+            'payment_method_id' => 'required|integer',
+            'payment_proof'  => 'required|file|mimes:jpg,jpeg,png,webp,pdf|max:5120',
+            // Items come in as JSON string when multipart/form-data; the
+            // frontend will JSON-encode before sending. Decoded below.
+            'items'          => 'required',
         ]);
 
         if ($validator->fails()) {
             return response()->json(['message' => 'Data tidak valid', 'errors' => $validator->errors()], 422);
         }
 
+        $items = $this->decodeItems($request->input('items'));
+        $itemsValidator = Validator::make(['items' => $items], [
+            'items'                => 'required|array|min:1',
+            'items.*.menu_id'      => 'required|integer',
+            'items.*.quantity'     => 'required|integer|min:1|max:50',
+            'items.*.notes'        => 'nullable|string|max:255',
+        ]);
+        if ($itemsValidator->fails()) {
+            return response()->json(['message' => 'Item pesanan tidak valid', 'errors' => $itemsValidator->errors()], 422);
+        }
+
         try {
-            $this->setSchema($outlet->schema_name);
+            $this->useSchema($outlet->schema_name);
+            $this->healOnlineOrderColumns();
             DB::beginTransaction();
 
             $table = DB::table('tables')
@@ -196,7 +197,14 @@ class TableOrderController extends Controller
                 ], 409);
             }
 
-            // Optional member lookup (if customer logged-in via member_card)
+            if (!$this->assertOnlinePaymentMethod($request->payment_method_id)) {
+                DB::rollBack();
+                $this->resetSchema();
+                return response()->json([
+                    'message' => 'Metode pembayaran tidak tersedia untuk pemesanan online',
+                ], 422);
+            }
+
             $memberId = null;
             if (!empty($request->member_card)) {
                 $member = DB::table('members')
@@ -213,54 +221,19 @@ class TableOrderController extends Controller
                 $memberId = $member->id;
             }
 
-            // Validate and price items from server-side menu (never trust client prices)
-            $itemsPayload = [];
-            $subtotal = 0;
-            foreach ($request->items as $it) {
-                $menu = DB::table('menu')
-                    ->where('id', $it['menu_id'])
-                    ->where('is_active', true)
-                    ->where('is_available', true)
-                    ->first();
-                if (!$menu) {
-                    DB::rollBack();
-                    $this->resetSchema();
-                    return response()->json(['message' => "Menu tidak tersedia (id {$it['menu_id']})"], 422);
-                }
-                $qty   = (int) $it['quantity'];
-                $price = (float) $menu->harga_jual;
-                $line  = $price * $qty;
-                $subtotal += $line;
-                $itemsPayload[] = [
-                    'menu_id'    => $menu->id,
-                    'menu_name'  => $menu->nama,
-                    'menu_price' => $price,
-                    'quantity'   => $qty,
-                    'subtotal'   => $line,
-                    'notes'      => $it['notes'] ?? null,
-                ];
-            }
+            [$itemsPayload, $subtotal] = $this->priceItems($items);
 
-            // Tax & service charge from settings
             $tx = DB::table('transaction_settings')->first();
             $taxPct = ($tx && $tx->tax_enabled) ? (float) $tx->tax_percentage : 0;
             $scPct  = ($tx && $tx->service_charge_enabled) ? (float) $tx->service_charge_percentage : 0;
-
             $taxAmount = round($subtotal * $taxPct / 100, 2);
             $scAmount  = round($subtotal * $scPct  / 100, 2);
             $total     = $subtotal + $taxAmount + $scAmount;
 
-            // Generate kode (ORD-YYYYMMDD-####)
-            $datePrefix = 'ORD' . date('Ymd');
-            $last = DB::table('orders')
-                ->where('kode', 'like', $datePrefix . '%')
-                ->orderBy('id', 'desc')
-                ->first();
-            $seq = 1;
-            if ($last && preg_match('/(\d{4})$/', $last->kode, $m)) {
-                $seq = ((int) $m[1]) + 1;
-            }
-            $kode = $datePrefix . str_pad($seq, 4, '0', STR_PAD_LEFT);
+            $kode = $this->generateOrderCode();
+
+            // Store proof BEFORE inserting so we have a path to set on the row.
+            $proofPath = $this->storePaymentProof($request->file('payment_proof'), $outlet, $kode);
 
             $now = now();
             $orderId = DB::table('orders')->insertGetId([
@@ -279,6 +252,9 @@ class TableOrderController extends Controller
                 'service_charge_percentage' => $scPct,
                 'service_charge_amount'     => $scAmount,
                 'total_amount'     => $total,
+                'payment_method_id' => $request->payment_method_id,
+                'payment_proof_path' => $proofPath,
+                'payment_proof_uploaded_at' => $now,
                 'notes'            => $request->notes,
                 'source'           => 'public',
                 'approval_status'  => 'pending',
@@ -299,7 +275,7 @@ class TableOrderController extends Controller
             DB::commit();
 
             $order = DB::table('orders')->where('id', $orderId)->first();
-            $items = DB::table('order_items')->where('order_id', $orderId)->get();
+            $itemsRows = DB::table('order_items')->where('order_id', $orderId)->get();
 
             $this->resetSchema();
 
@@ -307,7 +283,8 @@ class TableOrderController extends Controller
                 'message' => 'Pesanan dibuat, menunggu persetujuan kasir',
                 'data'    => [
                     'order'  => $order,
-                    'items'  => $items,
+                    'items'  => $itemsRows,
+                    'payment_proof_url' => $this->publicProofUrl($proofPath),
                 ],
             ], 201);
         } catch (\Exception $e) {
@@ -323,13 +300,14 @@ class TableOrderController extends Controller
      */
     public function status(Request $request, string $outletSlug, string $orderCode)
     {
-        $outlet = $this->resolveOutlet($outletSlug);
+        $outlet = $this->resolveOutletBySlug($outletSlug);
         if (!$outlet) {
             return response()->json(['message' => 'Outlet tidak ditemukan'], 404);
         }
 
         try {
-            $this->setSchema($outlet->schema_name);
+            $this->useSchema($outlet->schema_name);
+            $this->healOnlineOrderColumns();
 
             $order = DB::table('orders')
                 ->where('kode', $orderCode)
@@ -342,11 +320,15 @@ class TableOrderController extends Controller
 
             $items = DB::table('order_items')->where('order_id', $order->id)->get();
 
+            // expose proof url (public-readable since we used the public disk)
+            $proofUrl = $this->publicProofUrl($order->payment_proof_path ?? null);
+
             $this->resetSchema();
 
             return response()->json([
                 'order' => $order,
                 'items' => $items,
+                'payment_proof_url' => $proofUrl,
             ]);
         } catch (\Exception $e) {
             $this->resetSchema();
@@ -360,7 +342,7 @@ class TableOrderController extends Controller
      */
     public function update(Request $request, string $outletSlug, string $orderCode)
     {
-        $outlet = $this->resolveOutlet($outletSlug);
+        $outlet = $this->resolveOutletBySlug($outletSlug);
         if (!$outlet) {
             return response()->json(['message' => 'Outlet tidak ditemukan'], 404);
         }
@@ -377,7 +359,7 @@ class TableOrderController extends Controller
         }
 
         try {
-            $this->setSchema($outlet->schema_name);
+            $this->useSchema($outlet->schema_name);
             DB::beginTransaction();
 
             $order = DB::table('orders')
@@ -459,5 +441,112 @@ class TableOrderController extends Controller
             $this->resetSchema();
             return response()->json(['message' => $e->getMessage()], 500);
         }
+    }
+
+    /**
+     * Replace payment proof on a still-pending public order.
+     */
+    public function uploadProof(Request $request, string $outletSlug, string $orderCode)
+    {
+        $outlet = $this->resolveOutletBySlug($outletSlug);
+        if (!$outlet) {
+            return response()->json(['message' => 'Outlet tidak ditemukan'], 404);
+        }
+        $validator = Validator::make($request->all(), [
+            'payment_proof' => 'required|file|mimes:jpg,jpeg,png,webp,pdf|max:5120',
+        ]);
+        if ($validator->fails()) {
+            return response()->json(['message' => 'Data tidak valid', 'errors' => $validator->errors()], 422);
+        }
+        try {
+            $this->useSchema($outlet->schema_name);
+            $this->healOnlineOrderColumns();
+
+            $order = DB::table('orders')
+                ->where('kode', $orderCode)
+                ->where('source', 'public')
+                ->first();
+            if (!$order) {
+                $this->resetSchema();
+                return response()->json(['message' => 'Pesanan tidak ditemukan'], 404);
+            }
+            if ($order->approval_status !== 'pending') {
+                $this->resetSchema();
+                return response()->json(['message' => 'Pesanan sudah diproses, bukti tidak dapat diganti'], 409);
+            }
+            $proofPath = $this->storePaymentProof($request->file('payment_proof'), $outlet, $orderCode);
+            DB::table('orders')->where('id', $order->id)->update([
+                'payment_proof_path' => $proofPath,
+                'payment_proof_uploaded_at' => now(),
+                'updated_at' => now(),
+            ]);
+            $this->resetSchema();
+            return response()->json([
+                'message' => 'Bukti pembayaran berhasil diunggah',
+                'data' => [
+                    'payment_proof_url' => $this->publicProofUrl($proofPath),
+                ],
+            ]);
+        } catch (\Exception $e) {
+            $this->resetSchema();
+            return response()->json(['message' => $e->getMessage()], 500);
+        }
+    }
+
+    // ── Internals ───────────────────────────────────────────────────────────
+
+    private function decodeItems($items): array
+    {
+        if (is_array($items)) {
+            return $items;
+        }
+        if (is_string($items)) {
+            $decoded = json_decode($items, true);
+            return is_array($decoded) ? $decoded : [];
+        }
+        return [];
+    }
+
+    private function priceItems(array $items): array
+    {
+        $payload = [];
+        $subtotal = 0;
+        foreach ($items as $it) {
+            $menu = DB::table('menu')
+                ->where('id', $it['menu_id'])
+                ->where('is_active', true)
+                ->where('is_available', true)
+                ->first();
+            if (!$menu) {
+                throw new \RuntimeException("Menu tidak tersedia (id {$it['menu_id']})");
+            }
+            $qty   = (int) $it['quantity'];
+            $price = (float) $menu->harga_jual;
+            $line  = $price * $qty;
+            $subtotal += $line;
+            $payload[] = [
+                'menu_id'    => $menu->id,
+                'menu_name'  => $menu->nama,
+                'menu_price' => $price,
+                'quantity'   => $qty,
+                'subtotal'   => $line,
+                'notes'      => $it['notes'] ?? null,
+            ];
+        }
+        return [$payload, $subtotal];
+    }
+
+    private function generateOrderCode(): string
+    {
+        $datePrefix = 'ORD' . date('Ymd');
+        $last = DB::table('orders')
+            ->where('kode', 'like', $datePrefix . '%')
+            ->orderBy('id', 'desc')
+            ->first();
+        $seq = 1;
+        if ($last && preg_match('/(\d{4})$/', $last->kode, $m)) {
+            $seq = ((int) $m[1]) + 1;
+        }
+        return $datePrefix . str_pad($seq, 4, '0', STR_PAD_LEFT);
     }
 }

@@ -379,11 +379,14 @@ class OutletProvisioner
                 icon VARCHAR(255) NULL,
                 is_active BOOLEAN DEFAULT true,
                 display_order INTEGER DEFAULT 0,
+                is_online_orderable BOOLEAN DEFAULT FALSE,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 deleted_at TIMESTAMP NULL
             )
         ");
+        // Heal existing schemas
+        DB::statement("ALTER TABLE {$schema}.payment_methods ADD COLUMN IF NOT EXISTS is_online_orderable BOOLEAN DEFAULT FALSE");
         DB::statement("
             CREATE TABLE IF NOT EXISTS {$schema}.orders (
                 id BIGSERIAL PRIMARY KEY,
@@ -448,6 +451,8 @@ class OutletProvisioner
         DB::statement("ALTER TABLE {$schema}.orders ADD COLUMN IF NOT EXISTS rejected_at TIMESTAMP NULL");
         DB::statement("ALTER TABLE {$schema}.orders ADD COLUMN IF NOT EXISTS rejection_reason TEXT NULL");
         DB::statement("ALTER TABLE {$schema}.orders ADD COLUMN IF NOT EXISTS customer_email VARCHAR(255) NULL");
+        DB::statement("ALTER TABLE {$schema}.orders ADD COLUMN IF NOT EXISTS payment_proof_path VARCHAR(500) NULL");
+        DB::statement("ALTER TABLE {$schema}.orders ADD COLUMN IF NOT EXISTS payment_proof_uploaded_at TIMESTAMP NULL");
         DB::statement("CREATE INDEX IF NOT EXISTS idx_{$schema}_orders_source_approval ON {$schema}.orders(source, approval_status)");
         // Allow cashier_id NULL for public-source orders
         DB::statement("ALTER TABLE {$schema}.orders ALTER COLUMN cashier_id DROP NOT NULL");
@@ -456,12 +461,12 @@ class OutletProvisioner
         DB::statement("SET search_path TO {$schema}, public");
         if (DB::table('payment_methods')->count() == 0) {
             DB::table('payment_methods')->insert([
-                ['name' => 'Cash', 'code' => 'cash', 'display_order' => 1, 'is_active' => true],
-                ['name' => 'Debit Card', 'code' => 'debit_card', 'display_order' => 2, 'is_active' => true],
-                ['name' => 'Credit Card', 'code' => 'credit_card', 'display_order' => 3, 'is_active' => true],
-                ['name' => 'E-Wallet', 'code' => 'e_wallet', 'display_order' => 4, 'is_active' => true],
-                ['name' => 'Transfer Bank', 'code' => 'bank_transfer', 'display_order' => 5, 'is_active' => true],
-                ['name' => 'QRIS', 'code' => 'qris', 'display_order' => 6, 'is_active' => true],
+                ['name' => 'Cash', 'code' => 'cash', 'display_order' => 1, 'is_active' => true, 'is_online_orderable' => false],
+                ['name' => 'Debit Card', 'code' => 'debit_card', 'display_order' => 2, 'is_active' => true, 'is_online_orderable' => false],
+                ['name' => 'Credit Card', 'code' => 'credit_card', 'display_order' => 3, 'is_active' => true, 'is_online_orderable' => false],
+                ['name' => 'E-Wallet', 'code' => 'e_wallet', 'display_order' => 4, 'is_active' => true, 'is_online_orderable' => false],
+                ['name' => 'Transfer Bank', 'code' => 'bank_transfer', 'display_order' => 5, 'is_active' => true, 'is_online_orderable' => false],
+                ['name' => 'QRIS', 'code' => 'qris', 'display_order' => 6, 'is_active' => true, 'is_online_orderable' => true],
             ]);
         }
         if (DB::table('tables')->count() == 0) {

@@ -44,6 +44,7 @@ class PaymentMethodController extends Controller
             'is_active'     => 'boolean',
             'display_order' => 'integer|min:0',
             'defers_stock'  => 'boolean',
+            'is_online_orderable' => 'boolean',
         ]);
         try {
             DB::statement("SET search_path TO {$outlet->schema_name}, public");
@@ -55,6 +56,7 @@ class PaymentMethodController extends Controller
                 'is_active'     => $request->boolean('is_active', true),
                 'display_order' => $request->input('display_order', 99),
                 'defers_stock'  => $request->boolean('defers_stock', false),
+                'is_online_orderable' => $request->boolean('is_online_orderable', false),
             ]);
             DB::statement("SET search_path TO public");
             return response()->json(['message' => 'Payment method created', 'data' => $method], 201);
@@ -74,12 +76,13 @@ class PaymentMethodController extends Controller
             'is_active'     => 'boolean',
             'display_order' => 'integer|min:0',
             'defers_stock'  => 'boolean',
+            'is_online_orderable' => 'boolean',
         ]);
         try {
             DB::statement("SET search_path TO {$outlet->schema_name}, public");
             $this->ensureColumns();
             $method = PaymentMethod::findOrFail($id);
-            $method->update($request->only(['name', 'code', 'icon', 'is_active', 'display_order', 'defers_stock']));
+            $method->update($request->only(['name', 'code', 'icon', 'is_active', 'display_order', 'defers_stock', 'is_online_orderable']));
             DB::statement("SET search_path TO public");
             return response()->json(['message' => 'Payment method updated', 'data' => $method]);
         } catch (\Exception $e) {
@@ -148,6 +151,18 @@ class PaymentMethodController extends Controller
         $schema = DB::getSchemaBuilder();
         if (!$schema->hasColumn('payment_methods', 'defers_stock')) {
             DB::statement("ALTER TABLE payment_methods ADD COLUMN defers_stock BOOLEAN DEFAULT FALSE");
+        }
+        if (!$schema->hasColumn('payment_methods', 'is_online_orderable')) {
+            DB::statement("ALTER TABLE payment_methods ADD COLUMN is_online_orderable BOOLEAN DEFAULT FALSE");
+            // Default-enable QRIS for online ordering — safe assumption for typical
+            // outlets that already use QRIS as their cashless instrument.
+            DB::statement("UPDATE payment_methods SET is_online_orderable = TRUE WHERE code = 'qris'");
+        }
+        if (!$schema->hasColumn('orders', 'payment_proof_path')) {
+            DB::statement("ALTER TABLE orders ADD COLUMN payment_proof_path VARCHAR(500) NULL");
+        }
+        if (!$schema->hasColumn('orders', 'payment_proof_uploaded_at')) {
+            DB::statement("ALTER TABLE orders ADD COLUMN payment_proof_uploaded_at TIMESTAMP NULL");
         }
         if (!$schema->hasColumn('orders', 'payment_status')) {
             DB::statement("ALTER TABLE orders ADD COLUMN payment_status VARCHAR(20) DEFAULT 'paid'");

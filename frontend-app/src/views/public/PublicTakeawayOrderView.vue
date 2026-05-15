@@ -1,31 +1,17 @@
 <template>
   <div class="pto-page">
-    <!-- Loading -->
     <div v-if="loading" class="state">
       <div class="spinner"></div>
       <p>{{ t('publicOrder.loading') }}</p>
     </div>
 
-    <!-- Error -->
     <div v-else-if="loadError" class="state error">
       <i class="pi pi-exclamation-triangle"></i>
       <h2>{{ t('publicOrder.notFound') }}</h2>
       <p>{{ loadError }}</p>
     </div>
 
-    <!-- Unavailable: table exists but cannot accept orders right now -->
-    <div v-else-if="!isOrderable" class="state unavailable">
-      <i class="pi pi-info-circle"></i>
-      <h2>{{ t('publicOrder.unavailableTitle') }}</h2>
-      <p>{{ unavailableMessage }}</p>
-      <div class="unavailable-meta" v-if="outlet.name">
-        <strong>{{ outlet.name }}</strong>
-        <span v-if="table.table_number"> · {{ t('publicOrder.table') }} {{ table.table_number }}</span>
-      </div>
-    </div>
-
     <template v-else>
-      <!-- Header -->
       <header class="pto-header">
         <div class="brand">
           <img v-if="outlet.logo" :src="outlet.logo" alt="logo" class="logo" />
@@ -33,7 +19,7 @@
           <div>
             <div class="outlet-name">{{ outlet.name }}</div>
             <div class="table-label">
-              <i class="pi pi-th-large"></i> {{ t('publicOrder.table') }} {{ table.table_number }}
+              <i class="pi pi-shopping-bag"></i> {{ t('publicOrder.takeaway') }}
             </div>
           </div>
         </div>
@@ -43,15 +29,10 @@
         </button>
       </header>
 
-      <!-- Search + Category Tabs -->
       <div class="pto-controls">
         <div class="search">
           <i class="pi pi-search"></i>
-          <input
-            v-model="search"
-            :placeholder="t('publicOrder.searchMenu')"
-            type="text"
-          />
+          <input v-model="search" :placeholder="t('publicOrder.searchMenu')" type="text" />
         </div>
         <div class="tabs">
           <button
@@ -73,13 +54,8 @@
         </div>
       </div>
 
-      <!-- Menu Grid -->
       <main class="pto-menu">
-        <div
-          v-for="m in filteredMenu"
-          :key="m.id"
-          class="menu-card"
-        >
+        <div v-for="m in filteredMenu" :key="m.id" class="menu-card">
           <div class="menu-img">
             <img v-if="m.gambar_url" :src="m.gambar_url" :alt="m.nama" />
             <div v-else class="img-fallback">{{ initials(m.nama) }}</div>
@@ -90,16 +66,11 @@
             <div class="menu-row">
               <div class="menu-price">{{ formatIdr(m.harga_jual) }}</div>
               <div class="qty-control">
-                <button
-                  class="qty-btn"
-                  :disabled="!getQty(m.id)"
-                  @click="decQty(m)"
-                  :aria-label="'minus'"
-                >
+                <button class="qty-btn" :disabled="!getQty(m.id)" @click="decQty(m)">
                   <i class="pi pi-minus"></i>
                 </button>
                 <span class="qty">{{ getQty(m.id) }}</span>
-                <button class="qty-btn add" @click="incQty(m)" :aria-label="'plus'">
+                <button class="qty-btn add" @click="incQty(m)">
                   <i class="pi pi-plus"></i>
                 </button>
               </div>
@@ -112,7 +83,6 @@
         </div>
       </main>
 
-      <!-- Cart bar -->
       <footer v-if="cartCount" class="pto-footer">
         <div class="totals">
           <span>{{ cartCount }} {{ t('publicOrder.item') }}</span>
@@ -123,7 +93,6 @@
         </button>
       </footer>
 
-      <!-- Cart sheet -->
       <div v-if="cartOpen" class="sheet-backdrop" @click.self="cartOpen = false">
         <div class="sheet">
           <div class="sheet-header">
@@ -143,26 +112,16 @@
               <div class="ci-info">
                 <div class="ci-name">{{ c.menu_name }}</div>
                 <div class="ci-price">{{ formatIdr(c.menu_price) }} × {{ c.quantity }}</div>
-                <input
-                  v-model="c.notes"
-                  type="text"
-                  class="ci-notes"
-                  :placeholder="t('publicOrder.noteOptional')"
-                />
+                <input v-model="c.notes" type="text" class="ci-notes" :placeholder="t('publicOrder.noteOptional')" />
               </div>
               <div class="qty-control">
-                <button class="qty-btn" @click="changeCartQty(c, -1)">
-                  <i class="pi pi-minus"></i>
-                </button>
+                <button class="qty-btn" @click="changeCartQty(c, -1)"><i class="pi pi-minus"></i></button>
                 <span class="qty">{{ c.quantity }}</span>
-                <button class="qty-btn add" @click="changeCartQty(c, 1)">
-                  <i class="pi pi-plus"></i>
-                </button>
+                <button class="qty-btn add" @click="changeCartQty(c, 1)"><i class="pi pi-plus"></i></button>
               </div>
             </li>
           </ul>
 
-          <!-- Customer form -->
           <form v-if="cart.length" class="form" @submit.prevent="submitOrder">
             <h4>{{ t('publicOrder.contact') }}</h4>
             <div class="field">
@@ -171,46 +130,19 @@
             </div>
             <div class="field">
               <label>{{ t('publicOrder.phone') }} <span class="req">*</span></label>
-              <input
-                v-model="form.customer_phone"
-                type="tel"
-                inputmode="tel"
-                :placeholder="t('publicOrder.phonePh')"
-                required
-              />
+              <input v-model="form.customer_phone" type="tel" inputmode="tel" :placeholder="t('publicOrder.phonePh')" required />
             </div>
             <div class="field">
               <label>{{ t('publicOrder.email') }} <span class="req">*</span></label>
-              <input
-                v-model="form.customer_email"
-                type="email"
-                :placeholder="t('publicOrder.emailPh')"
-                required
-              />
+              <input v-model="form.customer_email" type="email" :placeholder="t('publicOrder.emailPh')" required />
             </div>
             <div class="field">
               <label>{{ t('publicOrder.memberCardOptional') }}</label>
-              <input
-                v-model="form.member_card"
-                type="text"
-                :placeholder="t('publicOrder.memberCardPh')"
-              />
-              <small class="hint">{{ t('publicOrder.memberHint') }}</small>
-              <a
-                v-if="settings.membership_open"
-                class="link"
-                :href="`/m/${outletSlug}`"
-                target="_blank"
-                >{{ t('publicOrder.registerMember') }}</a
-              >
+              <input v-model="form.member_card" type="text" :placeholder="t('publicOrder.memberCardPh')" />
             </div>
             <div class="field">
               <label>{{ t('publicOrder.notes') }}</label>
-              <textarea
-                v-model="form.notes"
-                rows="2"
-                :placeholder="t('publicOrder.notesPh')"
-              ></textarea>
+              <textarea v-model="form.notes" rows="2" :placeholder="t('publicOrder.notesPh')"></textarea>
             </div>
 
             <h4>{{ t('publicOrder.payment') }}</h4>
@@ -225,12 +157,7 @@
                 class="payment-method-card"
                 :class="{ active: form.payment_method_id === pm.id }"
               >
-                <input
-                  type="radio"
-                  name="payment_method"
-                  :value="pm.id"
-                  v-model="form.payment_method_id"
-                />
+                <input type="radio" name="payment_method" :value="pm.id" v-model="form.payment_method_id" />
                 <i class="pi" :class="pm.icon || 'pi-credit-card'"></i>
                 <span>{{ pm.name }}</span>
               </label>
@@ -294,16 +221,13 @@ const router = useRouter()
 const { t } = useI18n()
 
 const outletSlug = route.params.outletSlug
-const tableToken = route.params.tableToken
 
 const loading = ref(true)
 const loadError = ref('')
-const isOrderable = ref(true)
-const unavailableReason = ref('')
 const outlet = ref({})
-const table = ref({})
 const categories = ref([])
 const menu = ref([])
+const paymentMethods = ref([])
 const settings = ref({
   tax_enabled: false,
   tax_percentage: 0,
@@ -319,7 +243,6 @@ const cartOpen = ref(false)
 const submitting = ref(false)
 const submitError = ref('')
 
-const paymentMethods = ref([])
 const proofFile = ref(null)
 const proofPreview = ref('')
 const proofPreviewType = ref('image')
@@ -334,6 +257,95 @@ const form = ref({
   payment_method_id: null,
 })
 
+onMounted(async () => {
+  try {
+    const res = await api.get(`/public/outlet/${outletSlug}/takeaway`)
+    outlet.value = res.data.outlet || {}
+    categories.value = res.data.categories || []
+    menu.value = res.data.menu || []
+    paymentMethods.value = res.data.payment_methods || []
+    if (paymentMethods.value.length === 1) {
+      form.value.payment_method_id = paymentMethods.value[0].id
+    }
+    settings.value = { ...settings.value, ...(res.data.settings || {}) }
+    if (outlet.value.name) {
+      document.title = `${outlet.value.name} • Takeaway`
+    }
+  } catch (e) {
+    loadError.value = e.response?.data?.message || 'Halaman tidak ditemukan'
+  } finally {
+    loading.value = false
+  }
+})
+
+const filteredMenu = computed(() => {
+  let list = menu.value
+  if (activeCategory.value !== null) {
+    list = list.filter((m) => m.kategori_id === activeCategory.value)
+  }
+  if (search.value.trim()) {
+    const q = search.value.toLowerCase()
+    list = list.filter((m) =>
+      (m.nama || '').toLowerCase().includes(q) ||
+      (m.kode || '').toLowerCase().includes(q)
+    )
+  }
+  return list
+})
+
+function getQty (menuId) {
+  const found = cart.value.find((c) => c.menu_id === menuId)
+  return found ? found.quantity : 0
+}
+function incQty (m) {
+  const found = cart.value.find((c) => c.menu_id === m.id)
+  if (found) {
+    found.quantity++
+  } else {
+    cart.value.push({
+      menu_id: m.id,
+      menu_name: m.nama,
+      menu_price: Number(m.harga_jual),
+      quantity: 1,
+      notes: '',
+    })
+  }
+}
+function decQty (m) {
+  const idx = cart.value.findIndex((c) => c.menu_id === m.id)
+  if (idx === -1) return
+  cart.value[idx].quantity--
+  if (cart.value[idx].quantity <= 0) cart.value.splice(idx, 1)
+}
+function changeCartQty (c, delta) {
+  c.quantity += delta
+  if (c.quantity <= 0) {
+    cart.value = cart.value.filter((x) => x.menu_id !== c.menu_id)
+  }
+}
+
+const cartCount = computed(() => cart.value.reduce((s, c) => s + c.quantity, 0))
+const cartSubtotal = computed(() => cart.value.reduce((s, c) => s + c.menu_price * c.quantity, 0))
+const taxAmount = computed(() =>
+  settings.value.tax_enabled
+    ? Math.round((cartSubtotal.value * Number(settings.value.tax_percentage)) / 100)
+    : 0
+)
+const serviceAmount = computed(() =>
+  settings.value.service_charge_enabled
+    ? Math.round((cartSubtotal.value * Number(settings.value.service_charge_percentage)) / 100)
+    : 0
+)
+const grandTotal = computed(() => cartSubtotal.value + taxAmount.value + serviceAmount.value)
+
+function formatIdr (v) {
+  const n = Number(v) || 0
+  return 'Rp ' + n.toLocaleString('id-ID')
+}
+function initials (str) {
+  return (str || '?').split(' ').map((s) => s.charAt(0)).slice(0, 2).join('').toUpperCase()
+}
+
 function onProofPicked (e) {
   const f = e.target.files && e.target.files[0]
   if (!f) {
@@ -341,7 +353,6 @@ function onProofPicked (e) {
     proofPreview.value = ''
     return
   }
-  // 5 MB cap matches backend validator
   if (f.size > 5 * 1024 * 1024) {
     submitError.value = t('publicOrder.proofTooLarge')
     e.target.value = ''
@@ -360,124 +371,7 @@ function onProofPicked (e) {
   }
 }
 
-onMounted(async () => {
-  try {
-    const res = await api.get(`/public/outlet/${outletSlug}/table/${tableToken}`)
-    outlet.value = res.data.outlet || {}
-    table.value = res.data.table || {}
-    categories.value = res.data.categories || []
-    menu.value = res.data.menu || []
-    paymentMethods.value = res.data.payment_methods || []
-    if (paymentMethods.value.length === 1) {
-      form.value.payment_method_id = paymentMethods.value[0].id
-    }
-    settings.value = { ...settings.value, ...(res.data.settings || {}) }
-    isOrderable.value = res.data.is_orderable !== false
-    unavailableReason.value = res.data.unavailable_reason || ''
-    if (outlet.value.name) {
-      document.title = `${outlet.value.name} • Meja ${table.value.table_number || ''}`
-    }
-  } catch (e) {
-    loadError.value = e.response?.data?.message || 'Halaman tidak ditemukan'
-  } finally {
-    loading.value = false
-  }
-})
-
-const unavailableMessage = computed(() => {
-  const reason = unavailableReason.value
-  if (reason === 'occupied') return t('publicOrder.unavailableOccupied')
-  if (reason === 'reserved') return t('publicOrder.unavailableReserved')
-  if (reason === 'inactive') return t('publicOrder.unavailableInactive')
-  return t('publicOrder.unavailableGeneric')
-})
-
-const filteredMenu = computed(() => {
-  let list = menu.value
-  if (activeCategory.value !== null) {
-    list = list.filter((m) => m.kategori_id === activeCategory.value)
-  }
-  if (search.value.trim()) {
-    const q = search.value.toLowerCase()
-    list = list.filter((m) =>
-      (m.nama || '').toLowerCase().includes(q) ||
-      (m.kode || '').toLowerCase().includes(q)
-    )
-  }
-  return list
-})
-
-function getQty(menuId) {
-  const found = cart.value.find((c) => c.menu_id === menuId)
-  return found ? found.quantity : 0
-}
-
-function incQty(m) {
-  const found = cart.value.find((c) => c.menu_id === m.id)
-  if (found) {
-    found.quantity++
-  } else {
-    cart.value.push({
-      menu_id: m.id,
-      menu_name: m.nama,
-      menu_price: Number(m.harga_jual),
-      quantity: 1,
-      notes: '',
-    })
-  }
-}
-
-function decQty(m) {
-  const idx = cart.value.findIndex((c) => c.menu_id === m.id)
-  if (idx === -1) return
-  cart.value[idx].quantity--
-  if (cart.value[idx].quantity <= 0) cart.value.splice(idx, 1)
-}
-
-function changeCartQty(c, delta) {
-  c.quantity += delta
-  if (c.quantity <= 0) {
-    cart.value = cart.value.filter((x) => x.menu_id !== c.menu_id)
-  }
-}
-
-const cartCount = computed(() =>
-  cart.value.reduce((s, c) => s + c.quantity, 0)
-)
-const cartSubtotal = computed(() =>
-  cart.value.reduce((s, c) => s + c.menu_price * c.quantity, 0)
-)
-const taxAmount = computed(() =>
-  settings.value.tax_enabled
-    ? Math.round((cartSubtotal.value * Number(settings.value.tax_percentage)) / 100)
-    : 0
-)
-const serviceAmount = computed(() =>
-  settings.value.service_charge_enabled
-    ? Math.round(
-        (cartSubtotal.value * Number(settings.value.service_charge_percentage)) / 100
-      )
-    : 0
-)
-const grandTotal = computed(
-  () => cartSubtotal.value + taxAmount.value + serviceAmount.value
-)
-
-function formatIdr(v) {
-  const n = Number(v) || 0
-  return 'Rp ' + n.toLocaleString('id-ID')
-}
-
-function initials(str) {
-  return (str || '?')
-    .split(' ')
-    .map((s) => s.charAt(0))
-    .slice(0, 2)
-    .join('')
-    .toUpperCase()
-}
-
-async function submitOrder() {
+async function submitOrder () {
   submitError.value = ''
   if (!form.value.customer_phone || !form.value.customer_email) {
     submitError.value = t('publicOrder.errPhoneEmail')
@@ -509,20 +403,16 @@ async function submitOrder() {
       notes: c.notes || null,
     }))))
     const res = await api.post(
-      `/public/outlet/${outletSlug}/table/${tableToken}/order`,
+      `/public/outlet/${outletSlug}/takeaway/order`,
       fd,
       { headers: { 'Content-Type': 'multipart/form-data' } }
     )
     const kode = res.data?.data?.order?.kode
     if (kode) {
-      router.push({
-        name: 'public-order-status',
-        params: { outletSlug, orderCode: kode },
-      })
+      router.push({ name: 'public-order-status', params: { outletSlug, orderCode: kode } })
     }
   } catch (e) {
-    submitError.value =
-      e.response?.data?.message || t('publicOrder.errCreate')
+    submitError.value = e.response?.data?.message || t('publicOrder.errCreate')
   } finally {
     submitting.value = false
   }
@@ -531,71 +421,37 @@ async function submitOrder() {
 
 <style scoped>
 .pto-page {
-  min-height: 100vh;
-  background: #f6f7fb;
-  color: #1a1a1a;
-  font-family: 'Inter', -apple-system, sans-serif;
-  padding-bottom: 80px;
+  min-height: 100vh; background: #f6f7fb; color: #1a1a1a;
+  font-family: 'Inter', -apple-system, sans-serif; padding-bottom: 80px;
 }
 .state {
-  min-height: 60vh;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-  padding: 24px;
+  min-height: 60vh; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; text-align: center; padding: 24px;
 }
-.state.error i {
-  font-size: 48px;
-  color: #f87171;
-}
-.state.unavailable i {
-  font-size: 48px;
-  color: #f59e0b;
-}
-.state.unavailable h2 {
-  margin: 12px 0 6px;
-}
-.unavailable-meta {
-  margin-top: 12px;
-  color: #6b7280;
-  font-size: 14px;
-}
+.state.error i { font-size: 48px; color: #f87171; }
 .spinner {
-  width: 36px;
-  height: 36px;
-  border: 3px solid #e5e7eb;
-  border-top-color: #6366f1;
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-  margin-bottom: 12px;
+  width: 36px; height: 36px; border: 3px solid #e5e7eb; border-top-color: #6366f1;
+  border-radius: 50%; animation: spin 0.8s linear infinite; margin-bottom: 12px;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 
 .pto-header {
-  position: sticky;
-  top: 0;
-  z-index: 10;
-  background: #fff;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 12px 16px;
-  border-bottom: 1px solid #e5e7eb;
+  position: sticky; top: 0; z-index: 10; background: #fff;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 16px; border-bottom: 1px solid #e5e7eb;
 }
 .brand { display: flex; align-items: center; gap: 10px; }
 .brand .logo { width: 40px; height: 40px; border-radius: 8px; object-fit: cover; }
 .brand .logo-fallback {
-  width: 40px; height: 40px;
-  border-radius: 8px;
-  background: linear-gradient(135deg,#6366f1,#8b5cf6);
+  width: 40px; height: 40px; border-radius: 8px;
+  background: linear-gradient(135deg,#f59e0b,#ef4444);
   color:#fff; display:flex; align-items:center; justify-content:center; font-size:18px;
 }
 .outlet-name { font-weight: 700; font-size: 15px; }
 .table-label { font-size: 12px; color:#666; display:flex; align-items:center; gap:4px; }
 .cart-btn {
-  position:relative; background:#fff; border:1px solid #e5e7eb; width:42px; height:42px; border-radius:50%; cursor:pointer; font-size:18px;
+  position:relative; background:#fff; border:1px solid #e5e7eb; width:42px; height:42px;
+  border-radius:50%; cursor:pointer; font-size:18px;
 }
 .cart-btn .badge {
   position:absolute; top:-4px; right:-4px;
@@ -616,22 +472,12 @@ async function submitOrder() {
   flex-shrink:0; background:#f3f4f6; border:1px solid transparent;
   padding:6px 14px; border-radius:999px; font-size:13px; cursor:pointer;
 }
-.tab.active { background:#6366f1; color:#fff; }
+.tab.active { background:#f59e0b; color:#fff; }
 
-.pto-menu {
-  padding: 12px; display: grid; grid-template-columns: 1fr; gap: 10px;
-}
-@media (min-width: 640px) {
-  .pto-menu { grid-template-columns: 1fr 1fr; }
-}
-.menu-card {
-  background:#fff; border-radius:12px; overflow:hidden;
-  box-shadow:0 1px 3px rgba(0,0,0,.05); display:flex;
-}
-.menu-img {
-  width:100px; height:100px; flex-shrink:0;
-  background:#f3f4f6;
-}
+.pto-menu { padding: 12px; display: grid; grid-template-columns: 1fr; gap: 10px; }
+@media (min-width: 640px) { .pto-menu { grid-template-columns: 1fr 1fr; } }
+.menu-card { background:#fff; border-radius:12px; overflow:hidden; box-shadow:0 1px 3px rgba(0,0,0,.05); display:flex; }
+.menu-img { width:100px; height:100px; flex-shrink:0; background:#f3f4f6; }
 .menu-img img { width:100%; height:100%; object-fit:cover; }
 .img-fallback {
   width:100%; height:100%; display:flex; align-items:center; justify-content:center;
@@ -644,7 +490,7 @@ async function submitOrder() {
   display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;
 }
 .menu-row { margin-top:auto; display:flex; align-items:center; justify-content:space-between; }
-.menu-price { font-weight:700; color:#6366f1; font-size:14px; }
+.menu-price { font-weight:700; color:#f59e0b; font-size:14px; }
 
 .qty-control { display:flex; align-items:center; gap:6px; }
 .qty-btn {
@@ -652,7 +498,7 @@ async function submitOrder() {
   cursor:pointer; display:flex; align-items:center; justify-content:center; color:#374151;
 }
 .qty-btn:disabled { opacity:0.4; cursor:not-allowed; }
-.qty-btn.add { background:#6366f1; color:#fff; }
+.qty-btn.add { background:#f59e0b; color:#fff; }
 .qty { min-width:18px; text-align:center; font-weight:600; font-size:14px; }
 
 .pto-footer {
@@ -662,7 +508,7 @@ async function submitOrder() {
 .pto-footer .totals { display:flex; flex-direction:column; line-height:1.2; font-size:13px; }
 .pto-footer .totals strong { font-size:15px; color:#1a1a1a; }
 .primary {
-  background:#6366f1; color:#fff; border:none; padding:10px 18px; border-radius:10px;
+  background:#f59e0b; color:#fff; border:none; padding:10px 18px; border-radius:10px;
   font-weight:600; cursor:pointer; font-size:14px;
 }
 .primary:disabled { opacity:0.6; cursor:not-allowed; }
@@ -674,8 +520,7 @@ async function submitOrder() {
 }
 .sheet {
   width:100%; max-width:480px; max-height:90vh; overflow-y:auto;
-  background:#fff; border-radius:18px 18px 0 0;
-  padding: 16px 16px 24px;
+  background:#fff; border-radius:18px 18px 0 0; padding: 16px 16px 24px;
 }
 .sheet-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; }
 .sheet-header h3 { margin:0; font-size:16px; }
@@ -706,12 +551,11 @@ async function submitOrder() {
 }
 .field .req { color:#ef4444; }
 .field .hint { display:block; font-size:11px; color:#9ca3af; margin-top:4px; }
-.field .link { display:inline-block; margin-top:4px; font-size:12px; color:#6366f1; }
 
 .totals-detail { margin:14px 0; padding:10px; background:#f9fafb; border-radius:10px; font-size:13px; }
 .totals-detail .row { display:flex; justify-content:space-between; padding:3px 0; }
 .totals-detail .total { border-top:1px dashed #e5e7eb; padding-top:8px; margin-top:6px; font-size:14px; }
-.totals-detail .total strong { color:#6366f1; }
+.totals-detail .total strong { color:#f59e0b; }
 .error-msg { color:#ef4444; font-size:13px; margin: 8px 0 0; }
 .note { font-size:12px; color:#9ca3af; text-align:center; margin-top:8px; }
 
@@ -720,21 +564,16 @@ async function submitOrder() {
 }
 .payment-method-card {
   display: flex; align-items: center; gap: 8px;
-  padding: 10px 12px;
-  border: 1px solid #e5e7eb; border-radius: 10px;
-  background:#f9fafb; cursor: pointer; font-size: 13px;
-  transition: all 0.15s;
+  padding: 10px 12px; border: 1px solid #e5e7eb; border-radius: 10px;
+  background:#f9fafb; cursor: pointer; font-size: 13px; transition: all 0.15s;
 }
 .payment-method-card input { display: none; }
-.payment-method-card i { font-size: 16px; color: #6366f1; }
-.payment-method-card.active {
-  border-color: #6366f1; background: #eef2ff;
-}
+.payment-method-card i { font-size: 16px; color: #f59e0b; }
+.payment-method-card.active { border-color: #f59e0b; background: #fff7ed; }
 .warn-box {
   display: flex; align-items: center; gap: 8px;
   padding: 10px 12px; background: #fff7ed; border: 1px solid #fdba74;
-  color: #c2410c; border-radius: 8px; font-size: 13px;
-  margin-bottom: 12px;
+  color: #c2410c; border-radius: 8px; font-size: 13px; margin-bottom: 12px;
 }
 .warn-box i { font-size: 16px; }
 .proof-preview {

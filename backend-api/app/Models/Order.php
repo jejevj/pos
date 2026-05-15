@@ -55,6 +55,8 @@ class Order extends Model
         'rejected_at',
         'rejection_reason',
         'customer_email',
+        'payment_proof_path',
+        'payment_proof_uploaded_at',
     ];
 
     protected $casts = [

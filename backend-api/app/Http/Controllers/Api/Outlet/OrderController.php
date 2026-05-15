@@ -12,6 +12,7 @@ use App\Models\Table;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Barryvdh\DomPDF\Facade\Pdf;
 
@@ -1129,12 +1130,35 @@ class OrderController extends Controller
         $outlet = $this->authorizeOutlet($outletId);
         try {
             DB::statement("SET search_path TO {$outlet->schema_name}, public");
+            // Heal in case schema pre-dates online-order columns
+            $builder = DB::getSchemaBuilder();
+            if (!$builder->hasColumn('orders', 'payment_proof_path')) {
+                DB::statement("ALTER TABLE orders ADD COLUMN payment_proof_path VARCHAR(500) NULL");
+            }
+
             $orders = Order::with(['items', 'table'])
-                ->where('source', 'public')
-                ->where('approval_status', 'pending')
-                ->whereNull('deleted_at')
-                ->orderBy('created_at', 'asc')
+                ->leftJoin('payment_methods', 'orders.payment_method_id', '=', 'payment_methods.id')
+                ->where('orders.source', 'public')
+                ->where('orders.approval_status', 'pending')
+                ->whereNull('orders.deleted_at')
+                ->orderBy('orders.created_at', 'asc')
+                ->select(
+                    'orders.*',
+                    'payment_methods.name as payment_method_name',
+                    'payment_methods.code as payment_method_code',
+                    'payment_methods.icon as payment_method_icon'
+                )
                 ->get();
+
+            // Augment with proof public URL (frontend can render/download)
+            $orders = $orders->map(function ($o) {
+                $arr = $o->toArray();
+                $arr['payment_proof_url'] = !empty($o->payment_proof_path)
+                    ? url(Storage::url($o->payment_proof_path))
+                    : null;
+                return $arr;
+            });
+
             DB::statement("SET search_path TO public");
             return response()->json($orders);
         } catch (\Exception $e) {

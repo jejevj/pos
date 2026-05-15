@@ -412,7 +412,12 @@
         <div v-for="order in pendingPublicOrders" :key="order.id" class="bon-item public-pending-item">
           <div class="bon-item-header">
             <span class="bon-order-code">{{ order.kode }}</span>
-            <span class="bon-table"><i class="pi pi-th-large"></i> {{ order.table_number || '-' }}</span>
+            <span class="bon-table">
+              <i :class="order.order_type === 'takeaway' ? 'pi pi-shopping-bag' : 'pi pi-th-large'"></i>
+              {{ order.order_type === 'takeaway'
+                  ? $t('pos.publicOrders.takeaway')
+                  : ($t('pos.publicOrders.table') + ' ' + (order.table_number || '-')) }}
+            </span>
             <span class="bon-time">{{ formatBonTime(order.created_at) }}</span>
           </div>
           <div class="bon-item-body" style="flex-direction: column; align-items: flex-start; gap: 6px;">
@@ -420,6 +425,14 @@
               <i class="pi pi-user"></i> {{ order.customer_name || '-' }}
               · <i class="pi pi-phone"></i> {{ order.customer_phone || '-' }}
               <span v-if="order.customer_email"> · {{ order.customer_email }}</span>
+            </div>
+            <div style="font-size: 12px; color: #444;">
+              <i class="pi pi-credit-card"></i>
+              {{ order.payment_method_name || $t('pos.publicOrders.noPayment') }}
+              <a v-if="order.payment_proof_url" :href="order.payment_proof_url" target="_blank" rel="noopener" class="proof-link">
+                <i class="pi pi-image"></i> {{ $t('pos.publicOrders.viewProof') }}
+              </a>
+              <span v-else style="color:#ef4444;">· {{ $t('pos.publicOrders.noProof') }}</span>
             </div>
             <div style="display: flex; justify-content: space-between; width: 100%; align-items: center;">
               <span class="bon-items-summary">{{ (order.items && order.items.length) || 0 }} item</span>
@@ -1997,4 +2010,11 @@ onBeforeUnmount(() => {
 .pay-confirm-content { padding: 0.5rem 0; }
 .pay-confirm-total { display: flex; justify-content: space-between; margin-top: 0.75rem; padding: 0.75rem; background: var(--p-surface-50); border-radius: 6px; }
 :global(html.is-dark) .pay-confirm-total { background: #1a1a24; }
+.proof-link {
+  display: inline-flex; align-items: center; gap: 4px;
+  margin-left: 8px; padding: 2px 8px; border-radius: 6px;
+  background: #eef2ff; color: #4338ca; text-decoration: none;
+  font-size: 11px; font-weight: 600;
+}
+.proof-link:hover { background: #c7d2fe; }
 </style>
