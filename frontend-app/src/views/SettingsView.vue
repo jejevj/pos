@@ -479,6 +479,133 @@
                     </div>
                   </div>
 
+                  <!-- Kustomisasi Struk -->
+                  <div class="tx-section">
+                    <div class="tx-section-title">
+                      <i class="pi pi-file-edit"></i>
+                      Kustomisasi Struk
+                    </div>
+
+                    <div class="settings-section">
+                      <!-- Logo -->
+                      <div class="setting-item">
+                        <div class="setting-info">
+                          <label class="setting-label">Tampilkan Logo</label>
+                          <p class="setting-description">Logo outlet ditampilkan di bagian atas struk.</p>
+                        </div>
+                        <ToggleSwitch v-model="txSettings.receipt_logo_enabled" />
+                      </div>
+
+                      <div v-if="txSettings.receipt_logo_enabled" class="setting-item" style="align-items: flex-start;">
+                        <div class="setting-info">
+                          <label class="setting-label">URL Logo Kustom</label>
+                          <p class="setting-description">Opsional. Kosongkan untuk pakai logo outlet. Gunakan URL publik gambar (JPG/PNG).</p>
+                        </div>
+                        <InputText v-model="txSettings.receipt_custom_logo_url" class="setting-control" placeholder="https://..." />
+                      </div>
+
+                      <!-- Header kustom -->
+                      <div class="setting-item" style="align-items: flex-start;">
+                        <div class="setting-info">
+                          <label class="setting-label">Teks Header Struk</label>
+                          <p class="setting-description">Teks tambahan setelah nama & alamat outlet (mis: slogan, nomor izin usaha). Enter untuk baris baru.</p>
+                        </div>
+                        <Textarea
+                          v-model="txSettings.receipt_header"
+                          rows="2"
+                          class="setting-control"
+                          placeholder="Selamat datang di toko kami!"
+                        />
+                      </div>
+
+                      <!-- Footer kustom -->
+                      <div class="setting-item" style="align-items: flex-start;">
+                        <div class="setting-info">
+                          <label class="setting-label">Teks Footer Struk</label>
+                          <p class="setting-description">Ucapan terima kasih, promosi, atau informasi lain di bagian bawah struk.</p>
+                        </div>
+                        <Textarea
+                          v-model="txSettings.receipt_footer"
+                          rows="3"
+                          class="setting-control"
+                          placeholder="Terima kasih! Kunjungi kami lagi 😊"
+                        />
+                      </div>
+
+                      <!-- Tampilkan/sembunyikan kolom info -->
+                      <div class="setting-item">
+                        <div class="setting-info">
+                          <label class="setting-label">Tampilkan Nama Kasir</label>
+                          <p class="setting-description">Nama kasir yang memproses transaksi.</p>
+                        </div>
+                        <ToggleSwitch v-model="txSettings.receipt_show_cashier" />
+                      </div>
+
+                      <div class="setting-item">
+                        <div class="setting-info">
+                          <label class="setting-label">Tampilkan Nomor Meja</label>
+                          <p class="setting-description">Nomor meja untuk transaksi dine-in.</p>
+                        </div>
+                        <ToggleSwitch v-model="txSettings.receipt_show_table" />
+                      </div>
+
+                      <div class="setting-item">
+                        <div class="setting-info">
+                          <label class="setting-label">Tampilkan Info Member</label>
+                          <p class="setting-description">Nama member dan saldo poin di struk.</p>
+                        </div>
+                        <ToggleSwitch v-model="txSettings.receipt_show_member" />
+                      </div>
+
+                      <!-- QR Code -->
+                      <div class="setting-item">
+                        <div class="setting-info">
+                          <label class="setting-label">Tampilkan QR Code Tracking</label>
+                          <p class="setting-description">QR Code di struk untuk pelanggan cek status pesanan secara online.</p>
+                        </div>
+                        <ToggleSwitch v-model="txSettings.receipt_show_qr" />
+                      </div>
+
+                      <!-- WiFi -->
+                      <div class="setting-item">
+                        <div class="setting-info">
+                          <label class="setting-label">Cantumkan Info WiFi</label>
+                          <p class="setting-description">SSID dan password WiFi gratis ditampilkan di bawah struk, lengkap dengan QR Code untuk connect langsung.</p>
+                        </div>
+                        <ToggleSwitch v-model="txSettings.receipt_wifi_enabled" />
+                      </div>
+
+                      <template v-if="txSettings.receipt_wifi_enabled">
+                        <div class="setting-item">
+                          <div class="setting-info">
+                            <label class="setting-label">Nama WiFi (SSID)</label>
+                            <p class="setting-description">Nama jaringan WiFi yang ingin ditampilkan.</p>
+                          </div>
+                          <InputText v-model="txSettings.receipt_wifi_ssid" class="setting-control" placeholder="NamaWiFiSaya" />
+                        </div>
+
+                        <div class="setting-item">
+                          <div class="setting-info">
+                            <label class="setting-label">Password WiFi</label>
+                            <p class="setting-description">Kosongkan jika WiFi tidak menggunakan password.</p>
+                          </div>
+                          <InputText v-model="txSettings.receipt_wifi_password" class="setting-control" placeholder="password123" />
+                        </div>
+
+                        <!-- Preview WiFi QR -->
+                        <div v-if="txSettings.receipt_wifi_ssid" class="wifi-preview">
+                          <div class="wifi-preview-label">Preview QR WiFi:</div>
+                          <img
+                            :src="`https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent('WIFI:T:WPA;S:' + txSettings.receipt_wifi_ssid + ';P:' + txSettings.receipt_wifi_password + ';H:false;;')}`"
+                            alt="WiFi QR"
+                            class="wifi-preview-qr"
+                          />
+                          <p class="wifi-preview-hint">Scan dengan kamera HP untuk connect langsung.</p>
+                        </div>
+                      </template>
+                    </div>
+                  </div>
+
                   <!-- Preview kalkulasi -->
                   <div v-if="txSettings.tax_enabled || txSettings.service_charge_enabled" class="tx-preview">
                     <div class="tx-preview-title">Preview Kalkulasi (contoh: Rp 100.000)</div>
@@ -634,6 +761,16 @@ const txSettings = ref({
   service_charge_label:       'Service Charge',
   receipt_footer:             '',
   min_order_amount:           0,
+  receipt_logo_enabled:       true,
+  receipt_custom_logo_url:    '',
+  receipt_header:             '',
+  receipt_show_qr:            true,
+  receipt_wifi_enabled:       false,
+  receipt_wifi_ssid:          '',
+  receipt_wifi_password:      '',
+  receipt_show_cashier:       true,
+  receipt_show_table:         true,
+  receipt_show_member:        true,
 })
 
 const fetchTxSettings = async () => {
@@ -653,6 +790,16 @@ const fetchTxSettings = async () => {
       receipt_footer:            d.receipt_footer              || '',
       min_order_amount:          parseFloat(d.min_order_amount) || 0,
     }
+    txSettings.value.receipt_logo_enabled = Boolean(d.receipt_logo_enabled ?? true)
+    txSettings.value.receipt_custom_logo_url = d.receipt_custom_logo_url || ''
+    txSettings.value.receipt_header = d.receipt_header || ''
+    txSettings.value.receipt_show_qr = Boolean(d.receipt_show_qr ?? true)
+    txSettings.value.receipt_wifi_enabled = Boolean(d.receipt_wifi_enabled)
+    txSettings.value.receipt_wifi_ssid = d.receipt_wifi_ssid || ''
+    txSettings.value.receipt_wifi_password = d.receipt_wifi_password || ''
+    txSettings.value.receipt_show_cashier = Boolean(d.receipt_show_cashier ?? true)
+    txSettings.value.receipt_show_table = Boolean(d.receipt_show_table ?? true)
+    txSettings.value.receipt_show_member = Boolean(d.receipt_show_member ?? true)
   } catch (e) {
     toast.add({ severity: 'error', summary: 'Error', detail: 'Gagal memuat pengaturan transaksi', life: 3000 })
   } finally {
@@ -875,4 +1022,27 @@ html.is-dark .tx-preview-row.total { color: #8ab4ff; border-color: #2a2a38; }
 .flex { display: flex; }
 .justify-center { justify-content: center; }
 .py-8 { padding-top: 2rem; padding-bottom: 2rem; }
+
+.wifi-preview {
+  padding: 1rem;
+  background: var(--p-surface-50, #f9fafb);
+  border: 1px dashed var(--p-surface-300, #d1d5db);
+  border-radius: 8px;
+  text-align: center;
+}
+.wifi-preview-label {
+  font-size: 0.8rem;
+  color: var(--p-text-muted-color, #6b7280);
+  margin-bottom: 0.5rem;
+}
+.wifi-preview-qr {
+  width: 100px;
+  height: 100px;
+  border-radius: 4px;
+}
+.wifi-preview-hint {
+  font-size: 0.75rem;
+  color: var(--p-text-muted-color, #9ca3af);
+  margin-top: 0.4rem;
+}
 </style>

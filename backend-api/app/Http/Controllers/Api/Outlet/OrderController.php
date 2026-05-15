@@ -817,6 +817,9 @@ class OrderController extends Controller
             $createdAt = \Carbon\Carbon::parse($order->created_at)->setTimezone($tz)->format('d/m/Y H:i');
             $paidAt    = \Carbon\Carbon::parse($order->paid_at)->setTimezone($tz)->format('d/m/Y H:i:s');
 
+            // Baca receipt settings
+            $rs = DB::table('transaction_settings')->first();
+
             $pdf = Pdf::loadView('receipts.order', [
                 'order'       => $order,
                 'outlet'      => $outlet,
@@ -824,6 +827,8 @@ class OrderController extends Controller
                 'cashierName' => $cashierName,
                 'createdAt'   => $createdAt,
                 'paidAt'      => $paidAt,
+                'rs'          => $rs,   // receipt settings
+                'frontendUrl' => env('FRONTEND_URL', 'http://localhost:5173'),
             ])->setPaper([0, 0, 226.77, 841.89], 'portrait');
             
             $safeKode = preg_replace('/[^A-Za-z0-9\-_]/', '', trim($order->kode));
@@ -878,32 +883,69 @@ class OrderController extends Controller
             $tz = new \DateTimeZone($timezone);
             $paidAt = \Carbon\Carbon::parse($order->paid_at)->setTimezone($tz)->format('d/m/Y H:i:s');
 
-            // Build lines array for frontend ESC/POS rendering
+            // Baca receipt settings dari transaction_settings
+            $rs = DB::table('transaction_settings')->first();
+            $rLogoEnabled   = $rs ? (bool) $rs->receipt_logo_enabled  : true;
+            $rHeader        = $rs ? ($rs->receipt_header        ?? '') : '';
+            $rFooter        = $rs ? ($rs->receipt_footer        ?? '') : '';
+            $rShowQr        = $rs ? (bool) $rs->receipt_show_qr       : true;
+            $rWifiEnabled   = $rs ? (bool) $rs->receipt_wifi_enabled   : false;
+            $rWifiSsid      = $rs ? ($rs->receipt_wifi_ssid     ?? '') : '';
+            $rWifiPassword  = $rs ? ($rs->receipt_wifi_password ?? '') : '';
+            $rShowCashier   = $rs ? (bool) $rs->receipt_show_cashier   : true;
+            $rShowTable     = $rs ? (bool) $rs->receipt_show_table     : true;
+            $rShowMember    = $rs ? (bool) $rs->receipt_show_member    : true;
+            $rCustomLogoUrl = $rs ? ($rs->receipt_custom_logo_url ?? '') : '';
+
+            // Tax label dari settings
+            $taxLabel = $rs ? ($rs->tax_label ?? 'PPN') : 'PPN';
+            $scLabel  = $rs ? ($rs->service_charge_label ?? 'Service Charge') : 'Service Charge';
+
+            // Build lines array untuk ESC/POS rendering di frontend
             $lines = [];
 
-            // Header
+            // ── Header ──────────────────────────────────────────────────────
             $lines[] = ['type' => 'align', 'value' => 'center'];
+
+            // Logo (jika diaktifkan dan ada URL custom)
+            if ($rLogoEnabled && !empty($rCustomLogoUrl)) {
+                $lines[] = ['type' => 'image', 'value' => $rCustomLogoUrl];
+            } elseif ($rLogoEnabled && $outlet->logo) {
+                $lines[] = ['type' => 'image', 'value' => $outlet->logo];
+            }
+
             $lines[] = ['type' => 'bold', 'value' => true];
             $lines[] = ['type' => 'text', 'value' => strtoupper($outlet->name ?? 'OUTLET')];
             $lines[] = ['type' => 'bold', 'value' => false];
-            if ($outlet->address) $lines[] = ['type' => 'text', 'value' => $outlet->address];
-            if ($outlet->phone) $lines[] = ['type' => 'text', 'value' => $outlet->phone];
+            if ($outlet->address)  $lines[] = ['type' => 'text', 'value' => $outlet->address];
+            if ($outlet->phone)    $lines[] = ['type' => 'text', 'value' => $outlet->phone];
+
+            // Header kustom (baris demi baris jika ada newline)
+            if (!empty(trim($rHeader))) {
+                foreach (explode("\n", $rHeader) as $hLine) {
+                    $lines[] = ['type' => 'text', 'value' => trim($hLine)];
+                }
+            }
+
             $lines[] = ['type' => 'divider'];
 
-            // Order info
+            // ── Info order ──────────────────────────────────────────────────
             $lines[] = ['type' => 'align', 'value' => 'left'];
-            $lines[] = ['type' => 'row', 'left' => 'No', 'right' => $order->kode];
+            $lines[] = ['type' => 'row', 'left' => 'No',      'right' => $order->kode];
             $lines[] = ['type' => 'row', 'left' => 'Tanggal', 'right' => $paidAt];
-            $lines[] = ['type' => 'row', 'left' => 'Kasir', 'right' => $cashierName ?? '-'];
-            if ($order->table_number) {
+
+            if ($rShowCashier && $cashierName) {
+                $lines[] = ['type' => 'row', 'left' => 'Kasir', 'right' => $cashierName];
+            }
+            if ($rShowTable && $order->table_number) {
                 $lines[] = ['type' => 'row', 'left' => 'Meja', 'right' => $order->table_number];
             }
-            if ($memberData) {
+            if ($rShowMember && $memberData) {
                 $lines[] = ['type' => 'row', 'left' => 'Member', 'right' => $memberData['nama']];
             }
             $lines[] = ['type' => 'divider'];
 
-            // Items
+            // ── Items ────────────────────────────────────────────────────────
             foreach ($items as $item) {
                 $lines[] = ['type' => 'text', 'value' => $item->menu_name];
                 $lines[] = ['type' => 'row',
@@ -913,36 +955,64 @@ class OrderController extends Controller
             }
             $lines[] = ['type' => 'divider'];
 
-            // Totals
+            // ── Totals ───────────────────────────────────────────────────────
             $lines[] = ['type' => 'row', 'left' => 'Subtotal', 'right' => 'Rp ' . number_format($order->subtotal, 0, ',', '.')];
 
             if ($order->discount_amount > 0) {
                 $lines[] = ['type' => 'row', 'left' => 'Diskon', 'right' => '- Rp ' . number_format($order->discount_amount, 0, ',', '.')];
             }
+            if ($order->tax_amount > 0) {
+                $lines[] = ['type' => 'row', 'left' => "{$taxLabel} ({$order->tax_percentage}%)", 'right' => 'Rp ' . number_format($order->tax_amount, 0, ',', '.')];
+            }
+            if ($order->service_charge_amount > 0) {
+                $lines[] = ['type' => 'row', 'left' => "{$scLabel} ({$order->service_charge_percentage}%)", 'right' => 'Rp ' . number_format($order->service_charge_amount, 0, ',', '.')];
+            }
 
-            $lines[] = ['type' => 'row', 'left' => "Pajak ({$order->tax_percentage}%)", 'right' => 'Rp ' . number_format($order->tax_amount, 0, ',', '.')];
             $lines[] = ['type' => 'divider'];
-            $lines[] = ['type' => 'bold', 'value' => true];
-            $lines[] = ['type' => 'row', 'left' => 'TOTAL', 'right' => 'Rp ' . number_format($order->total_amount, 0, ',', '.')];
-            $lines[] = ['type' => 'bold', 'value' => false];
-            $lines[] = ['type' => 'row', 'left' => 'Bayar', 'right' => 'Rp ' . number_format($order->paid_amount, 0, ',', '.')];
-            $lines[] = ['type' => 'row', 'left' => 'Kembali', 'right' => 'Rp ' . number_format($order->change_amount, 0, ',', '.')];
-            $lines[] = ['type' => 'row', 'left' => 'Metode', 'right' => $paymentMethod?->name ?? '-'];
+            $lines[] = ['type' => 'bold',  'value' => true];
+            $lines[] = ['type' => 'row',   'left' => 'TOTAL', 'right' => 'Rp ' . number_format($order->total_amount, 0, ',', '.')];
+            $lines[] = ['type' => 'bold',  'value' => false];
+            $lines[] = ['type' => 'row',   'left' => 'Bayar',   'right' => 'Rp ' . number_format($order->paid_amount,  0, ',', '.')];
+            $lines[] = ['type' => 'row',   'left' => 'Kembali', 'right' => 'Rp ' . number_format($order->change_amount, 0, ',', '.')];
+            $lines[] = ['type' => 'row',   'left' => 'Metode',  'right' => $paymentMethod?->name ?? '-'];
 
-            // Footer
+            // ── Footer ───────────────────────────────────────────────────────
             $lines[] = ['type' => 'divider'];
             $lines[] = ['type' => 'align', 'value' => 'center'];
-            $lines[] = ['type' => 'text', 'value' => 'Terima kasih!'];
-            $lines[] = ['type' => 'text', 'value' => 'Simpan struk ini sebagai bukti'];
 
-            // QR Code tracking URL
-            $trackingUrl = rtrim(config('app.url'), '/') . '/track/' . $outlet->id . '/' . $order->kode;
-            $frontendUrl = env('FRONTEND_URL', 'http://localhost:5173');
-            $trackingUrl = rtrim($frontendUrl, '/') . '/track/' . $outlet->id . '/' . $order->kode;
-            $lines[] = ['type' => 'feed', 'lines' => 1];
-            $lines[] = ['type' => 'text', 'value' => 'Cek status pesanan:'];
-            $lines[] = ['type' => 'qr', 'value' => $trackingUrl];
-            $lines[] = ['type' => 'text', 'value' => $trackingUrl];
+            // Footer kustom
+            if (!empty(trim($rFooter))) {
+                foreach (explode("\n", $rFooter) as $fLine) {
+                    $lines[] = ['type' => 'text', 'value' => trim($fLine)];
+                }
+            } else {
+                $lines[] = ['type' => 'text', 'value' => 'Terima kasih!'];
+                $lines[] = ['type' => 'text', 'value' => 'Simpan struk ini sebagai bukti'];
+            }
+
+            // ── QR Code tracking ────────────────────────────────────────────
+            if ($rShowQr) {
+                $frontendUrl = env('FRONTEND_URL', 'http://localhost:5173');
+                $trackingUrl = rtrim($frontendUrl, '/') . '/track/' . $outlet->id . '/' . $order->kode;
+                $lines[] = ['type' => 'feed', 'lines' => 1];
+                $lines[] = ['type' => 'text', 'value' => 'Cek status pesanan:'];
+                $lines[] = ['type' => 'qr',   'value' => $trackingUrl];
+                $lines[] = ['type' => 'text', 'value' => $trackingUrl];
+            }
+
+            // ── WiFi ─────────────────────────────────────────────────────────
+            if ($rWifiEnabled && !empty($rWifiSsid)) {
+                $lines[] = ['type' => 'feed', 'lines' => 1];
+                $lines[] = ['type' => 'divider'];
+                $lines[] = ['type' => 'bold',  'value' => true];
+                $lines[] = ['type' => 'text',  'value' => 'WiFi Gratis'];
+                $lines[] = ['type' => 'bold',  'value' => false];
+                $lines[] = ['type' => 'row',   'left' => 'SSID',     'right' => $rWifiSsid];
+                $lines[] = ['type' => 'row',   'left' => 'Password', 'right' => !empty($rWifiPassword) ? $rWifiPassword : '(tanpa password)'];
+                // QR WiFi format: WIFI:T:WPA;S:ssid;P:password;;
+                $wifiQrData = 'WIFI:T:WPA;S:' . $rWifiSsid . ';P:' . $rWifiPassword . ';H:false;;';
+                $lines[] = ['type' => 'qr', 'value' => $wifiQrData];
+            }
 
             $lines[] = ['type' => 'feed', 'lines' => 4];
             $lines[] = ['type' => 'cut'];
