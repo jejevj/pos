@@ -687,3 +687,51 @@ html.is-dark .settings-view .wifi-preview-label,
 html.is-dark .settings-view .wifi-preview-hint {
   color: var(--p-text-muted-color, #9090b0) !important;
 }
+
+/* ── Outlet Utilities — Identity Card dark mode ── */
+html.is-dark .utilities-view .text-muted {
+  color: var(--p-text-muted-color, #9090b0) !important;
+}
+html.is-dark .utilities-view .tabs-container {
+  border-bottom-color: #2a2a38 !important;
+}
+html.is-dark .utilities-view .tab {
+  color: var(--p-text-muted-color, #9090b0) !important;
+}
+html.is-dark .utilities-view .tab:hover,
+html.is-dark .utilities-view .tab.active {
+  color: var(--p-primary-color, #5d87ff) !important;
+}
+html.is-dark .utilities-view .tab.active {
+  border-bottom-color: var(--p-primary-color, #5d87ff) !important;
+}
+html.is-dark .utilities-view .identity-card {
+  background: var(--p-surface-card, #1a1a24) !important;
+  color: var(--p-text-color, #e4e4ef) !important;
+}
+html.is-dark .utilities-view .card-header {
+  border-bottom-color: #2a2a38 !important;
+}
+html.is-dark .utilities-view .card-header h3 {
+  color: var(--p-text-color, #e4e4ef) !important;
+}
+html.is-dark .utilities-view .form-section h4 {
+  color: var(--p-text-color, #e4e4ef) !important;
+  border-bottom-color: #2a2a38 !important;
+}
+html.is-dark .utilities-view .form-field label {
+  color: var(--p-text-color, #d0d0e8) !important;
+}
+html.is-dark .utilities-view .logo-preview {
+  background: #1a1a24 !important;
+  border-color: #2a2a38 !important;
+}
+html.is-dark .utilities-view .logo-placeholder {
+  color: var(--p-text-muted-color, #9090b0) !important;
+}
+html.is-dark .utilities-view .form-actions {
+  border-top-color: #2a2a38 !important;
+}
+html.is-dark .utilities-view .page-header h2 {
+  color: var(--p-text-color, #e4e4ef) !important;
+}

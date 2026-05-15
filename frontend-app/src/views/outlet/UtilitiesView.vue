@@ -576,6 +576,7 @@ import { useRoute } from 'vue-router'
 import { useToast } from 'primevue/usetoast'
 import { useI18n } from 'vue-i18n'
 import api from '@/services/api'
+import { decodeOutletId } from '@/utils/outletId'
 import Card from 'primevue/card'
 import InputText from 'primevue/inputtext'
 import InputNumber from 'primevue/inputnumber'
@@ -590,7 +591,12 @@ const route = useRoute()
 const toast = useToast()
 const { t } = useI18n()
 
-const outletId = route.params.outletId
+// route.params.outletId is the encoded hash (e.g. "504f5301").
+// The api interceptor auto-decodes it, but we also resolve the numeric id
+// explicitly here so tx-settings calls work even if the URL pattern changes.
+const rawOutletParam = route.params.outletId
+const numericOutletId = decodeOutletId(rawOutletParam) || rawOutletParam
+const outletId = rawOutletParam
 const activeTab = ref('identity')
 const currentWeather = ref(null)
 const loading = ref(false)
@@ -941,10 +947,10 @@ const txSettings = ref({
 })
 
 const fetchTxSettings = async () => {
-  if (!outletId) return
+  if (!numericOutletId) return
   txLoading.value = true
   try {
-    const res = await api.get(`/outlets/${outletId}/transaction-settings`)
+    const res = await api.get(`/outlets/${numericOutletId}/transaction-settings`)
     const d   = res.data
     txSettings.value = {
       tax_enabled:               Boolean(d.tax_enabled),
@@ -975,13 +981,13 @@ const fetchTxSettings = async () => {
 }
 
 const saveTxSettings = async () => {
-  if (!outletId) {
+  if (!numericOutletId) {
     toast.add({ severity: 'warn', summary: 'Perhatian', detail: 'Buka halaman ini dari menu outlet.', life: 4000 })
     return
   }
   txSaving.value = true
   try {
-    await api.put(`/outlets/${outletId}/transaction-settings`, txSettings.value)
+    await api.put(`/outlets/${numericOutletId}/transaction-settings`, txSettings.value)
     toast.add({ severity: 'success', summary: 'Berhasil', detail: 'Pengaturan transaksi disimpan. Berlaku untuk transaksi baru.', life: 3000 })
   } catch (e) {
     const msg = e.response?.data?.message || 'Gagal menyimpan pengaturan transaksi'
@@ -1078,7 +1084,7 @@ onMounted(() => {
 }
 
 .identity-card {
-  background: white;
+  background: var(--p-surface-card, white);
 }
 
 .identity-form {
