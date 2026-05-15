@@ -146,11 +146,14 @@ class StationController extends Controller
         DB::statement("SET search_path TO {$outlet->schema_name}, public");
 
         // Update item status to 'ready'
+        // Use PHP now() (respects APP_TIMEZONE) instead of SQL NOW() to keep
+        // timestamps in the same timezone as orders.created_at (written by Eloquent).
+        $now = \Carbon\Carbon::now();
         DB::statement("
             UPDATE order_items
-            SET status = 'ready', confirmed_at = NOW(), ready_at = NOW(), confirmed_by = ?
+            SET status = 'ready', confirmed_at = ?, ready_at = ?, confirmed_by = ?
             WHERE id = ?
-        ", [Auth::id(), $itemId]);
+        ", [$now, $now, Auth::id(), $itemId]);
 
         // Check if ALL items in this order (across all stations) are ready
         $orderId = DB::selectOne("SELECT order_id FROM order_items WHERE id = ?", [$itemId])?->order_id;
@@ -183,14 +186,15 @@ class StationController extends Controller
         DB::statement("SET search_path TO {$outlet->schema_name}, public");
 
         // Mark all items of this station as 'served'
+        $now = \Carbon\Carbon::now();
         DB::statement("
             UPDATE order_items oi
-            SET status = 'served', served_at = NOW()
+            SET status = 'served', served_at = ?
             FROM menu m
             WHERE oi.menu_id = m.id
               AND m.station_id = ?
               AND oi.order_id = ?
-        ", [$stationId, $orderId]);
+        ", [$now, $stationId, $orderId]);
 
         // Check if ALL station items across all stations are served
         $pendingStationItems = DB::selectOne("
@@ -217,9 +221,10 @@ class StationController extends Controller
 
         DB::statement("SET search_path TO {$outlet->schema_name}, public");
 
+        $now = \Carbon\Carbon::now();
         DB::statement("
-            UPDATE order_items SET status = 'preparing', preparing_at = NOW() WHERE id = ?
-        ", [$itemId]);
+            UPDATE order_items SET status = 'preparing', preparing_at = ? WHERE id = ?
+        ", [$now, $itemId]);
 
         // Update order kitchen_status to 'preparing' if still pending
         $orderId = DB::selectOne("SELECT order_id FROM order_items WHERE id = ?", [$itemId])?->order_id;

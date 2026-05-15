@@ -573,16 +573,18 @@ const hasSocialMedia = computed(() => {
 
 const updateClock = () => {
   const now = new Date()
-  currentTime.value = now.toLocaleTimeString('id-ID', { 
-    hour: '2-digit', 
+  currentTime.value = now.toLocaleTimeString('id-ID', {
+    hour: '2-digit',
     minute: '2-digit',
-    second: '2-digit'
+    second: '2-digit',
+    timeZone: 'Asia/Jakarta'
   })
-  currentDate.value = now.toLocaleDateString('id-ID', { 
-    weekday: 'long', 
-    year: 'numeric', 
-    month: 'long', 
-    day: 'numeric' 
+  currentDate.value = now.toLocaleDateString('id-ID', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    timeZone: 'Asia/Jakarta'
   })
 }
 

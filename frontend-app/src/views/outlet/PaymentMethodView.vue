@@ -277,7 +277,7 @@ const settleBon = async (bon) => {
 }
 
 const formatNumber = (n) => Number(n || 0).toLocaleString('id-ID')
-const formatDate   = (d) => d ? new Date(d).toLocaleString('id-ID', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' }) : '-'
+const formatDate   = (d) => d ? new Date(d).toLocaleString('id-ID', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit', timeZone: 'Asia/Jakarta' }) : '-'
 
 onMounted(() => {
   fetchMethods()

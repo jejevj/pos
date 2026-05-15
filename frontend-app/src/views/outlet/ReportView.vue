@@ -441,7 +441,7 @@ const loadSalesReport = async () => {
     // Sales trend by date
     const salesByDate = {}
     orders.forEach(order => {
-      const date = new Date(order.created_at).toLocaleDateString('id-ID')
+      const date = new Date(order.created_at).toLocaleDateString('id-ID', { timeZone: 'Asia/Jakarta' })
       salesByDate[date] = (salesByDate[date] || 0) + parseFloat(order.total_amount)
     })
 

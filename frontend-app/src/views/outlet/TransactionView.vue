@@ -152,9 +152,10 @@
           <div class="order-card-right">
             <span class="amount">Rp {{ formatNumber(order.total_amount) }}</span>
             <div class="order-card-actions" @click.stop>
-              <Button v-if="order.status === 'paid'" icon="pi pi-print" text rounded size="small" 
-                      severity="success" @click.stop="printReceipt(order)" 
-                      :loading="printingId === order.id" />
+              <Button v-if="['paid','bon'].includes(order.status)" icon="pi pi-receipt" text rounded size="small"
+                      severity="success" @click.stop="printReceipt(order)"
+                      :loading="printingId === order.id"
+                      v-tooltip.top="$t('transaction.printReceipt')" />
               <Button icon="pi pi-qrcode" text rounded size="small" severity="info"
                       @click.stop="openQr(order)" />
             </div>
@@ -210,7 +211,7 @@
           <div class="action-buttons">
             <Button icon="pi pi-eye" text rounded size="small" @click.stop="openDetail(data)"
                     v-tooltip.top="$t('transaction.viewDetail')" />
-            <Button v-if="data.status === 'paid'" icon="pi pi-print" text rounded size="small" severity="success"
+            <Button v-if="['paid','bon'].includes(data.status)" icon="pi pi-receipt" text rounded size="small" severity="success"
                     @click.stop="printReceipt(data)" :loading="printingId === data.id"
                     v-tooltip.top="$t('transaction.printReceipt')" />
             <Button icon="pi pi-qrcode" text rounded size="small" severity="info"
@@ -534,8 +535,8 @@
         <Button :label="$t('common.close')" text @click="detailVisible = false" />
         <Button icon="pi pi-qrcode" label="QR Tracking" outlined severity="info"
                 @click="openQr(selectedOrder)" />
-        <Button v-if="selectedOrder?.status === 'paid'" :label="$t('transaction.printReceipt')"
-                icon="pi pi-print" @click="printReceipt(selectedOrder)"
+        <Button v-if="['paid','bon'].includes(selectedOrder?.status)" :label="$t('transaction.printReceipt')"
+                icon="pi pi-receipt" @click="printReceipt(selectedOrder)"
                 :loading="printingId === selectedOrder?.id" severity="success" />
       </template>
     </Dialog>
@@ -916,15 +917,15 @@ const getStepIcon = (step) => {
 
 const formatDateTime = (dt) => {
   if (!dt) return '-'
-  // Prioritize _local timestamp if available (already converted by backend)
-  const timestamp = dt.replace('_local', '')
-  const dateObj = new Date(timestamp)
-  return dateObj.toLocaleString('id-ID', { 
-    day: '2-digit', 
-    month: 'short', 
-    year: 'numeric', 
-    hour: '2-digit', 
-    minute: '2-digit' 
+  const dateObj = new Date(dt)
+  if (isNaN(dateObj.getTime())) return '-'
+  return dateObj.toLocaleString('id-ID', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    timeZone: 'Asia/Jakarta',
   })
 }
 
@@ -934,12 +935,12 @@ const getTierSeverity = (tier) => {
 }
 
 const getStatusLabel = (status) => {
-  const map = { draft: t('transaction.statusDraft'), paid: t('transaction.statusPaid'), cancelled: t('transaction.statusCancelled') }
+  const map = { draft: t('transaction.statusDraft'), paid: t('transaction.statusPaid'), cancelled: t('transaction.statusCancelled'), bon: 'Bon' }
   return map[status] || status
 }
 
 const getStatusSeverity = (status) => {
-  const map = { draft: 'warn', paid: 'success', cancelled: 'danger' }
+  const map = { draft: 'warn', paid: 'success', cancelled: 'danger', bon: 'info' }
   return map[status] || 'secondary'
 }
 

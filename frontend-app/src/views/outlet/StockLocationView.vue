@@ -425,7 +425,7 @@ const getLocStock = (bbId, locId) => {
 }
 
 const formatQty  = (n) => Number(n || 0).toLocaleString('id-ID', { maximumFractionDigits: 2 })
-const formatDate = (d) => d ? new Date(d).toLocaleString('id-ID', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' }) : '-'
+const formatDate = (d) => d ? new Date(d).toLocaleString('id-ID', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit', timeZone: 'Asia/Jakarta' }) : '-'
 const fmtDate    = (d) => { if (!d) return null; const dt = new Date(d); return `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}` }
 
 const typeColor = (t) => ({ warehouse: 'info', production: 'warn', retail: 'success' }[t] || 'secondary')

@@ -265,7 +265,7 @@ const fetchOrder = async (silent = false) => {
     const res  = await axios.get(`${base}/track/${numericOutletId}/${orderCode}`)
     data.value  = res.data
     error.value = null
-    lastUpdated.value = 'Diperbarui ' + new Date().toLocaleTimeString('id-ID')
+    lastUpdated.value = 'Diperbarui ' + new Date().toLocaleTimeString('id-ID', { timeZone: 'Asia/Jakarta' })
   } catch (e) {
     if (!silent) {
       error.value = e.response?.data?.message || 'Gagal memuat pesanan'
@@ -287,7 +287,7 @@ const formatDate = (dt) => {
   if (!dt) return ''
   return new Date(dt).toLocaleString('id-ID', {
     day: '2-digit', month: 'short', year: 'numeric',
-    hour: '2-digit', minute: '2-digit'
+    hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Jakarta'
   })
 }
 const formatCurrency = (n) => {

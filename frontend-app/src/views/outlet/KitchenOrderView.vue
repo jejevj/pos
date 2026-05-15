@@ -76,6 +76,9 @@
             <span class="order-kode">{{ order.kode }}</span>
             <Tag v-if="order.order_type === 'dine_in'" :value="$t('pos.dineIn')" severity="info" size="small" />
             <Tag v-else :value="$t('pos.takeaway')" severity="secondary" size="small" />
+            <Tag :value="kitchenStatusLabel(order)" :severity="kitchenStatusSeverity(order)" size="small" />
+            <Tag v-if="order.status === 'bon'" value="Bon" severity="warn" size="small" />
+            <Tag v-else-if="order.status === 'paid'" value="Paid" severity="success" size="small" />
           </div>
           <div class="order-card-right">
             <span v-if="order.table_number" class="table-badge">
@@ -236,7 +239,32 @@ const getOrderClass = (order) => {
 
 const formatTime = (dt) => {
   if (!dt) return ''
-  return new Date(dt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })
+  return new Date(dt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Jakarta' })
+}
+
+// Derive kitchen status from order items (falls back to order.kitchen_status if items missing)
+const computedKitchenStatus = (order) => {
+  if (!order?.items || order.items.length === 0) return order?.kitchen_status || 'pending'
+  if (order.items.every(i => i.status === 'served')) return 'served'
+  if (order.items.every(i => i.status === 'ready')) return 'ready'
+  if (order.items.some(i => i.status === 'preparing' || i.status === 'ready')) return 'preparing'
+  return 'pending'
+}
+
+const kitchenStatusLabel = (order) => {
+  const s = computedKitchenStatus(order)
+  const map = {
+    pending: t('kds.pending'),
+    preparing: t('kds.preparing'),
+    ready: t('kds.ready'),
+    served: t('kds.served') || 'Served',
+  }
+  return map[s] || s
+}
+
+const kitchenStatusSeverity = (order) => {
+  const map = { pending: 'secondary', preparing: 'warn', ready: 'success', served: 'info' }
+  return map[computedKitchenStatus(order)] || 'secondary'
 }
 
 const getElapsed = (dt) => {
@@ -390,7 +418,7 @@ onMounted(() => {
 
   // Clock
   const updateClock = () => {
-    currentTime.value = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+    currentTime.value = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit', timeZone: 'Asia/Jakarta' })
   }
   updateClock()
   clockInterval = setInterval(updateClock, 1000)

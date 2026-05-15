@@ -539,7 +539,7 @@ const err = (e, fallback = 'Error') => toast.add({ severity: 'error', summary: '
 
 const formatMsgTime = (ts) => {
   if (!ts) return ''
-  return new Date(ts * 1000).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })
+  return new Date(ts * 1000).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Jakarta' })
 }
 
 // ── session ────────────────────────────────────────────────────────────────

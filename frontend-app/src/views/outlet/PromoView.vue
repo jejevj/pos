@@ -382,7 +382,7 @@ const deletePromo = async (id) => {
 const formatDate = (date) => {
   if (!date) return '-'
   const d = new Date(date)
-  return d.toLocaleDateString('id-ID', { year: 'numeric', month: 'short', day: 'numeric' })
+  return d.toLocaleDateString('id-ID', { year: 'numeric', month: 'short', day: 'numeric', timeZone: 'Asia/Jakarta' })
 }
 
 const formatDateForAPI = (date) => {
