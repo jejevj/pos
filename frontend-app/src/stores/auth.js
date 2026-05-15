@@ -235,9 +235,8 @@ export const useAuthStore = defineStore('auth', () => {
         if (storedMemberships) {
           outletMemberships.value = JSON.parse(storedMemberships)
         }
-        // Refresh user data and menus from server
-        fetchUser()
-        fetchMenus()
+        // Refresh user data first, THEN fetch menus so isSuperAdmin is stable
+        fetchUser().then(() => fetchMenus()).catch(() => {})
       } catch (err) {
         clearAuth()
       }

@@ -226,6 +226,11 @@ const toggleSubmenu = (menuId) => {
 
 onMounted(async () => {
   menusLoading.value = true
+  // Pastikan user sudah ter-load dari server sebelum cek isSuperAdmin,
+  // agar tidak race condition antara initAuth dan render sidebar.
+  if (authStore.isAuthenticated && !authStore.user) {
+    await authStore.fetchUser()
+  }
   if (authStore.isSuperAdmin && authStore.menus.length === 0) {
     await authStore.fetchMenus()
   }
