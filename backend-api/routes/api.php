@@ -120,6 +120,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('outlets/{outlet}/bahan-baku/{id}/stock-history', [BahanBakuController::class, 'stockHistory']);
 
     // Stock Opname
+    Route::get('outlets/{outlet}/stock-opname/pic-options', [\App\Http\Controllers\Api\Outlet\StockOpnameController::class, 'picOptions']);
     Route::get('outlets/{outlet}/stock-opname', [\App\Http\Controllers\Api\Outlet\StockOpnameController::class, 'index']);
     Route::post('outlets/{outlet}/stock-opname', [\App\Http\Controllers\Api\Outlet\StockOpnameController::class, 'store']);
     Route::get('outlets/{outlet}/stock-opname/{id}', [\App\Http\Controllers\Api\Outlet\StockOpnameController::class, 'show']);

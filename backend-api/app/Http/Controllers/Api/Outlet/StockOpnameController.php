@@ -19,6 +19,39 @@ class StockOpnameController extends Controller
 
 
     /**
+     * Get list of outlet users eligible to be assigned as PIC for a
+     * stock opname in this outlet.
+     *
+     * Scoped strictly to the outlet (no cross-outlet leakage): only active,
+     * non-deleted outlet_users from the outlet's own schema are returned.
+     * Caller must have access to the outlet; permission `manage_stock_opname`
+     * is enforced (superadmin / outlet owner bypass).
+     */
+    public function picOptions($outletId)
+    {
+        $outlet = $this->authorizeOutlet($outletId, [
+            'permission' => 'manage_stock_opname',
+        ]);
+
+        try {
+            // authorizeOutlet has already set search_path to the outlet schema.
+            $users = DB::table('outlet_users')
+                ->where('outlet_id', $outlet->id)
+                ->where('is_active', true)
+                ->whereNull('deleted_at')
+                ->orderBy('name')
+                ->get(['id', 'name', 'email']);
+
+            DB::statement("SET search_path TO public");
+
+            return response()->json($users);
+        } catch (\Exception $e) {
+            DB::statement("SET search_path TO public");
+            return response()->json(['message' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
      * Get all stock opname records
      */
     public function index(Request $request, $outletId)
@@ -57,6 +90,7 @@ class StockOpnameController extends Controller
             'tanggal_mulai' => 'required|date',
             'tanggal_selesai' => 'required|date|after_or_equal:tanggal_mulai',
             'pic_name' => 'required|string|max:100',
+            'pic_user_id' => 'nullable|integer',
             'notes' => 'nullable|string',
         ]);
 
@@ -67,13 +101,32 @@ class StockOpnameController extends Controller
         try {
             DB::statement("SET search_path TO {$outlet->schema_name}, public");
             
+            // If the request supplies a pic_user_id, verify it resolves to an
+            // active outlet_user in THIS outlet. This prevents a client from
+            // setting an arbitrary id from another outlet.
+            $picUserId = $request->input('pic_user_id');
+            if ($picUserId !== null) {
+                $valid = DB::table('outlet_users')
+                    ->where('id', $picUserId)
+                    ->where('outlet_id', $outlet->id)
+                    ->where('is_active', true)
+                    ->whereNull('deleted_at')
+                    ->exists();
+                if (!$valid) {
+                    DB::statement("SET search_path TO public");
+                    return response()->json([
+                        'message' => 'PIC tidak valid untuk outlet ini.',
+                    ], 422);
+                }
+            }
+
             $stockOpname = StockOpname::create([
                 'kode' => StockOpname::generateKode(),
                 'tanggal_mulai' => $request->tanggal_mulai,
                 'tanggal_selesai' => $request->tanggal_selesai,
                 'status' => 'draft',
                 'pic_name' => $request->pic_name,
-                'pic_user_id' => Auth::id(),
+                'pic_user_id' => $picUserId ?? Auth::id(),
                 'notes' => $request->notes,
                 'created_by' => Auth::id(),
             ]);
