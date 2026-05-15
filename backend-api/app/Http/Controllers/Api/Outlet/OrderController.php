@@ -134,6 +134,13 @@ class OrderController extends Controller
             DB::statement("SET search_path TO {$outlet->schema_name}, public");
             DB::beginTransaction();
 
+            // Baca transaction_settings untuk mendapatkan PPN & service charge yang dikonfigurasi
+            $txSettings = DB::table('transaction_settings')->first();
+            $taxEnabled         = $txSettings ? (bool) $txSettings->tax_enabled          : true;
+            $taxPercentage      = ($taxEnabled && $txSettings) ? (float) $txSettings->tax_percentage      : 0;
+            $scEnabled          = $txSettings ? (bool) $txSettings->service_charge_enabled : false;
+            $scPercentage       = ($scEnabled  && $txSettings) ? (float) $txSettings->service_charge_percentage : 0;
+
             // Create order
             $order = Order::create([
                 'kode' => Order::generateKode(),
@@ -144,7 +151,8 @@ class OrderController extends Controller
                 'customer_phone' => $request->customer_phone,
                 'member_id' => $request->member_id,
                 'status' => 'draft',
-                'tax_percentage' => 11, // Default PPN 11%
+                'tax_percentage'             => $taxPercentage,
+                'service_charge_percentage'  => $scPercentage,
                 'cashier_id' => Auth::id(),
             ]);
 

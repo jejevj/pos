@@ -38,6 +38,10 @@
               <i class="pi pi-bell mr-2"></i>
               {{ $t('settings.notifications') }}
             </Tab>
+            <Tab value="transaction">
+              <i class="pi pi-receipt mr-2"></i>
+              {{ $t('settings.transaction') || 'Transaksi' }}
+            </Tab>
           </TabList>
           
           <TabPanels>
@@ -333,6 +337,184 @@
                 </div>
               </div>
             </TabPanel>
+
+            <!-- Transaction Tab -->
+            <TabPanel value="transaction">
+              <div class="tab-content">
+                <h3>Pengaturan Transaksi</h3>
+                <p class="text-muted mb-4">Konfigurasi PPN, service charge, dan aturan transaksi outlet ini.</p>
+
+                <div v-if="txLoading" class="flex justify-center py-8">
+                  <ProgressSpinner style="width:40px;height:40px" strokeWidth="4" />
+                </div>
+
+                <template v-else>
+                  <!-- PPN Section -->
+                  <div class="tx-section">
+                    <div class="tx-section-title">
+                      <i class="pi pi-percentage"></i>
+                      Pajak Pertambahan Nilai (PPN)
+                    </div>
+
+                    <div class="settings-section">
+                      <div class="setting-item">
+                        <div class="setting-info">
+                          <label class="setting-label">Aktifkan PPN</label>
+                          <p class="setting-description">PPN akan otomatis dihitung dan ditambahkan ke setiap transaksi.</p>
+                        </div>
+                        <ToggleSwitch v-model="txSettings.tax_enabled" />
+                      </div>
+
+                      <template v-if="txSettings.tax_enabled">
+                        <div class="setting-item">
+                          <div class="setting-info">
+                            <label class="setting-label">Persentase PPN (%)</label>
+                            <p class="setting-description">Tarif PPN standar Indonesia adalah 11%.</p>
+                          </div>
+                          <InputNumber
+                            v-model="txSettings.tax_percentage"
+                            :min="0" :max="100"
+                            :minFractionDigits="0" :maxFractionDigits="2"
+                            suffix=" %"
+                            class="setting-control"
+                          />
+                        </div>
+
+                        <div class="setting-item">
+                          <div class="setting-info">
+                            <label class="setting-label">Label PPN</label>
+                            <p class="setting-description">Nama yang tampil di struk (contoh: PPN, Pajak, Tax).</p>
+                          </div>
+                          <InputText v-model="txSettings.tax_label" class="setting-control" />
+                        </div>
+
+                        <div class="setting-item">
+                          <div class="setting-info">
+                            <label class="setting-label">PPN Inklusif (sudah termasuk dalam harga)</label>
+                            <p class="setting-description">Jika aktif, harga menu dianggap sudah termasuk PPN. Jika nonaktif, PPN ditambahkan di atas harga.</p>
+                          </div>
+                          <ToggleSwitch v-model="txSettings.tax_inclusive" />
+                        </div>
+                      </template>
+                    </div>
+                  </div>
+
+                  <!-- Service Charge Section -->
+                  <div class="tx-section">
+                    <div class="tx-section-title">
+                      <i class="pi pi-server"></i>
+                      Service Charge
+                    </div>
+
+                    <div class="settings-section">
+                      <div class="setting-item">
+                        <div class="setting-info">
+                          <label class="setting-label">Aktifkan Service Charge</label>
+                          <p class="setting-description">Biaya pelayanan yang ditambahkan ke total transaksi.</p>
+                        </div>
+                        <ToggleSwitch v-model="txSettings.service_charge_enabled" />
+                      </div>
+
+                      <template v-if="txSettings.service_charge_enabled">
+                        <div class="setting-item">
+                          <div class="setting-info">
+                            <label class="setting-label">Persentase Service Charge (%)</label>
+                            <p class="setting-description">Umumnya berkisar antara 5% - 10%.</p>
+                          </div>
+                          <InputNumber
+                            v-model="txSettings.service_charge_percentage"
+                            :min="0" :max="100"
+                            :minFractionDigits="0" :maxFractionDigits="2"
+                            suffix=" %"
+                            class="setting-control"
+                          />
+                        </div>
+
+                        <div class="setting-item">
+                          <div class="setting-info">
+                            <label class="setting-label">Label Service Charge</label>
+                            <p class="setting-description">Nama yang tampil di struk.</p>
+                          </div>
+                          <InputText v-model="txSettings.service_charge_label" class="setting-control" />
+                        </div>
+                      </template>
+                    </div>
+                  </div>
+
+                  <!-- Aturan Lain -->
+                  <div class="tx-section">
+                    <div class="tx-section-title">
+                      <i class="pi pi-sliders-h"></i>
+                      Aturan Lainnya
+                    </div>
+
+                    <div class="settings-section">
+                      <div class="setting-item">
+                        <div class="setting-info">
+                          <label class="setting-label">Minimum Nilai Order (Rp)</label>
+                          <p class="setting-description">Transaksi tidak bisa diproses jika di bawah nilai ini. Set 0 untuk menonaktifkan.</p>
+                        </div>
+                        <InputNumber
+                          v-model="txSettings.min_order_amount"
+                          :min="0"
+                          :minFractionDigits="0" :maxFractionDigits="0"
+                          prefix="Rp "
+                          :useGrouping="true"
+                          class="setting-control"
+                        />
+                      </div>
+
+                      <div class="setting-item" style="align-items: flex-start;">
+                        <div class="setting-info">
+                          <label class="setting-label">Catatan Bawah Struk</label>
+                          <p class="setting-description">Teks yang tampil di bagian bawah struk (ucapan terima kasih, promosi, dll).</p>
+                        </div>
+                        <Textarea
+                          v-model="txSettings.receipt_footer"
+                          rows="3"
+                          class="setting-control"
+                          placeholder="Terima kasih telah berbelanja!"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Preview kalkulasi -->
+                  <div v-if="txSettings.tax_enabled || txSettings.service_charge_enabled" class="tx-preview">
+                    <div class="tx-preview-title">Preview Kalkulasi (contoh: Rp 100.000)</div>
+                    <div class="tx-preview-row">
+                      <span>Subtotal</span>
+                      <span>Rp 100.000</span>
+                    </div>
+                    <div v-if="txSettings.tax_enabled" class="tx-preview-row tax">
+                      <span>{{ txSettings.tax_label || 'PPN' }} ({{ txSettings.tax_percentage }}%)
+                        <span v-if="txSettings.tax_inclusive" class="inclusive-badge">inklusif</span>
+                      </span>
+                      <span v-if="txSettings.tax_inclusive">sudah termasuk</span>
+                      <span v-else>+ Rp {{ Math.round(100000 * txSettings.tax_percentage / 100).toLocaleString('id-ID') }}</span>
+                    </div>
+                    <div v-if="txSettings.service_charge_enabled" class="tx-preview-row sc">
+                      <span>{{ txSettings.service_charge_label || 'Service Charge' }} ({{ txSettings.service_charge_percentage }}%)</span>
+                      <span>+ Rp {{ Math.round(100000 * txSettings.service_charge_percentage / 100).toLocaleString('id-ID') }}</span>
+                    </div>
+                    <div class="tx-preview-row total">
+                      <span>Total</span>
+                      <span>Rp {{ calcPreviewTotal().toLocaleString('id-ID') }}</span>
+                    </div>
+                  </div>
+
+                  <div class="settings-actions">
+                    <Button label="Reset" icon="pi pi-refresh" severity="secondary" outlined @click="fetchTxSettings" />
+                    <Button
+                      label="Simpan Pengaturan Transaksi"
+                      icon="pi pi-check"
+                      :loading="txSaving"
+                      @click="saveTxSettings"
+                    />
+                  </div>
+                </template>
+              </div>
+            </TabPanel>
           </TabPanels>
         </Tabs>
       </template>
@@ -341,9 +523,11 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, computed, onMounted } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
+import { useToast } from 'primevue/usetoast'
+import api from '@/services/api'
 import Card from 'primevue/card'
 import Tabs from 'primevue/tabs'
 import TabList from 'primevue/tablist'
@@ -359,9 +543,16 @@ import ToggleSwitch from 'primevue/toggleswitch'
 import Checkbox from 'primevue/checkbox'
 import Button from 'primevue/button'
 import Divider from 'primevue/divider'
+import InputNumber from 'primevue/inputnumber'
+import ProgressSpinner from 'primevue/progressspinner'
 
 const router = useRouter()
-const { t } = useI18n()
+const route  = useRoute()
+const toast  = useToast()
+const { t }  = useI18n()
+
+// outletId dari route params (halaman ini diakses via /outlets/:outletId/settings)
+const outletId = computed(() => route.params.outletId)
 
 // Breadcrumb
 const breadcrumbHome = ref({ icon: 'pi pi-home', to: '/dashboard' })
@@ -429,6 +620,77 @@ const sessionTimeouts = ref([
   { label: '2 hours', value: 120 },
   { label: 'Never', value: 0 }
 ])
+
+// ── Transaction Settings (PPN & Service Charge) ───────────────────────────────
+const txLoading = ref(false)
+const txSaving  = ref(false)
+const txSettings = ref({
+  tax_enabled:                true,
+  tax_percentage:             11,
+  tax_label:                  'PPN',
+  tax_inclusive:              false,
+  service_charge_enabled:     false,
+  service_charge_percentage:  0,
+  service_charge_label:       'Service Charge',
+  receipt_footer:             '',
+  min_order_amount:           0,
+})
+
+const fetchTxSettings = async () => {
+  if (!outletId.value) return
+  txLoading.value = true
+  try {
+    const res = await api.get(`/outlets/${outletId.value}/transaction-settings`)
+    const d   = res.data
+    txSettings.value = {
+      tax_enabled:               Boolean(d.tax_enabled),
+      tax_percentage:            parseFloat(d.tax_percentage)  || 11,
+      tax_label:                 d.tax_label                   || 'PPN',
+      tax_inclusive:             Boolean(d.tax_inclusive),
+      service_charge_enabled:    Boolean(d.service_charge_enabled),
+      service_charge_percentage: parseFloat(d.service_charge_percentage) || 0,
+      service_charge_label:      d.service_charge_label        || 'Service Charge',
+      receipt_footer:            d.receipt_footer              || '',
+      min_order_amount:          parseFloat(d.min_order_amount) || 0,
+    }
+  } catch (e) {
+    toast.add({ severity: 'error', summary: 'Error', detail: 'Gagal memuat pengaturan transaksi', life: 3000 })
+  } finally {
+    txLoading.value = false
+  }
+}
+
+const saveTxSettings = async () => {
+  if (!outletId.value) {
+    toast.add({ severity: 'warn', summary: 'Perhatian', detail: 'Buka halaman ini dari menu outlet, bukan langsung.', life: 4000 })
+    return
+  }
+  txSaving.value = true
+  try {
+    await api.put(`/outlets/${outletId.value}/transaction-settings`, txSettings.value)
+    toast.add({ severity: 'success', summary: 'Berhasil', detail: 'Pengaturan transaksi disimpan. Berlaku untuk transaksi baru.', life: 3000 })
+  } catch (e) {
+    const msg = e.response?.data?.message || 'Gagal menyimpan pengaturan transaksi'
+    toast.add({ severity: 'error', summary: 'Error', detail: msg, life: 3000 })
+  } finally {
+    txSaving.value = false
+  }
+}
+
+const calcPreviewTotal = () => {
+  const base = 100000
+  let tax = txSettings.value.tax_enabled && !txSettings.value.tax_inclusive
+    ? Math.round(base * txSettings.value.tax_percentage / 100)
+    : 0
+  let sc = txSettings.value.service_charge_enabled
+    ? Math.round(base * txSettings.value.service_charge_percentage / 100)
+    : 0
+  return base + tax + sc
+}
+
+onMounted(() => {
+  fetchTxSettings()
+})
 </script>
 
 <style scoped>
@@ -538,4 +800,79 @@ const sessionTimeouts = ref([
     min-width: auto;
   }
 }
+
+/* ── Transaction Settings ── */
+.tx-section {
+  margin-bottom: 2rem;
+}
+.tx-section-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--p-text-color, #1f2937);
+  margin-bottom: 1rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 2px solid var(--p-primary-color, #5d87ff);
+}
+
+.tx-preview {
+  margin: 1.5rem 0;
+  padding: 1.25rem 1.5rem;
+  background: var(--p-surface-50, #f9fafb);
+  border: 1px solid var(--p-surface-200, #e5e7eb);
+  border-radius: 10px;
+  max-width: 400px;
+}
+.tx-preview-title {
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--p-text-muted-color, #6b7280);
+  margin-bottom: 0.75rem;
+}
+.tx-preview-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.9rem;
+  padding: 0.3rem 0;
+  color: var(--p-text-color, #374151);
+  border-bottom: 1px dashed var(--p-surface-200, #e5e7eb);
+}
+.tx-preview-row:last-child { border-bottom: none; }
+.tx-preview-row.tax  { color: #f59e0b; }
+.tx-preview-row.sc   { color: #6366f1; }
+.tx-preview-row.total {
+  font-weight: 700;
+  font-size: 1rem;
+  color: var(--p-primary-color, #5d87ff);
+  border-top: 2px solid var(--p-surface-200, #e5e7eb);
+  margin-top: 0.25rem;
+  padding-top: 0.5rem;
+}
+.inclusive-badge {
+  display: inline-block;
+  font-size: 0.65rem;
+  background: rgba(245,158,11,0.15);
+  color: #b45309;
+  padding: 0.1rem 0.4rem;
+  border-radius: 999px;
+  margin-left: 0.4rem;
+  vertical-align: middle;
+}
+
+/* dark mode overrides untuk tx panel */
+html.is-dark .tx-section-title { color: #e4e4ef; }
+html.is-dark .tx-preview {
+  background: #1a1a24 !important;
+  border-color: #2a2a38 !important;
+}
+html.is-dark .tx-preview-row { color: #d0d0e8; border-color: #2a2a38; }
+html.is-dark .tx-preview-row.total { color: #8ab4ff; border-color: #2a2a38; }
+
+.flex { display: flex; }
+.justify-center { justify-content: center; }
+.py-8 { padding-top: 2rem; padding-bottom: 2rem; }
 </style>

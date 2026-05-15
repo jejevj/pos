@@ -184,6 +184,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('outlets/{outlet}/membership-settings', [\App\Http\Controllers\Api\Outlet\MembershipSettingController::class, 'index']);
     Route::put('outlets/{outlet}/membership-settings', [\App\Http\Controllers\Api\Outlet\MembershipSettingController::class, 'update']);
 
+    // Transaction Settings (PPN, Service Charge, dll)
+    Route::get('outlets/{outlet}/transaction-settings',  [\App\Http\Controllers\Api\Outlet\TransactionSettingController::class, 'index']);
+    Route::put('outlets/{outlet}/transaction-settings',  [\App\Http\Controllers\Api\Outlet\TransactionSettingController::class, 'update']);
+
     // Orders/POS
     Route::get('outlets/{outlet}/orders', [\App\Http\Controllers\Api\Outlet\OrderController::class, 'index']);
     Route::post('outlets/{outlet}/orders', [\App\Http\Controllers\Api\Outlet\OrderController::class, 'store']);
