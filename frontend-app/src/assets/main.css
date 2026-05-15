@@ -255,87 +255,26 @@ html.is-dark [style*="background:#fdf2f8"] {
   background: #2a2a36 !important;
 }
 
-/* ── PrimeVue component overrides dalam dark mode ─────────────── */
-html.is-dark .p-card,
-html.is-dark .p-panel,
-html.is-dark .p-dialog,
-html.is-dark .p-sidebar {
-  background: #1e1e28;
-  border-color: #2e2e3e;
-  color: var(--dark-text);
-}
-
-html.is-dark .p-datatable .p-datatable-tbody > tr {
-  background: #1e1e28;
-  color: var(--dark-text);
-  border-color: #2e2e3e;
-}
-
-html.is-dark .p-datatable .p-datatable-tbody > tr:nth-child(even) {
-  background: #232330;
-}
-
-html.is-dark .p-datatable .p-datatable-tbody > tr:hover {
-  background: #2a2a3a !important;
-}
-
-html.is-dark .p-datatable .p-datatable-thead > tr > th {
-  background: #232330;
-  border-color: #2e2e3e;
-  color: var(--light-text);
-}
-
-html.is-dark .p-inputtext,
-html.is-dark .p-dropdown,
-html.is-dark .p-multiselect,
-html.is-dark .p-inputnumber-input,
-html.is-dark .p-textarea,
-html.is-dark .p-select {
-  background: #232330 !important;
-  border-color: #3a3a50 !important;
-  color: var(--dark-text) !important;
-}
-
-html.is-dark .p-dropdown-panel,
-html.is-dark .p-multiselect-panel,
-html.is-dark .p-select-overlay {
-  background: #1e1e28;
-  border-color: #2e2e3e;
-}
-
-html.is-dark .p-dropdown-item,
-html.is-dark .p-multiselect-item,
-html.is-dark .p-select-option {
-  color: var(--dark-text);
-}
-
-html.is-dark .p-dropdown-item:hover,
-html.is-dark .p-select-option:hover {
-  background: #2a2a3a !important;
-}
-
-html.is-dark .p-menu,
-html.is-dark .p-menubar,
-html.is-dark .p-tieredmenu {
-  background: #1e1e28;
-  border-color: #2e2e3e;
-}
-
-html.is-dark .p-menuitem-link:hover {
-  background: #2a2a3a !important;
-}
-
-html.is-dark .p-tag {
-  color: var(--dark-text);
-}
-
-html.is-dark .p-divider-horizontal::before {
-  border-color: #2e2e3e;
+/* ── PrimeVue safety overrides (yang tidak di-cover design tokens) ─ */
+html.is-dark .p-datatable-header {
+  background: #1e1e28 !important;
+  border-color: #2e2e3e !important;
+  color: #e4e4ef !important;
 }
 
 html.is-dark .p-skeleton {
-  background: #2a2a36;
+  background: #2a2a36 !important;
 }
 html.is-dark .p-skeleton::after {
-  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.04), transparent);
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.04), transparent) !important;
+}
+
+html.is-dark .p-divider-horizontal::before {
+  border-color: #2e2e3e !important;
+}
+
+/* Teks & input fallback jika token tidak ter-apply */
+html.is-dark input::placeholder,
+html.is-dark textarea::placeholder {
+  color: #5a5a7a !important;
 }
