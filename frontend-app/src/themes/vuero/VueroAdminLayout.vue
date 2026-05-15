@@ -29,6 +29,11 @@
       <Menu ref="userMenu" :model="userMenuItems" popup />
     </template>
 
+    <!-- Sidebar nav links -->
+    <template #links>
+      <VueroNavItem v-for="item in navLinks" :key="item.id ?? item.to" :item="item" />
+    </template>
+
     <!-- Sidebar bottom slot -->
     <template #links-bottom>
       <!-- User profile pill in sidebar footer -->
@@ -54,6 +59,7 @@ import { useLanguage } from '@/composables/useLanguage'
 import { useI18n } from 'vue-i18n'
 import Menu from 'primevue/menu'
 import VueroLayout from './layouts/VueroLayout.vue'
+import VueroNavItem from './layouts/VueroNavItem.vue'
 
 const router    = useRouter()
 const route     = useRoute()
