@@ -102,16 +102,6 @@ const router = createRouter({
             permission: 'reports.view'
           }
         },
-        {
-          path: 'settings',
-          name: 'settings',
-          component: () => import('@/views/SettingsView.vue'),
-          meta: {
-            requiresAuth: true,
-            title: 'Settings',
-            permission: 'settings.view'
-          }
-        },
       ]
     },
     {
@@ -385,6 +375,12 @@ const router = createRouter({
           name: 'outlet-production',
           component: () => import('@/views/outlet/ProductionView.vue'),
           meta: { requiresAuth: true, title: 'Production' }
+        },
+        {
+          path: 'outlets/:outletId/settings',
+          name: 'outlet-settings',
+          component: () => import('@/views/SettingsView.vue'),
+          meta: { requiresAuth: true, title: 'Pengaturan Transaksi' }
         }
       ]
     },
@@ -401,7 +397,6 @@ const router = createRouter({
     { path: '/permissions', redirect: '/admin/permissions' },
     { path: '/menus',       redirect: '/admin/menus' },
     { path: '/reports',     redirect: '/admin/reports' },
-    { path: '/settings',    redirect: '/admin/settings' },
     { path: '/dashboard',   redirect: '/admin/dashboard' },
     {
       path: '/unauthorized',

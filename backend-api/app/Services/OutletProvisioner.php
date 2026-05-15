@@ -51,6 +51,7 @@ class OutletProvisioner
             $this->ensureRbacTables($outlet);
             $this->seedRbac($outlet);
             $this->ensureTransactionTables($outlet);
+            $this->ensureTransactionSettingsTable($outlet);
             $this->ensureMenuTables($outlet);
             $this->ensureBahanBakuTables($outlet);
             $this->ensureStationTables($outlet);
@@ -460,6 +461,81 @@ class OutletProvisioner
             DB::table('tables')->insert($rows);
         }
         DB::statement('SET search_path TO public');
+    }
+
+    /**
+     * Seed the per-outlet `transaction_settings` table with a default row.
+     * Mirrors the table shape in TransactionSettingController::ensureTable
+     * so a brand-new outlet already has settings before the API is ever hit.
+     */
+    private function ensureTransactionSettingsTable(Outlet $outlet): void
+    {
+        $schema = $outlet->schema_name;
+        $existed = $this->tableExists($schema, 'transaction_settings');
+
+        DB::statement("
+            CREATE TABLE IF NOT EXISTS {$schema}.transaction_settings (
+                id                          SERIAL PRIMARY KEY,
+                tax_enabled                 BOOLEAN DEFAULT true,
+                tax_percentage              DECIMAL(5,2) DEFAULT 11,
+                tax_label                   VARCHAR(50) DEFAULT 'PPN',
+                tax_inclusive               BOOLEAN DEFAULT false,
+                service_charge_enabled      BOOLEAN DEFAULT false,
+                service_charge_percentage   DECIMAL(5,2) DEFAULT 0,
+                service_charge_label        VARCHAR(50) DEFAULT 'Service Charge',
+                min_order_amount            DECIMAL(15,2) DEFAULT 0,
+                receipt_logo_enabled        BOOLEAN DEFAULT true,
+                receipt_header              TEXT DEFAULT '',
+                receipt_footer              TEXT DEFAULT '',
+                receipt_show_qr             BOOLEAN DEFAULT true,
+                receipt_wifi_enabled        BOOLEAN DEFAULT false,
+                receipt_wifi_ssid           VARCHAR(100) DEFAULT '',
+                receipt_wifi_password       VARCHAR(100) DEFAULT '',
+                receipt_show_cashier        BOOLEAN DEFAULT true,
+                receipt_show_table          BOOLEAN DEFAULT true,
+                receipt_show_member         BOOLEAN DEFAULT true,
+                receipt_custom_logo_url     TEXT DEFAULT '',
+                created_at                  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at                  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ");
+
+        // Heal pre-existing tables that may be missing newer columns.
+        $columns = [
+            'receipt_logo_enabled'    => 'BOOLEAN DEFAULT true',
+            'receipt_header'          => "TEXT DEFAULT ''",
+            'receipt_footer'          => "TEXT DEFAULT ''",
+            'receipt_show_qr'         => 'BOOLEAN DEFAULT true',
+            'receipt_wifi_enabled'    => 'BOOLEAN DEFAULT false',
+            'receipt_wifi_ssid'       => "VARCHAR(100) DEFAULT ''",
+            'receipt_wifi_password'   => "VARCHAR(100) DEFAULT ''",
+            'receipt_show_cashier'    => 'BOOLEAN DEFAULT true',
+            'receipt_show_table'      => 'BOOLEAN DEFAULT true',
+            'receipt_show_member'     => 'BOOLEAN DEFAULT true',
+            'receipt_custom_logo_url' => "TEXT DEFAULT ''",
+            'min_order_amount'        => 'DECIMAL(15,2) DEFAULT 0',
+        ];
+        foreach ($columns as $col => $def) {
+            DB::statement("ALTER TABLE {$schema}.transaction_settings ADD COLUMN IF NOT EXISTS {$col} {$def}");
+        }
+
+        // Insert the default row only on first creation. If the table already
+        // existed but is empty (older outlet provisioned before this seed was
+        // added), backfill a default row as well.
+        $hasRow = DB::table("{$schema}.transaction_settings")->exists();
+        if (!$existed || !$hasRow) {
+            DB::statement("
+                INSERT INTO {$schema}.transaction_settings
+                    (tax_enabled, tax_percentage, tax_label, tax_inclusive,
+                     service_charge_enabled, service_charge_percentage, service_charge_label,
+                     min_order_amount,
+                     receipt_logo_enabled, receipt_header, receipt_footer,
+                     receipt_show_qr, receipt_wifi_enabled, receipt_wifi_ssid, receipt_wifi_password,
+                     receipt_show_cashier, receipt_show_table, receipt_show_member, receipt_custom_logo_url)
+                VALUES (true, 11, 'PPN', false, false, 0, 'Service Charge', 0,
+                        true, '', '', true, false, '', '', true, true, true, '')
+            ");
+        }
     }
 
     private function ensureMenuTables(Outlet $outlet): void

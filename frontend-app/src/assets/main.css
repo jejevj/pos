@@ -607,3 +607,83 @@ html.is-dark .wifi-preview {
   background: #1a1a24 !important;
   border-color: #2a2a38 !important;
 }
+
+/* ── SettingsView (Transaction/Receipt settings) dark mode ──────── */
+html.is-dark .settings-view .p-card,
+html.is-dark .settings-view .p-card .p-card-body,
+html.is-dark .settings-view .p-card .p-card-content {
+  background: var(--p-content-background, #1e1e28) !important;
+  color: var(--p-text-color, #e4e4ef) !important;
+  border-color: var(--p-content-border-color, #2e2e3e) !important;
+}
+
+html.is-dark .settings-view .setting-item {
+  background: #1a1a24 !important;
+  border-color: #2a2a38 !important;
+}
+
+html.is-dark .settings-view .setting-label,
+html.is-dark .settings-view .tab-content h3,
+html.is-dark .settings-view .notification-category {
+  color: var(--p-text-color, #e4e4ef) !important;
+}
+
+html.is-dark .settings-view .setting-description,
+html.is-dark .settings-view .text-muted {
+  color: var(--p-text-muted-color, #9090b0) !important;
+}
+
+html.is-dark .settings-view .settings-actions {
+  border-top-color: #2a2a38 !important;
+}
+
+html.is-dark .settings-view .tx-section-title {
+  color: var(--p-text-color, #e4e4ef) !important;
+}
+
+html.is-dark .settings-view .tx-preview {
+  background: #1a1a24 !important;
+  border-color: #2a2a38 !important;
+}
+html.is-dark .settings-view .tx-preview-title {
+  color: var(--p-text-muted-color, #9090b0) !important;
+}
+html.is-dark .settings-view .tx-preview-row {
+  color: var(--p-text-color, #d0d0e8) !important;
+  border-bottom-color: #2a2a38 !important;
+}
+html.is-dark .settings-view .tx-preview-row.total {
+  color: var(--p-primary-color, #8ab4ff) !important;
+  border-top-color: #2a2a38 !important;
+}
+
+html.is-dark .settings-view .p-tablist,
+html.is-dark .settings-view .p-tabs-nav,
+html.is-dark .settings-view .p-tabpanels,
+html.is-dark .settings-view .p-tabpanel {
+  background: transparent !important;
+  color: var(--p-text-color, #e4e4ef) !important;
+}
+
+html.is-dark .settings-view .p-tab,
+html.is-dark .settings-view .p-tablist-tab-list .p-tab {
+  background: transparent !important;
+  color: var(--p-text-muted-color, #9090b0) !important;
+}
+html.is-dark .settings-view .p-tab.p-tab-active,
+html.is-dark .settings-view .p-tablist-tab-list .p-tab[data-p-active="true"] {
+  color: var(--p-primary-color, #41b3a3) !important;
+}
+
+html.is-dark .settings-view .p-divider-horizontal::before {
+  border-top-color: #2a2a38 !important;
+}
+
+html.is-dark .settings-view .wifi-preview {
+  background: #1a1a24 !important;
+  border-color: #2a2a38 !important;
+}
+html.is-dark .settings-view .wifi-preview-label,
+html.is-dark .settings-view .wifi-preview-hint {
+  color: var(--p-text-muted-color, #9090b0) !important;
+}

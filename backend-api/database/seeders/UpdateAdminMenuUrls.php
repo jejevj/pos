@@ -17,7 +17,6 @@ class UpdateAdminMenuUrls extends Seeder
             'menu-management'       => '/admin/menus',
             'site-settings'         => '/admin/site-settings',
             'reports'               => '/admin/reports',
-            'settings'              => '/admin/settings',
         ];
 
         foreach ($updates as $name => $url) {

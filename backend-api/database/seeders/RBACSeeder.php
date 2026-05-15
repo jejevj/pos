@@ -232,19 +232,9 @@ class RBACSeeder extends Seeder
         );
         $reports->permissions()->sync(Permission::where('name', 'reports.view')->pluck('id'));
 
-        // Settings
-        $settings = Menu::firstOrCreate(
-            ['name' => 'settings'],
-            [
-                'title' => 'Settings',
-                'icon' => 'pi pi-cog',
-                'route' => '/admin/settings',
-                'url' => '/admin/settings',
-                'order' => 7,
-                'is_active' => true,
-            ]
-        );
-        $settings->permissions()->sync(Permission::where('name', 'settings.view')->pluck('id'));
+        // Settings menu is outlet-scoped only; seeded via OutletDashboardMenuSeeder.
+        // Drop the legacy site-level entry if it exists.
+        Menu::where('name', 'settings')->delete();
 
         // Site Settings (superadmin — Pengaturan Situs)
         $siteSettings = Menu::firstOrCreate(

@@ -1,5 +1,5 @@
 <template>
-  <div class="view-container">
+  <div class="view-container settings-view">
     <!-- Breadcrumb -->
     <Breadcrumb :home="breadcrumbHome" :model="breadcrumbItems" class="mb-4">
       <template #item="{ item, props }">
@@ -682,7 +682,10 @@ const { t }  = useI18n()
 const outletId = computed(() => route.params.outletId)
 
 // Breadcrumb
-const breadcrumbHome = ref({ icon: 'pi pi-home', to: '/dashboard' })
+const breadcrumbHome = computed(() => ({
+  icon: 'pi pi-home',
+  to: outletId.value ? `/outlets/${outletId.value}/dashboard` : '/'
+}))
 const breadcrumbItems = computed(() => [
   { label: t('common.settings') }
 ])
