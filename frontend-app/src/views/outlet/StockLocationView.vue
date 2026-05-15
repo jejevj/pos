@@ -39,11 +39,13 @@
                 :placeholder="$t('stockLocation.allLocations')" showClear style="width:200px" />
       </div>
 
-      <DataTable :value="filteredSummary" :loading="loadingSummary" stripedRows class="mt-2"
-                 expandable-row-groups row-group-mode="subheader" group-rows-by="kategori_nama"
-                 sort-field="kategori_nama" :sort-order="1">
+      <DataTable :value="filteredSummary" :loading="loadingSummary" stripedRows class="mt-2 sl-datatable"
+                 row-group-mode="subheader" group-rows-by="kategori_nama"
+                 sort-field="kategori_nama" :sort-order="1"
+                 :emptyMessage="$t('common.noData')"
+                 tableStyle="min-width: 60rem">
         <template #groupheader="{ data }">
-          <span class="group-header">{{ data.kategori_nama || 'Uncategorized' }}</span>
+          <span class="group-header">{{ data.kategori_nama || $t('common.uncategorized') }}</span>
         </template>
         <Column field="kode" :header="$t('bahanBaku.code')" style="width:120px" />
         <Column field="nama" :header="$t('common.name')" />
@@ -80,7 +82,10 @@
 
     <!-- ── LOCATIONS TAB ── -->
     <div v-if="tab === 'locations'">
-      <DataTable :value="locations" :loading="loadingLocations" stripedRows>
+      <DataTable :value="locations" :loading="loadingLocations" stripedRows
+                 :emptyMessage="$t('common.noData')"
+                 tableStyle="min-width: 50rem"
+                 class="sl-datatable">
         <Column field="name" :header="$t('common.name')" />
         <Column field="type" :header="$t('stockLocation.type')">
           <template #body="{ data }">
@@ -115,7 +120,10 @@
         <Button :label="$t('common.filter')" icon="pi pi-filter" @click="fetchMovements" />
       </div>
 
-      <DataTable :value="movements" :loading="loadingMovements" stripedRows paginator :rows="25" class="mt-2">
+      <DataTable :value="movements" :loading="loadingMovements" stripedRows paginator :rows="25"
+                 :emptyMessage="$t('common.noData')"
+                 tableStyle="min-width: 70rem"
+                 class="mt-2 sl-datatable">
         <Column field="created_at" :header="$t('common.date')" style="width:150px">
           <template #body="{ data }">{{ formatDate(data.created_at) }}</template>
         </Column>
@@ -445,15 +453,40 @@ onMounted(() => {
 .text-muted { color: #6b7280; font-size: 0.875rem; margin: 0; }
 .header-actions { display: flex; gap: 0.5rem; }
 
-.tabs-bar { display: flex; gap: 0.25rem; border-bottom: 2px solid #e5e7eb; margin-bottom: 1.5rem; }
-.tab-btn {
-  padding: 0.6rem 1.25rem; background: none; border: none;
-  border-bottom: 2px solid transparent; margin-bottom: -2px;
-  color: #6b7280; font-weight: 500; cursor: pointer;
-  display: flex; align-items: center; gap: 0.4rem; transition: all 0.15s;
+.tabs-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  border-bottom: 2px solid #e5e7eb;
+  margin-bottom: 1.5rem;
 }
+.tab-btn {
+  padding: 0.6rem 1.25rem;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+  color: #6b7280;
+  font-weight: 500;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  white-space: nowrap;
+  transition: all 0.15s;
+}
+.tab-btn > i { flex-shrink: 0; }
 .tab-btn:hover { color: #3b82f6; }
 .tab-btn.active { color: #3b82f6; border-bottom-color: #3b82f6; }
+
+/* DataTable wrapper — horizontal scroll for narrow viewports */
+.sl-datatable {
+  width: 100%;
+  overflow-x: auto;
+}
+.sl-datatable :deep(.p-datatable-table) {
+  width: 100%;
+}
 
 .quick-actions { display: flex; gap: 0.75rem; flex-wrap: wrap; }
 .filter-bar { display: flex; gap: 0.75rem; flex-wrap: wrap; align-items: center; }
