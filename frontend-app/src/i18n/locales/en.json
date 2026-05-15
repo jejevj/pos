@@ -351,7 +351,11 @@
     "canMake": "Can Make",
     "materialCost": "Material Cost",
     "fixedCost": "Fixed Cost",
-    "totalCost": "Total Cost"
+    "totalCost": "Total Cost",
+    "userManagement": "User Management",
+    "roleManagement": "Role Management",
+    "permissionManagement": "Permission Management",
+    "menuManagement": "Menu Management"
   },
   "stockOpname": {
     "title": "Stock Opname",

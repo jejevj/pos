@@ -360,7 +360,11 @@
     "canMake": "Bisa Buat",
     "materialCost": "Biaya Bahan Baku",
     "fixedCost": "Fixed Cost",
-    "totalCost": "Total Biaya"
+    "totalCost": "Total Biaya",
+    "userManagement": "Manajemen Pengguna",
+    "roleManagement": "Manajemen Role",
+    "permissionManagement": "Manajemen Izin",
+    "menuManagement": "Manajemen Menu"
   },
   "stockOpname": {
     "title": "Stock Opname",
