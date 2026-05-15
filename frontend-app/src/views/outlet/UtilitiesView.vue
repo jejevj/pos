@@ -26,6 +26,14 @@
           <i class="pi pi-receipt"></i>
           Transaksi &amp; Struk
         </button>
+        <button
+          class="tab"
+          :class="{ active: activeTab === 'membership' }"
+          @click="activeTab = 'membership'"
+        >
+          <i class="pi pi-id-card"></i>
+          Membership
+        </button>
       </div>
     </div>
 
@@ -458,11 +466,192 @@
         </template>
       </Card>
     </div>
+
+    <!-- Membership Tab -->
+    <div v-show="activeTab === 'membership'" class="tab-content settings-view">
+      <Card>
+        <template #header>
+          <div class="card-header">
+            <h3>Pengaturan Halaman Pendaftaran Member</h3>
+          </div>
+        </template>
+        <template #content>
+          <div v-if="memberLoading" class="flex justify-center py-8">
+            <ProgressSpinner style="width:40px;height:40px" strokeWidth="4" />
+          </div>
+
+          <template v-else>
+            <!-- Toggle buka/tutup -->
+            <div class="tx-section">
+              <div class="tx-section-title">
+                <i class="pi pi-power-off"></i>
+                Status Pendaftaran
+              </div>
+              <div class="settings-section">
+                <div class="setting-item">
+                  <div class="setting-info">
+                    <label class="setting-label">Buka Pendaftaran Member</label>
+                    <p class="setting-description">Izinkan pelanggan mendaftar via halaman publik.</p>
+                  </div>
+                  <ToggleSwitch v-model="memberSettings.registration_open" />
+                </div>
+              </div>
+            </div>
+
+            <!-- URL Publik dengan QR -->
+            <div class="tx-section">
+              <div class="tx-section-title">
+                <i class="pi pi-link"></i>
+                URL Pendaftaran &amp; QR Code
+              </div>
+              <div class="settings-section">
+                <div class="setting-item member-url-row">
+                  <div class="setting-info" style="flex: 1; min-width: 0;">
+                    <label class="setting-label">URL Halaman Pendaftaran</label>
+                    <p class="setting-description">Bagikan link ini ke pelanggan untuk mendaftar member.</p>
+                    <div class="url-display">
+                      <code>{{ memberPageUrl || '—' }}</code>
+                      <Button icon="pi pi-copy" text size="small" :disabled="!memberPageUrl" @click="copyMemberUrl" aria-label="Copy URL" />
+                      <Button icon="pi pi-external-link" text size="small" :disabled="!memberPageUrl" @click="openMemberUrl" aria-label="Open URL" />
+                    </div>
+                  </div>
+                </div>
+                <div v-if="memberPageUrl" class="qr-preview">
+                  <img :src="`https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=${encodeURIComponent(memberPageUrl)}`" alt="QR" />
+                  <div class="qr-hint">Scan untuk membuka halaman pendaftaran</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Kustomisasi halaman -->
+            <div class="tx-section">
+              <div class="tx-section-title">
+                <i class="pi pi-palette"></i>
+                Kustomisasi Tampilan
+              </div>
+              <div class="settings-section">
+                <div class="setting-item">
+                  <div class="setting-info">
+                    <label class="setting-label">Judul Halaman</label>
+                    <p class="setting-description">Teks besar yang muncul di hero halaman pendaftaran.</p>
+                  </div>
+                  <InputText v-model="memberSettings.page_title" class="setting-control" />
+                </div>
+
+                <div class="setting-item setting-item-block">
+                  <div class="setting-info">
+                    <label class="setting-label">Deskripsi Halaman</label>
+                    <p class="setting-description">Penjelasan singkat program member.</p>
+                  </div>
+                  <Textarea v-model="memberSettings.page_description" rows="3" autoResize class="setting-control full" />
+                </div>
+
+                <div class="setting-item setting-item-block">
+                  <div class="setting-info">
+                    <label class="setting-label">Pesan Sambutan</label>
+                    <p class="setting-description">Pesan setelah pelanggan berhasil mendaftar.</p>
+                  </div>
+                  <Textarea v-model="memberSettings.welcome_message" rows="3" autoResize class="setting-control full" />
+                </div>
+
+                <div class="setting-item">
+                  <div class="setting-info">
+                    <label class="setting-label">Warna Tema</label>
+                    <p class="setting-description">Kosongkan untuk pakai warna default. Contoh: #667eea</p>
+                  </div>
+                  <div class="color-input-wrap">
+                    <input
+                      type="color"
+                      :value="memberSettings.custom_primary_color || '#667eea'"
+                      @input="memberSettings.custom_primary_color = $event.target.value"
+                      class="color-swatch"
+                    />
+                    <InputText v-model="memberSettings.custom_primary_color" placeholder="#667eea" class="color-text" />
+                    <Button v-if="memberSettings.custom_primary_color" icon="pi pi-times" text size="small" @click="memberSettings.custom_primary_color = ''" aria-label="Reset color" />
+                  </div>
+                </div>
+
+                <div class="setting-item setting-item-block">
+                  <div class="setting-info">
+                    <label class="setting-label">Logo Custom</label>
+                    <p class="setting-description">Opsional. Kosongkan untuk pakai logo outlet. Upload gambar (JPG/PNG/WEBP, maks 2MB).</p>
+                  </div>
+                  <div class="logo-upload-row">
+                    <img v-if="memberSettings.custom_logo_url" :src="memberSettings.custom_logo_url" class="logo-preview-sm" alt="Logo" />
+                    <input type="file" accept="image/*" @change="handleMemberLogoUpload" :disabled="memberLogoUploading" />
+                    <ProgressSpinner v-if="memberLogoUploading" style="width:20px;height:20px" strokeWidth="4" />
+                    <Button v-if="memberSettings.custom_logo_url" icon="pi pi-times" text size="small" @click="memberSettings.custom_logo_url = ''" aria-label="Remove logo" />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Benefits editor -->
+            <div class="tx-section">
+              <div class="tx-section-title">
+                <i class="pi pi-star"></i>
+                Benefit Member
+              </div>
+              <div class="settings-section">
+                <p class="setting-description" style="margin: 0 0 0.75rem;">Daftar keuntungan yang ditampilkan di halaman pendaftaran.</p>
+                <div class="benefits-editor">
+                  <div v-for="(_, i) in memberSettings.benefits" :key="i" class="benefit-row">
+                    <InputText
+                      v-model="memberSettings.benefits[i]"
+                      :placeholder="'Contoh: Diskon 10% setiap pembelian'"
+                      class="setting-control full"
+                    />
+                    <Button icon="pi pi-trash" severity="danger" text size="small" @click="removeBenefit(i)" aria-label="Hapus benefit" />
+                  </div>
+                  <Button icon="pi pi-plus" label="Tambah Benefit" text @click="addBenefit" />
+                </div>
+              </div>
+            </div>
+
+            <!-- Requirements -->
+            <div class="tx-section">
+              <div class="tx-section-title">
+                <i class="pi pi-shield"></i>
+                Persyaratan &amp; Persetujuan
+              </div>
+              <div class="settings-section">
+                <div class="setting-item">
+                  <div class="setting-info">
+                    <label class="setting-label">Wajib Isi Nomor Telepon</label>
+                    <p class="setting-description">Calon member harus mengisi no. telepon.</p>
+                  </div>
+                  <ToggleSwitch v-model="memberSettings.require_phone" />
+                </div>
+                <div class="setting-item">
+                  <div class="setting-info">
+                    <label class="setting-label">Wajib Isi Alamat</label>
+                    <p class="setting-description">Calon member harus mengisi alamat lengkap.</p>
+                  </div>
+                  <ToggleSwitch v-model="memberSettings.require_address" />
+                </div>
+                <div class="setting-item">
+                  <div class="setting-info">
+                    <label class="setting-label">Setujui Otomatis</label>
+                    <p class="setting-description">Member langsung aktif tanpa persetujuan manual.</p>
+                  </div>
+                  <ToggleSwitch v-model="memberSettings.auto_approve" />
+                </div>
+              </div>
+            </div>
+
+            <div class="form-actions">
+              <Button label="Simpan Pengaturan Membership" icon="pi pi-check" :loading="memberSaving" @click="saveMemberSettings" />
+              <Button label="Reset" icon="pi pi-refresh" severity="secondary" outlined @click="fetchMemberSettings" />
+            </div>
+          </template>
+        </template>
+      </Card>
+    </div>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { useToast } from 'primevue/usetoast'
 import { useI18n } from 'vue-i18n'
@@ -490,6 +679,7 @@ const outletId = rawOutletParam
 const activeTab = ref('identity')
 const savingIdentity = ref(false)
 const uploadingLogo = ref(false)
+const outletSlug = ref('')
 
 // Outlet Identity Form
 const outletForm = ref({
@@ -517,6 +707,7 @@ const loadOutletData = async () => {
     const response = await api.get(`/outlets/${outletId}`)
     const outlet = response.data
     
+    outletSlug.value = outlet.slug || ''
     outletForm.value = {
       name: outlet.name || '',
       logo: outlet.logo || null,
@@ -752,9 +943,132 @@ async function handleLogoUpload(event) {
   }
 }
 
+// ──────────────── Membership Settings ────────────────
+const memberLoading = ref(false)
+const memberSaving = ref(false)
+const memberLogoUploading = ref(false)
+const memberSettings = ref({
+  registration_open: false,
+  page_title: 'Daftar Member',
+  page_description: '',
+  benefits: [],
+  welcome_message: 'Selamat datang di program member kami!',
+  require_phone: true,
+  require_address: false,
+  auto_approve: true,
+  custom_primary_color: '',
+  custom_logo_url: '',
+})
+
+const memberPageUrl = computed(() => {
+  if (!outletSlug.value) return ''
+  return `${window.location.origin}/m/${outletSlug.value}`
+})
+
+const fetchMemberSettings = async () => {
+  if (!numericOutletId) return
+  memberLoading.value = true
+  try {
+    const res = await api.get(`/outlets/${numericOutletId}/membership-settings`)
+    const d = res.data || {}
+    let benefits = d.benefits
+    if (typeof benefits === 'string') {
+      try { benefits = JSON.parse(benefits || '[]') } catch { benefits = [] }
+    }
+    if (!Array.isArray(benefits)) benefits = []
+    memberSettings.value = {
+      registration_open:    Boolean(d.registration_open),
+      page_title:           d.page_title           || 'Daftar Member',
+      page_description:     d.page_description     || '',
+      benefits,
+      welcome_message:      d.welcome_message      || 'Selamat datang di program member kami!',
+      require_phone:        Boolean(d.require_phone ?? true),
+      require_address:      Boolean(d.require_address ?? false),
+      auto_approve:         Boolean(d.auto_approve ?? true),
+      custom_primary_color: d.custom_primary_color || '',
+      custom_logo_url:      d.custom_logo_url      || '',
+    }
+  } catch (e) {
+    toast.add({ severity: 'error', summary: 'Error', detail: 'Gagal memuat pengaturan membership', life: 3000 })
+  } finally {
+    memberLoading.value = false
+  }
+}
+
+const saveMemberSettings = async () => {
+  if (!numericOutletId) {
+    toast.add({ severity: 'warn', summary: 'Perhatian', detail: 'Buka halaman ini dari menu outlet.', life: 4000 })
+    return
+  }
+  memberSaving.value = true
+  try {
+    const payload = {
+      ...memberSettings.value,
+      benefits: (memberSettings.value.benefits || []).filter(b => String(b || '').trim() !== ''),
+    }
+    await api.put(`/outlets/${numericOutletId}/membership-settings`, payload)
+    toast.add({ severity: 'success', summary: 'Berhasil', detail: 'Pengaturan membership disimpan.', life: 3000 })
+  } catch (e) {
+    const msg = e.response?.data?.message || 'Gagal menyimpan pengaturan membership'
+    toast.add({ severity: 'error', summary: 'Error', detail: msg, life: 3000 })
+  } finally {
+    memberSaving.value = false
+  }
+}
+
+const addBenefit = () => {
+  memberSettings.value.benefits.push('')
+}
+const removeBenefit = (i) => {
+  memberSettings.value.benefits.splice(i, 1)
+}
+
+const copyMemberUrl = async () => {
+  if (!memberPageUrl.value) return
+  try {
+    await navigator.clipboard.writeText(memberPageUrl.value)
+    toast.add({ severity: 'success', summary: 'Disalin', detail: 'URL pendaftaran disalin ke clipboard.', life: 2000 })
+  } catch {
+    toast.add({ severity: 'error', summary: 'Gagal', detail: 'Tidak bisa menyalin URL.', life: 3000 })
+  }
+}
+
+const openMemberUrl = () => {
+  if (memberPageUrl.value) window.open(memberPageUrl.value, '_blank', 'noopener')
+}
+
+async function handleMemberLogoUpload(event) {
+  const file = event.target.files[0]
+  if (!file) return
+  if (file.size > 2_000_000) {
+    toast.add({ severity: 'error', summary: 'Error', detail: 'File terlalu besar. Maksimal 2MB', life: 3000 })
+    event.target.value = ''
+    return
+  }
+  memberLogoUploading.value = true
+  try {
+    const formData = new FormData()
+    formData.append('image', file)
+    const response = await api.post(
+      `/outlets/${numericOutletId}/upload/image`,
+      formData,
+      { headers: { 'Content-Type': 'multipart/form-data' } }
+    )
+    memberSettings.value.custom_logo_url = response.data.url
+    toast.add({ severity: 'success', summary: 'Berhasil', detail: 'Logo diupload. Jangan lupa Simpan.', life: 3000 })
+  } catch (err) {
+    const msg = err.response?.data?.message || 'Gagal mengupload logo'
+    toast.add({ severity: 'error', summary: 'Error', detail: msg, life: 3000 })
+  } finally {
+    memberLogoUploading.value = false
+    event.target.value = ''
+  }
+}
+
 onMounted(() => {
   loadOutletData()
   fetchTxSettings()
+  fetchMemberSettings()
 })
 </script>
 
@@ -1139,4 +1453,98 @@ html.is-dark .setting-description { color: #9ca0bc; }
     width: 100%;
   }
 }
+
+/* ─── Membership tab specifics ─── */
+.url-display {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.4rem;
+  background: #f3f4f6;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 0.4rem 0.6rem;
+}
+.url-display code {
+  flex: 1;
+  font-size: 0.85rem;
+  word-break: break-all;
+  color: #2563eb;
+}
+html.is-dark .url-display {
+  background: #1f2937;
+  border-color: #374151;
+}
+html.is-dark .url-display code { color: #60a5fa; }
+
+.qr-preview {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.75rem;
+}
+.qr-preview img {
+  width: 140px;
+  height: 140px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #fff;
+  padding: 4px;
+}
+.qr-hint {
+  font-size: 0.75rem;
+  color: #6b7280;
+}
+
+.benefits-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.benefit-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.benefit-row :deep(.p-inputtext) { flex: 1; }
+
+.color-input-wrap {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.color-swatch {
+  width: 36px;
+  height: 36px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  cursor: pointer;
+  background: none;
+  padding: 2px;
+}
+.color-text {
+  width: 140px;
+}
+
+.logo-upload-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+.logo-preview-sm {
+  width: 48px;
+  height: 48px;
+  border-radius: 8px;
+  object-fit: cover;
+  border: 1px solid #e5e7eb;
+}
+
+.setting-item-block {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.5rem;
+}
+.setting-control.full { width: 100%; }
+.member-url-row { align-items: flex-start; }
 </style>

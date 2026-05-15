@@ -19,6 +19,10 @@ use Illuminate\Support\Facades\Route;
 // ── Public order tracking (no auth required) ──────────────────────────────
 Route::get('/track/{outletId}/{orderCode}', [\App\Http\Controllers\Api\OrderTrackingController::class, 'show']);
 
+// ── Public membership registration (no auth required) ─────────────────────
+Route::get('/public/membership/{outletSlug}',          [\App\Http\Controllers\Api\Public\MembershipController::class, 'show']);
+Route::post('/public/membership/{outletSlug}/register', [\App\Http\Controllers\Api\Public\MembershipController::class, 'register']);
+
 // ── Site Settings — public read so frontend can load branding ────────────
 Route::get('/site-settings', [SiteSettingController::class, 'index']);
 Route::middleware('auth:sanctum')->group(function () {

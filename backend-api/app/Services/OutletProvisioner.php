@@ -853,10 +853,40 @@ class OutletProvisioner
                     {\"name\": \"Gold\", \"min_points\": 1000, \"discount_percentage\": 5},
                     {\"name\": \"Platinum\", \"min_points\": 5000, \"discount_percentage\": 10}
                 ]'::jsonb,
+                registration_open BOOLEAN DEFAULT false,
+                page_title VARCHAR(200) DEFAULT 'Daftar Member',
+                page_description TEXT DEFAULT '',
+                benefits JSONB DEFAULT '[]'::jsonb,
+                welcome_message TEXT DEFAULT 'Selamat datang di program member kami!',
+                require_phone BOOLEAN DEFAULT true,
+                require_address BOOLEAN DEFAULT false,
+                auto_approve BOOLEAN DEFAULT true,
+                custom_primary_color VARCHAR(20) DEFAULT '',
+                custom_logo_url TEXT DEFAULT '',
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         ");
+        // Backfill public-page columns for outlets where the table already existed.
+        if ($settingsExisted) {
+            $publicColumns = [
+                'registration_open'    => 'BOOLEAN DEFAULT false',
+                'page_title'           => "VARCHAR(200) DEFAULT 'Daftar Member'",
+                'page_description'     => "TEXT DEFAULT ''",
+                'benefits'             => "JSONB DEFAULT '[]'::jsonb",
+                'welcome_message'      => "TEXT DEFAULT 'Selamat datang di program member kami!'",
+                'require_phone'        => 'BOOLEAN DEFAULT true',
+                'require_address'      => 'BOOLEAN DEFAULT false',
+                'auto_approve'         => 'BOOLEAN DEFAULT true',
+                'custom_primary_color' => "VARCHAR(20) DEFAULT ''",
+                'custom_logo_url'      => "TEXT DEFAULT ''",
+            ];
+            foreach ($publicColumns as $col => $def) {
+                if (!$this->columnExists($schema, 'membership_settings', $col)) {
+                    DB::statement("ALTER TABLE {$schema}.membership_settings ADD COLUMN {$col} {$def}");
+                }
+            }
+        }
         if (!$settingsExisted) {
             DB::statement("INSERT INTO {$schema}.membership_settings (point_conversion_rate, point_per_rupiah, min_transaction_for_points) VALUES (1000, 1.00, 0)");
         }

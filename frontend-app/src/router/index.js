@@ -20,6 +20,13 @@ const router = createRouter({
       component: () => import('@/views/OrderTrackingView.vue'),
       meta: { public: true }
     },
+    // Public membership registration — no auth, no layout
+    {
+      path: '/m/:outletSlug',
+      name: 'membership-register',
+      component: () => import('@/views/public/MembershipRegisterView.vue'),
+      meta: { public: true }
+    },
     {
       path: '/register',
       name: 'register',
