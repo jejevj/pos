@@ -4,12 +4,12 @@ import api from '@/services/api'
 import { encodeOutletId, decodeOutletId } from '@/utils/outletId'
 
 export const useAuthStore = defineStore('auth', () => {
-  const user = ref(null)
+  const user = ref(JSON.parse(localStorage.getItem('user') || 'null'))
   const token = ref(localStorage.getItem('auth_token'))
   const loading = ref(false)
   const error = ref(null)
-  const menus = ref([])
-  const permissions = ref([])
+  const menus = ref(JSON.parse(localStorage.getItem('menus') || '[]'))
+  const permissions = ref(JSON.parse(localStorage.getItem('permissions') || '[]'))
 
   /**
    * outletMemberships: array dari outlet-outlet di mana user ini terdaftar
@@ -220,30 +220,12 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  // Initialize user from localStorage
+  // Initialize: user/menus/permissions sudah di-load dari localStorage saat store dibuat.
+  // initAuth hanya perlu refresh dari server (background) untuk sinkronisasi.
   const initAuth = () => {
-    const storedUser = localStorage.getItem('user')
-    const storedMenus = localStorage.getItem('menus')
-    const storedPermissions = localStorage.getItem('permissions')
-    const storedMemberships = localStorage.getItem('outlet_memberships')
-    
-    if (storedUser && token.value) {
-      try {
-        user.value = JSON.parse(storedUser)
-        if (storedMenus) {
-          menus.value = JSON.parse(storedMenus)
-        }
-        if (storedPermissions) {
-          permissions.value = JSON.parse(storedPermissions)
-        }
-        if (storedMemberships) {
-          outletMemberships.value = JSON.parse(storedMemberships)
-        }
-        // Refresh user data and menus from server
-        fetchUser().then(() => fetchMenus())
-      } catch (err) {
-        clearAuth()
-      }
+    if (token.value && user.value) {
+      // Refresh user data first THEN menus agar isSuperAdmin sudah stabil
+      fetchUser().then(() => fetchMenus()).catch(() => {})
     }
   }
 
