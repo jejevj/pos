@@ -49,6 +49,7 @@ class CreateStockOpnameTables extends Command
                         id SERIAL PRIMARY KEY,
                         stock_opname_id INTEGER NOT NULL,
                         bahan_baku_id INTEGER NOT NULL,
+                        stock_location_id BIGINT,
                         system_stock DECIMAL(10,2) NOT NULL,
                         physical_stock DECIMAL(10,2),
                         difference DECIMAL(10,2),
@@ -59,11 +60,14 @@ class CreateStockOpnameTables extends Command
                         FOREIGN KEY (bahan_baku_id) REFERENCES bahan_baku(id) ON DELETE CASCADE
                     )
                 ");
+                // Backfill column for older schemas
+                DB::statement("ALTER TABLE stock_opname_detail ADD COLUMN IF NOT EXISTS stock_location_id BIGINT");
 
                 // Create indexes
                 DB::statement("CREATE INDEX IF NOT EXISTS idx_stock_opname_status ON stock_opname(status)");
                 DB::statement("CREATE INDEX IF NOT EXISTS idx_stock_opname_tanggal ON stock_opname(tanggal_mulai, tanggal_selesai)");
                 DB::statement("CREATE INDEX IF NOT EXISTS idx_stock_opname_detail_opname ON stock_opname_detail(stock_opname_id)");
+                DB::statement("CREATE INDEX IF NOT EXISTS idx_stock_opname_detail_location ON stock_opname_detail(stock_location_id)");
                 
                 $this->info("✓ Successfully created tables for {$outlet->name}");
             } catch (\Exception $e) {

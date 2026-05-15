@@ -11,6 +11,7 @@ class StockOpnameDetail extends Model
     protected $fillable = [
         'stock_opname_id',
         'bahan_baku_id',
+        'stock_location_id',
         'system_stock',
         'physical_stock',
         'difference',

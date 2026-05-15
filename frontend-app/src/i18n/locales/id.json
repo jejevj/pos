@@ -453,7 +453,14 @@
     "rejectedSuccessfully": "Stock opname berhasil ditolak",
     "backToList": "Kembali ke Daftar",
     "noStockOpname": "Belum ada stock opname",
-    "createFirst": "Buat jadwal stock opname pertama Anda"
+    "createFirst": "Buat jadwal stock opname pertama Anda",
+    "stockLocation": "Lokasi Stok",
+    "stockLocations": "Lokasi Stok",
+    "filterLocation": "Filter Lokasi",
+    "allLocations": "Semua Lokasi",
+    "allLocationsHint": "Kosongkan = opname global (tanpa lokasi)",
+    "locationPickerHelp": "Pilih satu atau lebih lokasi untuk opname per lokasi. Jika tidak dipilih, opname dibuat secara global per bahan baku.",
+    "globalLocation": "Global"
   },
   "promo": {
     "title": "Manajemen Promo",

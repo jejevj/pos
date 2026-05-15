@@ -742,6 +742,11 @@ class OutletProvisioner
     private function ensureStockOpnameTables(Outlet $outlet): void
     {
         $schema = $outlet->schema_name;
+
+        // Ensure locations + bahan_baku_locations + stock_movements exist so opname
+        // can operate per-location even when LocationController has not been called yet.
+        $this->ensureStockLocationTables($outlet);
+
         DB::statement("
             CREATE TABLE IF NOT EXISTS {$schema}.stock_opname (
                 id SERIAL PRIMARY KEY,
@@ -768,6 +773,7 @@ class OutletProvisioner
                 id SERIAL PRIMARY KEY,
                 stock_opname_id INTEGER NOT NULL,
                 bahan_baku_id INTEGER NOT NULL REFERENCES {$schema}.bahan_baku(id) ON DELETE CASCADE,
+                stock_location_id BIGINT,
                 system_stock DECIMAL(10,2) NOT NULL,
                 physical_stock DECIMAL(10,2),
                 difference DECIMAL(10,2),
@@ -777,9 +783,64 @@ class OutletProvisioner
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         ");
+        // Backfill column for outlets provisioned before location-aware opname
+        DB::statement("ALTER TABLE {$schema}.stock_opname_detail ADD COLUMN IF NOT EXISTS stock_location_id BIGINT");
         DB::statement("CREATE INDEX IF NOT EXISTS idx_stock_opname_status ON {$schema}.stock_opname(status)");
         DB::statement("CREATE INDEX IF NOT EXISTS idx_stock_opname_tanggal ON {$schema}.stock_opname(tanggal_mulai, tanggal_selesai)");
         DB::statement("CREATE INDEX IF NOT EXISTS idx_stock_opname_detail_opname ON {$schema}.stock_opname_detail(stock_opname_id)");
+        DB::statement("CREATE INDEX IF NOT EXISTS idx_stock_opname_detail_location ON {$schema}.stock_opname_detail(stock_location_id)");
+    }
+
+    /**
+     * Ensure stock-location related tables (locations, bahan_baku_locations,
+     * stock_movements) exist. Mirrors LocationController::ensureTables() but is
+     * called at provisioning time so opname can safely reference them.
+     */
+    private function ensureStockLocationTables(Outlet $outlet): void
+    {
+        $schema = $outlet->schema_name;
+
+        DB::statement("
+            CREATE TABLE IF NOT EXISTS {$schema}.locations (
+                id BIGSERIAL PRIMARY KEY,
+                name VARCHAR(100) NOT NULL,
+                type VARCHAR(30) NOT NULL DEFAULT 'warehouse',
+                description TEXT,
+                is_active BOOLEAN DEFAULT TRUE,
+                display_order INTEGER DEFAULT 0,
+                created_at TIMESTAMP DEFAULT NOW(),
+                updated_at TIMESTAMP DEFAULT NOW(),
+                deleted_at TIMESTAMP NULL
+            )
+        ");
+
+        DB::statement("
+            CREATE TABLE IF NOT EXISTS {$schema}.bahan_baku_locations (
+                id BIGSERIAL PRIMARY KEY,
+                bahan_baku_id BIGINT NOT NULL,
+                location_id BIGINT NOT NULL,
+                current_stock DECIMAL(12,4) DEFAULT 0,
+                created_at TIMESTAMP DEFAULT NOW(),
+                updated_at TIMESTAMP DEFAULT NOW(),
+                UNIQUE(bahan_baku_id, location_id)
+            )
+        ");
+
+        DB::statement("
+            CREATE TABLE IF NOT EXISTS {$schema}.stock_movements (
+                id BIGSERIAL PRIMARY KEY,
+                bahan_baku_id BIGINT NOT NULL,
+                from_location_id BIGINT NULL,
+                to_location_id BIGINT NULL,
+                type VARCHAR(30) NOT NULL,
+                quantity DECIMAL(12,4) NOT NULL,
+                notes TEXT,
+                reference_type VARCHAR(50),
+                reference_id BIGINT,
+                created_by BIGINT,
+                created_at TIMESTAMP DEFAULT NOW()
+            )
+        ");
     }
 
     private function ensurePromoTables(Outlet $outlet): void

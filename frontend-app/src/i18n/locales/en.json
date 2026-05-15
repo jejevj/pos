@@ -453,7 +453,14 @@
     "rejectedSuccessfully": "Stock opname rejected successfully",
     "backToList": "Back to List",
     "noStockOpname": "No stock opname yet",
-    "createFirst": "Create your first stock opname schedule"
+    "createFirst": "Create your first stock opname schedule",
+    "stockLocation": "Stock Location",
+    "stockLocations": "Stock Locations",
+    "filterLocation": "Filter Location",
+    "allLocations": "All Locations",
+    "allLocationsHint": "Leave empty = global opname (no location)",
+    "locationPickerHelp": "Pick one or more locations for per-location opname. If none selected, opname is created globally per material.",
+    "globalLocation": "Global"
   },
   "promo": {
     "title": "Promo Management",

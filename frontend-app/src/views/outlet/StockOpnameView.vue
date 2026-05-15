@@ -112,9 +112,23 @@
                     rows="3" style="width: 100%" />
         </div>
 
+        <!-- Location filter (when opname has per-location lines) -->
+        <div v-if="hasLocationLines" class="mb-4" style="display:flex; gap: 0.5rem; align-items:center; flex-wrap:wrap;">
+          <label style="font-weight:600;">{{ $t('stockOpname.filterLocation') }}:</label>
+          <Select v-model="detailLocationFilter" :options="locationFilterOptions" optionLabel="label"
+                  optionValue="value" :placeholder="$t('stockOpname.allLocations')" showClear style="min-width: 240px" />
+          <span class="text-muted">{{ filteredDetails.length }} / {{ selectedOpname.details.length }} {{ $t('stockOpname.totalItems') }}</span>
+        </div>
+
         <!-- Details Table -->
-        <DataTable :value="selectedOpname.details" :loading="loadingDetail" stripedRows showGridlines>
+        <DataTable :value="filteredDetails" :loading="loadingDetail" stripedRows showGridlines>
           <Column field="bahan_baku.nama" :header="$t('stockOpname.materialName')" />
+          <Column v-if="hasLocationLines" :header="$t('stockOpname.stockLocation')" style="width: 160px">
+            <template #body="{ data }">
+              <Tag v-if="data.stock_location" :value="data.stock_location.name" severity="info" />
+              <span v-else class="text-muted">{{ $t('stockOpname.globalLocation') }}</span>
+            </template>
+          </Column>
           <Column :header="$t('stockOpname.systemStock')" style="width: 150px">
             <template #body="{ data }">
               {{ formatNumber(data.system_stock) }} {{ data.bahan_baku?.satuan?.singkatan }}
@@ -200,6 +214,12 @@
           <h4>{{ $t('stockOpname.profitItemsDetail') }}</h4>
           <DataTable :value="reportData.profit_items" stripedRows>
             <Column field="bahan_baku.nama" :header="$t('stockOpname.materialName')" />
+            <Column v-if="reportHasLocations" :header="$t('stockOpname.stockLocation')">
+              <template #body="{ data }">
+                <Tag v-if="data.stock_location" :value="data.stock_location.name" severity="info" />
+                <span v-else class="text-muted">{{ $t('stockOpname.globalLocation') }}</span>
+              </template>
+            </Column>
             <Column :header="$t('stockOpname.difference')">
               <template #body="{ data }">
                 +{{ formatNumber(data.difference) }} {{ data.bahan_baku?.satuan?.singkatan }}
@@ -219,6 +239,12 @@
           <h4>{{ $t('stockOpname.lossItemsDetail') }}</h4>
           <DataTable :value="reportData.loss_items" stripedRows>
             <Column field="bahan_baku.nama" :header="$t('stockOpname.materialName')" />
+            <Column v-if="reportHasLocations" :header="$t('stockOpname.stockLocation')">
+              <template #body="{ data }">
+                <Tag v-if="data.stock_location" :value="data.stock_location.name" severity="info" />
+                <span v-else class="text-muted">{{ $t('stockOpname.globalLocation') }}</span>
+              </template>
+            </Column>
             <Column :header="$t('stockOpname.difference')">
               <template #body="{ data }">
                 {{ formatNumber(data.difference) }} {{ data.bahan_baku?.satuan?.singkatan }}
@@ -236,7 +262,7 @@
     </Card>
 
     <!-- Create Dialog -->
-    <Dialog v-model:visible="createDialogVisible" :header="$t('stockOpname.scheduleForm')" modal :style="{ width: '600px' }">
+    <Dialog v-model:visible="createDialogVisible" :header="$t('stockOpname.scheduleForm')" modal :style="{ width: '640px' }">
       <p class="text-muted mb-4">{{ $t('stockOpname.scheduleFormDesc') }}</p>
       <div class="form-grid">
         <div class="form-field">
@@ -250,6 +276,12 @@
         <div class="form-field full-width">
           <label>{{ $t('stockOpname.picName') }} *</label>
           <InputText v-model="formData.pic_name" :placeholder="$t('stockOpname.picNameHelp')" fluid />
+        </div>
+        <div class="form-field full-width">
+          <label>{{ $t('stockOpname.stockLocations') }}</label>
+          <MultiSelect v-model="formData.location_ids" :options="locations" optionLabel="name" optionValue="id"
+                       :placeholder="$t('stockOpname.allLocationsHint')" display="chip" filter fluid />
+          <small class="text-muted">{{ $t('stockOpname.locationPickerHelp') }}</small>
         </div>
         <div class="form-field full-width">
           <label>{{ $t('common.notes') }}</label>
@@ -282,6 +314,8 @@ import Textarea from 'primevue/textarea'
 import Tag from 'primevue/tag'
 import Dialog from 'primevue/dialog'
 import DatePicker from 'primevue/datepicker'
+import MultiSelect from 'primevue/multiselect'
+import Select from 'primevue/select'
 
 const route = useRoute()
 const router = useRouter()
@@ -309,12 +343,41 @@ const creating = ref(false)
 const currentView = ref('list')
 const createDialogVisible = ref(false)
 const approvalNotes = ref('')
+const locations = ref([])
+const detailLocationFilter = ref(null)
 
 const formData = ref({
   tanggal_mulai: null,
   tanggal_selesai: null,
   pic_name: '',
-  notes: ''
+  notes: '',
+  location_ids: []
+})
+
+const hasLocationLines = computed(() =>
+  !!selectedOpname.value?.details?.some(d => d.stock_location_id)
+)
+
+const reportHasLocations = computed(() => {
+  if (!reportData.value) return false
+  const all = [...(reportData.value.profit_items || []), ...(reportData.value.loss_items || [])]
+  return all.some(d => d.stock_location_id || d.stock_location)
+})
+
+const locationFilterOptions = computed(() => {
+  const seen = new Map()
+  for (const d of selectedOpname.value?.details || []) {
+    if (d.stock_location && !seen.has(d.stock_location.id)) {
+      seen.set(d.stock_location.id, { value: d.stock_location.id, label: d.stock_location.name })
+    }
+  }
+  return Array.from(seen.values())
+})
+
+const filteredDetails = computed(() => {
+  const details = selectedOpname.value?.details || []
+  if (!detailLocationFilter.value) return details
+  return details.filter(d => d.stock_location_id === detailLocationFilter.value)
 })
 
 const fetchOutlet = async () => {
@@ -323,6 +386,16 @@ const fetchOutlet = async () => {
     outlet.value = response.data
   } catch (error) {
     console.error('Failed to fetch outlet:', error)
+  }
+}
+
+const fetchLocations = async () => {
+  try {
+    const response = await api.get(`/outlets/${outletId}/locations`, { params: { is_active: true } })
+    locations.value = response.data || []
+  } catch (error) {
+    // Locations endpoint should exist; soft-fail to keep form usable
+    locations.value = []
   }
 }
 
@@ -343,7 +416,8 @@ const showCreateDialog = () => {
     tanggal_mulai: null,
     tanggal_selesai: null,
     pic_name: '',
-    notes: ''
+    notes: '',
+    location_ids: []
   }
   createDialogVisible.value = true
 }
@@ -355,7 +429,8 @@ const createSchedule = async () => {
       tanggal_mulai: formatDateForAPI(formData.value.tanggal_mulai),
       tanggal_selesai: formatDateForAPI(formData.value.tanggal_selesai),
       pic_name: formData.value.pic_name,
-      notes: formData.value.notes
+      notes: formData.value.notes,
+      location_ids: Array.isArray(formData.value.location_ids) ? formData.value.location_ids : []
     }
     await api.post(`/outlets/${outletId}/stock-opname`, payload)
     toast.add({ severity: 'success', summary: t('messages.success'), detail: t('stockOpname.createdSuccessfully'), life: 3000 })
@@ -399,6 +474,7 @@ const backToList = () => {
   selectedOpname.value = null
   reportData.value = null
   approvalNotes.value = ''
+  detailLocationFilter.value = null
   fetchStockOpnames()
 }
 
@@ -604,6 +680,7 @@ const getStatusTranslationKey = (status) => {
 onMounted(() => {
   fetchOutlet()
   fetchStockOpnames()
+  fetchLocations()
 })
 </script>
 
