@@ -208,15 +208,9 @@ export const useAuthStore = defineStore('auth', () => {
 
   const fetchMenus = async () => {
     if (!token.value) return
-    
     try {
-      // Superadmin: gunakan endpoint menu global (sidebar)
-      // Outlet user: tidak perlu fetch global menus (sidebar tidak ditampilkan)
-      if (!isSuperAdmin.value && outletMemberships.value.length > 0) {
-        menus.value = []
-        return
-      }
-
+      // Fetch global menus — called only from AdminLayout for superadmin
+      // Outlet users use a separate layout with no sidebar, so this won't be called for them
       const response = await api.get('/menus/user')
       menus.value = response.data
       localStorage.setItem('menus', JSON.stringify(response.data))
