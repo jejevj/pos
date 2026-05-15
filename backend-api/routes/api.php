@@ -264,6 +264,9 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // HR Management - Shift Management
     Route::get('outlets/{outlet}/shifts', [\App\Http\Controllers\Api\Outlet\ShiftController::class, 'index']);
+    Route::post('outlets/{outlet}/shifts', [\App\Http\Controllers\Api\Outlet\ShiftController::class, 'storeShift']);
+    // Sub-resource routes MUST come BEFORE the catch-all /shifts/{id} routes,
+    // otherwise Laravel will route e.g. "assignments" into the {id} parameter.
     Route::get('outlets/{outlet}/shifts/assignments', [\App\Http\Controllers\Api\Outlet\ShiftController::class, 'getAssignments']);
     Route::get('outlets/{outlet}/shifts/calendar', [\App\Http\Controllers\Api\Outlet\ShiftController::class, 'getCalendar']);
     Route::post('outlets/{outlet}/shifts/assign', [\App\Http\Controllers\Api\Outlet\ShiftController::class, 'assignShift']);
@@ -275,6 +278,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('outlets/{outlet}/shifts/copy-day', [\App\Http\Controllers\Api\Outlet\ShiftController::class, 'copyDaySchedule']);
     Route::put('outlets/{outlet}/shifts/assignments/{id}', [\App\Http\Controllers\Api\Outlet\ShiftController::class, 'updateAssignment']);
     Route::delete('outlets/{outlet}/shifts/assignments/{id}', [\App\Http\Controllers\Api\Outlet\ShiftController::class, 'deleteAssignment']);
+    // Catch-all numeric-id routes for shift configuration CRUD.
+    Route::put('outlets/{outlet}/shifts/{id}', [\App\Http\Controllers\Api\Outlet\ShiftController::class, 'updateShift'])->whereNumber('id');
+    Route::delete('outlets/{outlet}/shifts/{id}', [\App\Http\Controllers\Api\Outlet\ShiftController::class, 'destroyShift'])->whereNumber('id');
 
     // Purchase Management
     Route::get('outlets/{outlet}/purchases', [\App\Http\Controllers\Api\Outlet\PurchaseController::class, 'index']);

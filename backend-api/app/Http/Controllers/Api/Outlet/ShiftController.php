@@ -21,22 +21,276 @@ class ShiftController extends Controller
     public function index(Request $request, $outletId)
     {
         $outlet = $this->authorizeOutlet($outletId);
-        
+
         try {
             DB::statement("SET search_path TO {$outlet->schema_name}, public");
-            
-            $shifts = DB::table('shifts')
-                ->where('is_active', true)
-                ->orderBy('start_time')
-                ->get();
-            
+
+            $this->ensureShiftsTable($outlet->schema_name);
+
+            $query = DB::table('shifts');
+            // By default only return active shifts; manager UI can opt-in to all via ?include_inactive=1
+            if (!$request->boolean('include_inactive')) {
+                $query->where('is_active', true);
+            }
+            $shifts = $query->orderBy('start_time')->get();
+
             DB::statement("SET search_path TO public");
-            
+
             return response()->json($shifts);
         } catch (\Exception $e) {
             DB::statement("SET search_path TO public");
             return response()->json(['message' => $e->getMessage()], 500);
         }
+    }
+
+    /**
+     * Create a new shift configuration (e.g. shift pagi, shift malam).
+     * Allowed for superadmin and outlet owner.
+     */
+    public function storeShift(Request $request, $outletId)
+    {
+        $outlet = $this->authorizeOutlet($outletId);
+
+        if (!$this->isOutletAdmin()) {
+            DB::statement("SET search_path TO public");
+            return response()->json([
+                'message' => 'Hanya superadmin atau pemilik outlet yang dapat mengelola konfigurasi shift.',
+            ], 403);
+        }
+
+        $request->validate([
+            'name'        => 'required|string|max:100',
+            'code'        => 'nullable|string|max:20',
+            'start_time'  => 'required|date_format:H:i',
+            'end_time'    => 'required|date_format:H:i',
+            'color'       => 'nullable|string|max:7',
+            'description' => 'nullable|string',
+            'is_active'   => 'boolean',
+        ]);
+
+        try {
+            DB::statement("SET search_path TO {$outlet->schema_name}, public");
+            $this->ensureShiftsTable($outlet->schema_name);
+
+            $code = $request->code ?: $this->generateShiftCode($request->name);
+
+            if (DB::table('shifts')->where('code', $code)->exists()) {
+                DB::statement("SET search_path TO public");
+                return response()->json([
+                    'message' => 'Kode shift sudah digunakan, silakan pilih kode lain.',
+                ], 422);
+            }
+
+            $id = DB::table('shifts')->insertGetId([
+                'name'        => $request->name,
+                'code'        => $code,
+                'start_time'  => $request->start_time,
+                'end_time'    => $request->end_time,
+                'color'       => $request->color ?: '#3b82f6',
+                'description' => $request->description,
+                'is_active'   => $request->boolean('is_active', true),
+                'created_at'  => now(),
+                'updated_at'  => now(),
+            ]);
+
+            $shift = DB::table('shifts')->where('id', $id)->first();
+
+            DB::statement("SET search_path TO public");
+
+            return response()->json([
+                'message' => 'Konfigurasi shift berhasil dibuat',
+                'data'    => $shift,
+            ], 201);
+        } catch (\Exception $e) {
+            DB::statement("SET search_path TO public");
+            return response()->json(['message' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Update an existing shift configuration.
+     */
+    public function updateShift(Request $request, $outletId, $id)
+    {
+        $outlet = $this->authorizeOutlet($outletId);
+
+        if (!$this->isOutletAdmin()) {
+            DB::statement("SET search_path TO public");
+            return response()->json([
+                'message' => 'Hanya superadmin atau pemilik outlet yang dapat mengelola konfigurasi shift.',
+            ], 403);
+        }
+
+        $request->validate([
+            'name'        => 'sometimes|required|string|max:100',
+            'code'        => 'nullable|string|max:20',
+            'start_time'  => 'sometimes|required|date_format:H:i',
+            'end_time'    => 'sometimes|required|date_format:H:i',
+            'color'       => 'nullable|string|max:7',
+            'description' => 'nullable|string',
+            'is_active'   => 'boolean',
+        ]);
+
+        try {
+            DB::statement("SET search_path TO {$outlet->schema_name}, public");
+
+            $shift = DB::table('shifts')->where('id', $id)->first();
+            if (!$shift) {
+                DB::statement("SET search_path TO public");
+                return response()->json(['message' => 'Shift tidak ditemukan'], 404);
+            }
+
+            $data = array_filter([
+                'name'        => $request->input('name'),
+                'code'        => $request->input('code'),
+                'start_time'  => $request->input('start_time'),
+                'end_time'    => $request->input('end_time'),
+                'color'       => $request->input('color'),
+                'description' => $request->input('description'),
+            ], fn ($v) => $v !== null);
+
+            if ($request->has('is_active')) {
+                $data['is_active'] = $request->boolean('is_active');
+            }
+
+            if (!empty($data['code']) && $data['code'] !== $shift->code) {
+                $codeExists = DB::table('shifts')
+                    ->where('code', $data['code'])
+                    ->where('id', '!=', $id)
+                    ->exists();
+                if ($codeExists) {
+                    DB::statement("SET search_path TO public");
+                    return response()->json([
+                        'message' => 'Kode shift sudah digunakan, silakan pilih kode lain.',
+                    ], 422);
+                }
+            }
+
+            $data['updated_at'] = now();
+            DB::table('shifts')->where('id', $id)->update($data);
+
+            $shift = DB::table('shifts')->where('id', $id)->first();
+
+            DB::statement("SET search_path TO public");
+
+            return response()->json([
+                'message' => 'Konfigurasi shift berhasil diperbarui',
+                'data'    => $shift,
+            ]);
+        } catch (\Exception $e) {
+            DB::statement("SET search_path TO public");
+            return response()->json(['message' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Delete (or soft-deactivate) a shift configuration.
+     * If the shift has assignments, we soft-deactivate instead of hard-deleting
+     * to avoid breaking historical records.
+     */
+    public function destroyShift($outletId, $id)
+    {
+        $outlet = $this->authorizeOutlet($outletId);
+
+        if (!$this->isOutletAdmin()) {
+            DB::statement("SET search_path TO public");
+            return response()->json([
+                'message' => 'Hanya superadmin atau pemilik outlet yang dapat mengelola konfigurasi shift.',
+            ], 403);
+        }
+
+        try {
+            DB::statement("SET search_path TO {$outlet->schema_name}, public");
+
+            $shift = DB::table('shifts')->where('id', $id)->first();
+            if (!$shift) {
+                DB::statement("SET search_path TO public");
+                return response()->json(['message' => 'Shift tidak ditemukan'], 404);
+            }
+
+            $hasAssignments = DB::table('shift_assignments')->where('shift_id', $id)->exists();
+
+            if ($hasAssignments) {
+                DB::table('shifts')->where('id', $id)->update([
+                    'is_active'  => false,
+                    'updated_at' => now(),
+                ]);
+                DB::statement("SET search_path TO public");
+                return response()->json([
+                    'message' => 'Shift dinonaktifkan karena masih memiliki jadwal terkait.',
+                    'soft'    => true,
+                ]);
+            }
+
+            DB::table('shifts')->where('id', $id)->delete();
+
+            DB::statement("SET search_path TO public");
+
+            return response()->json(['message' => 'Konfigurasi shift berhasil dihapus']);
+        } catch (\Exception $e) {
+            DB::statement("SET search_path TO public");
+            return response()->json(['message' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Ensure the shifts table exists for the given outlet schema. This makes
+     * the controller resilient even for outlets that were created before the
+     * shift-management feature was introduced.
+     */
+    private function ensureShiftsTable(string $schemaName): void
+    {
+        try {
+            $exists = DB::select("SELECT EXISTS (
+                SELECT FROM information_schema.tables
+                WHERE table_schema = ?
+                AND table_name = 'shifts'
+            ) AS exists", [$schemaName]);
+
+            if (empty($exists) || !$exists[0]->exists) {
+                DB::statement("
+                    CREATE TABLE {$schemaName}.shifts (
+                        id SERIAL PRIMARY KEY,
+                        name VARCHAR(100) NOT NULL,
+                        code VARCHAR(20) NOT NULL UNIQUE,
+                        start_time TIME NOT NULL,
+                        end_time TIME NOT NULL,
+                        color VARCHAR(7) DEFAULT '#3b82f6',
+                        description TEXT,
+                        is_active BOOLEAN DEFAULT true,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                ");
+            }
+        } catch (\Exception $e) {
+            \Log::error('Error ensuring shifts table: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Generate a unique code from a shift name. Used when the caller doesn't
+     * supply one explicitly.
+     */
+    private function generateShiftCode(string $name): string
+    {
+        $base = strtoupper(substr(preg_replace('/[^A-Za-z0-9]/', '', $name), 0, 6));
+        if ($base === '') {
+            $base = 'SHIFT';
+        }
+
+        $candidate = $base;
+        $i = 1;
+        while (DB::table('shifts')->where('code', $candidate)->exists()) {
+            $candidate = $base . $i;
+            $i++;
+            if ($i > 999) {
+                $candidate = $base . substr((string) microtime(true), -4);
+                break;
+            }
+        }
+
+        return $candidate;
     }
 
     /**

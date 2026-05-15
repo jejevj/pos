@@ -160,11 +160,37 @@
         </div>
         <div class="field">
           <label>{{ $t('bahanBaku.storageLocation') }}</label>
-          <InputText v-model="form.lokasi_penyimpanan" style="width: 100%" />
+          <Select
+            v-model="form.lokasi_penyimpanan"
+            :options="storageLocations"
+            optionLabel="label"
+            optionValue="value"
+            :placeholder="storageLocations.length ? $t('bahanBaku.selectStorageLocation') || 'Pilih lokasi penyimpanan' : ($t('bahanBaku.noLocationsAvailable') || 'Belum ada lokasi penyimpanan di outlet ini')"
+            :disabled="!storageLocations.length"
+            style="width: 100%"
+            showClear
+            filter
+          />
+          <small v-if="!storageLocations.length" class="text-orange-600">
+            <i class="pi pi-info-circle" /> {{ $t('bahanBaku.addLocationHint') || 'Buat lokasi penyimpanan terlebih dahulu di menu Lokasi.' }}
+          </small>
         </div>
         <div class="field">
-          <label>{{ $t('bahanBaku.expiryDate') }}</label>
-          <DatePicker v-model="form.expired_date" style="width: 100%" dateFormat="yy-mm-dd" />
+          <label>
+            {{ $t('bahanBaku.expiryDate') }}
+            <span class="text-muted">({{ $t('common.optional') || 'opsional' }})</span>
+          </label>
+          <DatePicker
+            v-model="form.expired_date"
+            style="width: 100%"
+            dateFormat="yy-mm-dd"
+            showButtonBar
+            :showIcon="true"
+            :placeholder="$t('bahanBaku.expiryDatePlaceholder') || 'Kosongkan jika tidak ada masa kedaluwarsa'"
+          />
+          <small class="text-muted">
+            {{ $t('bahanBaku.expiryDateHint') || 'Boleh dikosongkan untuk bahan baku yang tidak memiliki tanggal kedaluwarsa.' }}
+          </small>
         </div>
         <div class="field">
           <label>{{ $t('bahanBaku.description') }}</label>
@@ -370,6 +396,21 @@ const materials = ref([])
 const categories = ref([])
 const units = ref([])
 const suppliers = ref([])
+// Storage locations available for THIS outlet (scoped, not global).
+const locations = ref([])
+const storageLocations = computed(() => {
+  const base = locations.value
+    .filter(l => l.is_active)
+    .map(l => ({ label: l.name + (l.type ? ` (${l.type})` : ''), value: l.name }))
+  // If the currently-loaded form has a legacy free-text location that doesn't
+  // match any active location, surface it as a disabled-looking extra option so
+  // the user can still see it (and replace it).
+  const current = form.value?.lokasi_penyimpanan
+  if (current && !base.some(o => o.value === current)) {
+    base.unshift({ label: `${current} (${t('common.legacy') || 'lama'})`, value: current })
+  }
+  return base
+})
 const stockHistory = ref([])
 const locationStocks = ref([])
 const loadingLocationStocks = ref(false)
@@ -453,6 +494,19 @@ const fetchSuppliers = async () => {
     const response = await api.get(`/outlets/${outletId}/supplier`)
     suppliers.value = response.data
   } catch (error) { console.error(error) }
+}
+
+// Pulls storage locations scoped to the current outlet. Used by the
+// "Lokasi Penyimpanan" dropdown in the bahan baku form so users can only
+// pick from locations defined for this outlet (not global / not empty).
+const fetchLocations = async () => {
+  try {
+    const response = await api.get(`/outlets/${outletId}/locations`)
+    locations.value = Array.isArray(response.data) ? response.data : []
+  } catch (error) {
+    console.error('Failed to fetch locations:', error)
+    locations.value = []
+  }
 }
 
 const fetchStockHistory = async (materialId) => {
@@ -592,6 +646,7 @@ onMounted(() => {
   fetchCategories()
   fetchUnits()
   fetchSuppliers()
+  fetchLocations()
 })
 </script>
 

@@ -14,9 +14,35 @@
         <p class="text-muted">{{ $t('shift.subtitle') }}</p>
       </div>
       <div class="header-actions">
+        <Button
+          v-if="canManageShifts"
+          :label="$t('shift.manageShifts') || 'Kelola Shift'"
+          icon="pi pi-cog"
+          severity="primary"
+          @click="openManageShiftsDialog"
+        />
         <Button :label="$t('shift.viewAllDayOffs')" icon="pi pi-calendar-times" severity="secondary" outlined @click="openViewAllDayOffsDialog" />
       </div>
     </div>
+
+    <!-- Empty state when no shift configurations exist -->
+    <Message v-if="!loading && shifts.length === 0" severity="warn" :closable="false" class="empty-shifts-banner">
+      <div class="empty-shifts-content">
+        <div>
+          <strong>{{ $t('shift.noShiftsTitle') || 'Belum ada konfigurasi shift' }}</strong>
+          <p class="text-muted" style="margin: 0.25rem 0 0;">
+            {{ $t('shift.noShiftsHint') || 'Buat konfigurasi shift terlebih dahulu (misal: Shift Pagi, Shift Malam) sebelum menetapkan karyawan ke kalender.' }}
+          </p>
+        </div>
+        <Button
+          v-if="canManageShifts"
+          :label="$t('shift.createFirstShift') || 'Buat Shift Sekarang'"
+          icon="pi pi-plus"
+          severity="warn"
+          @click="openManageShiftsDialog"
+        />
+      </div>
+    </Message>
 
     <!-- Month Navigation -->
     <div class="month-navigation">
@@ -279,6 +305,93 @@
       </template>
     </Dialog>
 
+    <!-- Manage Shift Configurations Dialog (Superadmin / Outlet Owner) -->
+    <Dialog v-model:visible="manageShiftsDialogVisible" :header="$t('shift.manageShifts') || 'Kelola Shift'" modal :style="{ width: '720px' }">
+      <div class="manage-shifts-content">
+        <div class="manage-shifts-toolbar">
+          <p class="text-muted" style="margin: 0;">
+            {{ $t('shift.manageShiftsHint') || 'Atur konfigurasi shift untuk outlet ini, misalnya Shift Pagi (08:00-16:00) atau Shift Malam (16:00-00:00).' }}
+          </p>
+          <Button
+            :label="$t('shift.addShift') || 'Tambah Shift'"
+            icon="pi pi-plus"
+            size="small"
+            @click="openShiftForm()"
+          />
+        </div>
+
+        <DataTable :value="shifts" stripedRows :loading="savingShift" class="mt-3" emptyMessage="-">
+          <Column :header="$t('shift.name') || 'Nama'" field="name" />
+          <Column :header="$t('shift.code') || 'Kode'" field="code" style="width: 110px" />
+          <Column :header="$t('shift.startTime') || 'Mulai'" style="width: 100px">
+            <template #body="{ data }">{{ formatTime(data.start_time) }}</template>
+          </Column>
+          <Column :header="$t('shift.endTime') || 'Selesai'" style="width: 100px">
+            <template #body="{ data }">{{ formatTime(data.end_time) }}</template>
+          </Column>
+          <Column :header="$t('common.status') || 'Status'" style="width: 110px">
+            <template #body="{ data }">
+              <Tag :value="data.is_active ? ($t('common.active') || 'Aktif') : ($t('common.inactive') || 'Nonaktif')" :severity="data.is_active ? 'success' : 'secondary'" />
+            </template>
+          </Column>
+          <Column :header="$t('common.actions') || 'Aksi'" style="width: 130px">
+            <template #body="{ data }">
+              <Button icon="pi pi-pencil" text rounded size="small" @click="openShiftForm(data)" />
+              <Button icon="pi pi-trash" text rounded size="small" severity="danger" @click="confirmDeleteShift(data)" />
+            </template>
+          </Column>
+        </DataTable>
+      </div>
+
+      <template #footer>
+        <Button :label="$t('common.close')" text @click="manageShiftsDialogVisible = false" />
+      </template>
+    </Dialog>
+
+    <!-- Shift Form Dialog -->
+    <Dialog v-model:visible="shiftFormDialogVisible" :header="shiftFormIsEdit ? ($t('shift.editShift') || 'Ubah Shift') : ($t('shift.addShift') || 'Tambah Shift')" modal :style="{ width: '460px' }">
+      <div class="shift-form">
+        <div class="form-field">
+          <label>{{ $t('shift.name') || 'Nama' }} *</label>
+          <InputText v-model="shiftForm.name" fluid placeholder="Shift Pagi" />
+        </div>
+        <div class="form-field">
+          <label>{{ $t('shift.code') || 'Kode' }}</label>
+          <InputText v-model="shiftForm.code" fluid placeholder="PAGI" maxlength="20" />
+          <small class="text-muted">{{ $t('shift.codeHint') || 'Kosongkan untuk dibuat otomatis dari nama.' }}</small>
+        </div>
+        <div class="form-row">
+          <div class="form-field" style="flex: 1">
+            <label>{{ $t('shift.startTime') || 'Mulai' }} *</label>
+            <InputText v-model="shiftForm.start_time" fluid placeholder="08:00" maxlength="5" />
+          </div>
+          <div class="form-field" style="flex: 1">
+            <label>{{ $t('shift.endTime') || 'Selesai' }} *</label>
+            <InputText v-model="shiftForm.end_time" fluid placeholder="16:00" maxlength="5" />
+          </div>
+        </div>
+        <small class="text-muted">{{ $t('shift.timeHint') || 'Format 24 jam, contoh: 08:00, 16:00.' }}</small>
+        <div class="form-field" style="margin-top: 0.75rem;">
+          <label>{{ $t('shift.color') || 'Warna' }}</label>
+          <InputText v-model="shiftForm.color" fluid placeholder="#3b82f6" maxlength="7" />
+        </div>
+        <div class="form-field">
+          <label>{{ $t('shift.description') || 'Deskripsi' }}</label>
+          <Textarea v-model="shiftForm.description" rows="2" fluid />
+        </div>
+        <div class="form-field">
+          <div class="flex align-items-center gap-2">
+            <Checkbox v-model="shiftForm.is_active" :binary="true" inputId="shift_is_active" />
+            <label for="shift_is_active">{{ $t('common.active') || 'Aktif' }}</label>
+          </div>
+        </div>
+      </div>
+      <template #footer>
+        <Button :label="$t('common.cancel')" text @click="shiftFormDialogVisible = false" />
+        <Button :label="$t('common.save')" :loading="savingShift" @click="saveShift" />
+      </template>
+    </Dialog>
+
     <!-- View All Day Offs Dialog -->
     <Dialog v-model:visible="viewAllDayOffsDialogVisible" :header="$t('shift.allDayOffs')" modal :style="{ width: '900px' }">
       <div class="all-day-offs-content">
@@ -327,8 +440,10 @@ import Column from 'primevue/column'
 import Chip from 'primevue/chip'
 import MultiSelect from 'primevue/multiselect'
 import api from '@/services/api'
+import { useAuthStore } from '@/stores/auth'
 import Button from 'primevue/button'
 import Dialog from 'primevue/dialog'
+import InputText from 'primevue/inputtext'
 import ProgressSpinner from 'primevue/progressspinner'
 import Select from 'primevue/select'
 import DatePicker from 'primevue/datepicker'
@@ -339,8 +454,161 @@ const route = useRoute()
 const toast = useToast()
 const confirm = useConfirm()
 const { t } = useI18n()
+const authStore = useAuthStore()
 
 const outletId = route.params.outletId
+
+// Only superadmin or outlet owner may manage shift configurations.
+const canManageShifts = computed(() => {
+  if (authStore.isSuperAdmin) return true
+  const membership = authStore.getOutletMembership(outletId)
+  if (!membership) return false
+  return membership.roles?.some(r => (r.name || r) === 'owner') || false
+})
+
+// State for shift-configuration management dialog
+const manageShiftsDialogVisible = ref(false)
+const shiftFormDialogVisible = ref(false)
+const shiftFormIsEdit = ref(false)
+const savingShift = ref(false)
+const shiftForm = ref({
+  id: null,
+  name: '',
+  code: '',
+  start_time: '08:00',
+  end_time: '16:00',
+  color: '#3b82f6',
+  description: '',
+  is_active: true,
+})
+
+const openManageShiftsDialog = () => {
+  // Refresh including inactive shifts so admins can re-enable them.
+  fetchShiftsForManagement()
+  manageShiftsDialogVisible.value = true
+}
+
+const fetchShiftsForManagement = async () => {
+  try {
+    const response = await api.get(`/outlets/${outletId}/shifts`, { params: { include_inactive: 1 } })
+    shifts.value = response.data || []
+  } catch (error) {
+    console.error('Failed to fetch shifts for management:', error)
+  }
+}
+
+const resetShiftForm = () => {
+  shiftForm.value = {
+    id: null,
+    name: '',
+    code: '',
+    start_time: '08:00',
+    end_time: '16:00',
+    color: '#3b82f6',
+    description: '',
+    is_active: true,
+  }
+}
+
+const openShiftForm = (shift = null) => {
+  if (shift) {
+    shiftFormIsEdit.value = true
+    shiftForm.value = {
+      id: shift.id,
+      name: shift.name,
+      code: shift.code,
+      start_time: (shift.start_time || '').substring(0, 5),
+      end_time: (shift.end_time || '').substring(0, 5),
+      color: shift.color || '#3b82f6',
+      description: shift.description || '',
+      is_active: !!shift.is_active,
+    }
+  } else {
+    shiftFormIsEdit.value = false
+    resetShiftForm()
+  }
+  shiftFormDialogVisible.value = true
+}
+
+const validateShiftTime = (val) => /^([01]\d|2[0-3]):[0-5]\d$/.test(val || '')
+
+const saveShift = async () => {
+  if (!shiftForm.value.name?.trim()) {
+    toast.add({ severity: 'warn', summary: t('messages.warning'), detail: t('users.fillRequired'), life: 3000 })
+    return
+  }
+  if (!validateShiftTime(shiftForm.value.start_time) || !validateShiftTime(shiftForm.value.end_time)) {
+    toast.add({ severity: 'warn', summary: t('messages.warning'), detail: t('shift.invalidTimeFormat') || 'Format jam harus HH:MM (24 jam).', life: 4000 })
+    return
+  }
+
+  savingShift.value = true
+  try {
+    const payload = {
+      name: shiftForm.value.name.trim(),
+      code: shiftForm.value.code?.trim() || null,
+      start_time: shiftForm.value.start_time,
+      end_time: shiftForm.value.end_time,
+      color: shiftForm.value.color || '#3b82f6',
+      description: shiftForm.value.description || null,
+      is_active: shiftForm.value.is_active,
+    }
+    if (shiftFormIsEdit.value && shiftForm.value.id) {
+      await api.put(`/outlets/${outletId}/shifts/${shiftForm.value.id}`, payload)
+    } else {
+      await api.post(`/outlets/${outletId}/shifts`, payload)
+    }
+    toast.add({ severity: 'success', summary: t('messages.success'), detail: t('messages.savedSuccessfully'), life: 3000 })
+    shiftFormDialogVisible.value = false
+    await fetchShiftsForManagement()
+    // Refresh calendar shifts list (which only shows active)
+    await fetchShifts()
+  } catch (error) {
+    toast.add({
+      severity: 'error',
+      summary: t('messages.error'),
+      detail: error.response?.data?.message || t('messages.errorOccurred'),
+      life: 4000,
+    })
+  } finally {
+    savingShift.value = false
+  }
+}
+
+const confirmDeleteShift = (shift) => {
+  confirm.require({
+    message: t('messages.confirmDelete', { item: shift.name }),
+    header: t('shift.deleteShift') || 'Hapus Shift',
+    icon: 'pi pi-exclamation-triangle',
+    acceptLabel: t('common.yes'),
+    rejectLabel: t('common.no'),
+    accept: () => deleteShift(shift.id),
+  })
+}
+
+const deleteShift = async (id) => {
+  savingShift.value = true
+  try {
+    const res = await api.delete(`/outlets/${outletId}/shifts/${id}`)
+    toast.add({
+      severity: res.data?.soft ? 'warn' : 'success',
+      summary: t('messages.success'),
+      detail: res.data?.message || t('messages.deletedSuccessfully'),
+      life: 3500,
+    })
+    await fetchShiftsForManagement()
+    await fetchShifts()
+  } catch (error) {
+    toast.add({
+      severity: 'error',
+      summary: t('messages.error'),
+      detail: error.response?.data?.message || t('messages.errorOccurred'),
+      life: 4000,
+    })
+  } finally {
+    savingShift.value = false
+  }
+}
 
 const loading = ref(false)
 const saving = ref(false)
@@ -843,6 +1111,34 @@ onMounted(() => {
 .text-muted { color: #6b7280; font-size: 0.875rem; margin: 0; }
 
 .header-actions {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.empty-shifts-banner {
+  margin-bottom: 1.5rem;
+}
+.empty-shifts-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.manage-shifts-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+}
+.shift-form .form-field {
+  margin-bottom: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+.shift-form .form-row {
   display: flex;
   gap: 0.75rem;
 }
