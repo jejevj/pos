@@ -51,7 +51,8 @@
     "signUp": "Sign Up",
     "sessionExpired": "Session Expired",
     "sessionExpiredMessage": "Your session has expired due to inactivity.",
-    "sessionExpiredHint": "Please login again to continue."
+    "sessionExpiredHint": "Please login again to continue.",
+    "welcomeTo": "Welcome to {name}"
   },
   "dashboard": {
     "welcomeBack": "Welcome back, {name}!",

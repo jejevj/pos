@@ -21,8 +21,11 @@
     <div class="left-panel">
       <div class="left-inner">
         <div class="brand">
-          <i class="pi pi-box brand-icon"></i>
-          <span class="brand-name">SaaS App</span>
+          <img v-if="site.hasLogo" :src="site.siteLogo" :alt="site.siteName" class="brand-logo" />
+          <template v-else>
+            <i class="pi pi-box brand-icon"></i>
+            <span class="brand-name">{{ site.siteName }}</span>
+          </template>
         </div>
         <img src="/login-bg.svg" alt="Login illustration" class="login-illustration" />
       </div>
@@ -32,8 +35,8 @@
     <div class="right-panel">
       <div class="form-wrap">
 
-        <h2 class="welcome-title">Welcome to SaaS App</h2>
-        <p class="welcome-sub">Your Admin Dashboard</p>
+        <h2 class="welcome-title">{{ $t('auth.welcomeTo', { name: site.siteName }) }}</h2>
+        <p class="welcome-sub">{{ site.siteTagline }}</p>
 
         <!-- Email -->
         <div class="field-group">
@@ -109,6 +112,7 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
+import { useSiteSettings } from '@/stores/siteSettings'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useI18n } from 'vue-i18n'
@@ -118,6 +122,7 @@ import Button from 'primevue/button'
 const router    = useRouter()
 const route     = useRoute()
 const authStore = useAuthStore()
+const site      = useSiteSettings()
 const { t }     = useI18n()
 
 const showPassword          = ref(false)

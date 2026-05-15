@@ -22,13 +22,16 @@
 import { RouterView } from 'vue-router'
 import { onMounted } from 'vue'
 import { useAuthStore } from '@/stores/auth'
+import { useSiteSettings } from '@/stores/siteSettings'
 import Toast from 'primevue/toast'
 import ConfirmDialog from 'primevue/confirmdialog'
 
-const authStore = useAuthStore()
+const authStore  = useAuthStore()
+const siteSettings = useSiteSettings()
 
 onMounted(() => {
   authStore.initAuth()
+  siteSettings.fetch()   // load site identity (name, logo, favicon) saat app start
 })
 </script>
 

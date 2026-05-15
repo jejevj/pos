@@ -8,8 +8,11 @@
   >
     <!-- Logo slot -->
     <template #logo>
-      <i class="pi pi-box logo-icon" />
-      <span class="brand-name">SaaS App</span>
+      <img v-if="site.hasLogo" :src="site.siteLogo" :alt="site.siteName" class="brand-logo-img" />
+      <template v-else>
+        <i class="pi pi-box logo-icon" />
+        <span class="brand-name">{{ site.siteName }}</span>
+      </template>
     </template>
 
     <!-- Toolbar slot (top-right header) -->
@@ -59,9 +62,11 @@ import { useLanguage } from '@/composables/useLanguage'
 import { useI18n } from 'vue-i18n'
 import Menu from 'primevue/menu'
 import VueroLayout from './layouts/VueroLayout.vue'
+import { useSiteSettings } from '@/stores/siteSettings'
 import VueroNavItem from './layouts/VueroNavItem.vue'
 
 const router    = useRouter()
+const site      = useSiteSettings()
 const route     = useRoute()
 const authStore = useAuthStore()
 const { t }     = useI18n()

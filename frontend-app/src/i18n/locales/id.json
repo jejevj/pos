@@ -59,7 +59,8 @@
     "signUp": "Daftar",
     "sessionExpired": "Sesi Berakhir",
     "sessionExpiredMessage": "Sesi Anda telah berakhir karena tidak ada aktivitas.",
-    "sessionExpiredHint": "Silakan masuk kembali untuk melanjutkan."
+    "sessionExpiredHint": "Silakan masuk kembali untuk melanjutkan.",
+    "welcomeTo": "Selamat Datang di {name}"
   },
   "dashboard": {
     "welcomeBack": "Selamat datang kembali, {name}!",
