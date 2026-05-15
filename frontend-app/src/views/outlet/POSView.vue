@@ -61,6 +61,8 @@
           <div class="order-type-buttons">
             <Button :label="$t('pos.dineIn')" icon="pi pi-home" @click="startOrder('dine_in')" class="p-button-lg" />
             <Button :label="$t('pos.takeaway')" icon="pi pi-shopping-bag" @click="startOrder('takeaway')" class="p-button-lg" />
+            <Button label="Daftar Bon" icon="pi pi-receipt" severity="warning" outlined
+                    @click="showBonList = true" class="p-button-lg" />
           </div>
         </div>
 
@@ -359,6 +361,56 @@
       </template>
     </Dialog>
 
+    <!-- Daftar Bon Dialog -->
+    <Dialog v-model:visible="showBonList" header="Daftar Bon" :style="{ width: '520px' }" modal>
+      <div v-if="bonOrders.length === 0" class="bon-empty">
+        <i class="pi pi-check-circle"></i>
+        <p>Tidak ada bon yang menunggu pembayaran</p>
+      </div>
+
+      <div v-else class="bon-list">
+        <div v-for="order in bonOrders" :key="order.id" class="bon-item">
+          <div class="bon-item-header">
+            <span class="bon-order-code">{{ order.kode || order.order_code }}</span>
+            <span class="bon-table">{{ getBonTableLabel(order) }}</span>
+            <span class="bon-time">{{ formatBonTime(order.created_at_local || order.created_at) }}</span>
+          </div>
+          <div class="bon-item-body">
+            <span class="bon-items-summary">{{ (order.items && order.items.length) || 0 }} item</span>
+            <span class="bon-total">Rp {{ formatNumber(order.total_amount || order.grand_total || 0) }}</span>
+          </div>
+          <div class="bon-item-actions">
+            <Button label="Lunas" icon="pi pi-check" severity="success" size="small"
+                    :loading="processingPayment && selectedBonOrder && selectedBonOrder.id === order.id"
+                    @click="markBonAsPaid(order)" />
+            <Button label="Detail" icon="pi pi-eye" severity="secondary" size="small" outlined
+                    @click="viewBonDetail(order)" />
+          </div>
+        </div>
+      </div>
+
+      <template #footer>
+        <Button label="Tutup" severity="secondary" outlined @click="showBonList = false" />
+        <Button label="Refresh" icon="pi pi-refresh" outlined @click="loadBonOrders" />
+      </template>
+    </Dialog>
+
+    <!-- Payment Confirmation Dialog -->
+    <Dialog v-model:visible="showPayConfirm" header="Konfirmasi Pembayaran" :style="{ width: '360px' }" modal>
+      <div v-if="selectedBonOrder" class="pay-confirm-content">
+        <p>Tandai pesanan <strong>{{ selectedBonOrder.kode || selectedBonOrder.order_code }}</strong> sebagai lunas?</p>
+        <div class="pay-confirm-total">
+          <span>Total:</span>
+          <strong>Rp {{ formatNumber(selectedBonOrder.total_amount || selectedBonOrder.grand_total || 0) }}</strong>
+        </div>
+      </div>
+      <template #footer>
+        <Button label="Batal" severity="secondary" outlined @click="showPayConfirm = false" />
+        <Button label="Lunas" icon="pi pi-check" severity="success"
+                :loading="processingPayment" @click="confirmPayment" />
+      </template>
+    </Dialog>
+
     <!-- Printer Settings Dialog -->
     <PrinterSettingsDialog v-model="printerSettingsVisible" :printer="printer" />
 
@@ -418,6 +470,13 @@ const showCleanupDialog = ref(false)
 const processing = ref(false)
 const selectedArea = ref(null)
 const promoRefreshInterval = ref(null)
+
+// Daftar Bon state
+const showBonList = ref(false)
+const showPayConfirm = ref(false)
+const bonOrders = ref([])
+const selectedBonOrder = ref(null)
+const processingPayment = ref(false)
 
 // Transaction settings (tax/service charge) from outlet config
 const txSettings = ref({
@@ -996,6 +1055,62 @@ const getTableStatusSeverity = (status) => {
 const getAreaLabel = (area) => {
   const labels = { indoor: t('table.indoor'), outdoor: t('table.outdoor'), vip: t('table.vip') }
   return labels[area] || area
+}
+
+// Daftar Bon helpers
+function getBonTableLabel(order) {
+  const num = order?.table?.table_number || order?.table_number
+  if (num) return `Meja ${num}`
+  return order?.order_type === 'takeaway' ? 'Takeaway' : '-'
+}
+
+function formatBonTime(ts) {
+  if (!ts) return ''
+  try {
+    return new Date(ts).toLocaleString('id-ID', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: 'short' })
+  } catch (e) {
+    return String(ts)
+  }
+}
+
+async function loadBonOrders() {
+  try {
+    const res = await api.get(`/outlets/${numericOutletId}/orders`, { params: { status: 'bon' } })
+    bonOrders.value = res.data?.data || res.data || []
+  } catch (err) {
+    console.error('Failed to load bon orders:', err)
+    toast.add({ severity: 'error', summary: 'Gagal memuat daftar bon', detail: err.message, life: 3000 })
+  }
+}
+
+watch(showBonList, (val) => { if (val) loadBonOrders() })
+
+function viewBonDetail(order) {
+  const code = order.kode || order.order_code
+  if (!code) return
+  window.open(`/track/${outletId}/${code}`, '_blank')
+}
+
+function markBonAsPaid(order) {
+  selectedBonOrder.value = order
+  showPayConfirm.value = true
+}
+
+async function confirmPayment() {
+  if (!selectedBonOrder.value) return
+  processingPayment.value = true
+  try {
+    await api.post(`/outlets/${numericOutletId}/orders/${selectedBonOrder.value.id}/settle-bon`)
+    toast.add({ severity: 'success', summary: 'Berhasil', detail: 'Bon telah dilunasi', life: 3000 })
+    showPayConfirm.value = false
+    selectedBonOrder.value = null
+    await loadBonOrders()
+  } catch (err) {
+    console.error('Payment failed:', err)
+    toast.add({ severity: 'error', summary: 'Gagal melunasi bon', detail: err.response?.data?.message || err.message, life: 3000 })
+  } finally {
+    processingPayment.value = false
+  }
 }
 
 const openCleanupDialog = () => {
@@ -1757,4 +1872,20 @@ onBeforeUnmount(() => {
   color: #92400e;
   font-size: 0.75rem;
 }
+
+/* Daftar Bon */
+.bon-list { display: flex; flex-direction: column; gap: 0.75rem; max-height: 400px; overflow-y: auto; }
+.bon-item { border: 1px solid var(--p-surface-border); border-radius: 8px; padding: 0.75rem; }
+.bon-item-header { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.25rem; }
+.bon-order-code { font-weight: 700; font-size: 0.9rem; }
+.bon-table { font-size: 0.8rem; color: var(--p-text-muted-color); }
+.bon-time { font-size: 0.75rem; color: var(--p-text-muted-color); margin-left: auto; }
+.bon-item-body { display: flex; justify-content: space-between; margin-bottom: 0.5rem; }
+.bon-total { font-weight: 600; }
+.bon-item-actions { display: flex; gap: 0.5rem; justify-content: flex-end; }
+.bon-empty { text-align: center; padding: 2rem; color: var(--p-text-muted-color); }
+.bon-empty i { font-size: 2rem; margin-bottom: 0.5rem; display: block; }
+.pay-confirm-content { padding: 0.5rem 0; }
+.pay-confirm-total { display: flex; justify-content: space-between; margin-top: 0.75rem; padding: 0.75rem; background: var(--p-surface-50); border-radius: 6px; }
+:global(html.is-dark) .pay-confirm-total { background: #1a1a24; }
 </style>
