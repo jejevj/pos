@@ -102,15 +102,17 @@ class OutletDashboardMenuSeeder extends Seeder
                 'order'     => 50,
                 'parent_id' => null,
                 'children'  => [
-                    ['name' => 'outlet-tables',    'title' => 'Meja',          'icon' => 'pi pi-table',    'url' => "/outlets/{$outletId}/tables",    'order' => 1],
-                    ['name' => 'outlet-stations',  'title' => 'Stasiun',       'icon' => 'pi pi-server',   'url' => "/outlets/{$outletId}/stations",  'order' => 2],
-                    ['name' => 'outlet-users',     'title' => 'Pengguna',      'icon' => 'pi pi-user-plus','url' => "/outlets/{$outletId}/users",     'order' => 3],
-                    ['name' => 'outlet-utilities', 'title' => 'Utilitas',      'icon' => 'pi pi-wrench',   'url' => "/outlets/{$outletId}/utilities", 'order' => 4],
-                    ['name' => 'outlet-whatsapp',  'title' => 'WhatsApp',      'icon' => 'pi pi-whatsapp', 'url' => "/outlets/{$outletId}/whatsapp",  'order' => 5],
-                    ['name' => 'outlet-settings',  'title' => 'Transaksi & Struk', 'icon' => 'pi pi-receipt', 'url' => "/outlets/{$outletId}/settings", 'order' => 6],
+                    ['name' => 'outlet-tables',    'title' => 'Meja',      'icon' => 'pi pi-table',    'url' => "/outlets/{$outletId}/tables",    'order' => 1],
+                    ['name' => 'outlet-stations',  'title' => 'Stasiun',   'icon' => 'pi pi-server',   'url' => "/outlets/{$outletId}/stations",  'order' => 2],
+                    ['name' => 'outlet-users',     'title' => 'Pengguna',  'icon' => 'pi pi-user-plus','url' => "/outlets/{$outletId}/users",     'order' => 3],
+                    ['name' => 'outlet-utilities', 'title' => 'Utilitas',  'icon' => 'pi pi-wrench',   'url' => "/outlets/{$outletId}/utilities", 'order' => 4],
+                    ['name' => 'outlet-whatsapp',  'title' => 'WhatsApp',  'icon' => 'pi pi-whatsapp', 'url' => "/outlets/{$outletId}/whatsapp",  'order' => 5],
                 ],
             ],
         ];
+
+        // Remove sidebar menu item that was added by mistake (settings now live in Utilities tab).
+        Menu::where('name', 'outlet-settings')->delete();
 
         foreach ($menus as $menuData) {
             $children = $menuData['children'] ?? [];

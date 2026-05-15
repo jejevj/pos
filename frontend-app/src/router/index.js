@@ -375,12 +375,6 @@ const router = createRouter({
           name: 'outlet-production',
           component: () => import('@/views/outlet/ProductionView.vue'),
           meta: { requiresAuth: true, title: 'Production' }
-        },
-        {
-          path: 'outlets/:outletId/settings',
-          name: 'outlet-settings',
-          component: () => import('@/views/SettingsView.vue'),
-          meta: { requiresAuth: true, title: 'Pengaturan Transaksi' }
         }
       ]
     },
