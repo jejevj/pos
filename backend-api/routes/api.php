@@ -144,6 +144,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('outlets/{outlet}/menu/upload-image', [\App\Http\Controllers\Api\Outlet\MenuImageController::class, 'upload']);
     Route::post('outlets/{outlet}/menu/delete-image', [\App\Http\Controllers\Api\Outlet\MenuImageController::class, 'delete']);
 
+    // Generic Image Upload (logos, etc.)
+    Route::post('outlets/{outlet}/upload/image', [\App\Http\Controllers\Api\Outlet\UploadController::class, 'uploadImage']);
+
     // Tables Management
     Route::get('outlets/{outlet}/tables', [\App\Http\Controllers\Api\Outlet\TableController::class, 'index']);
     Route::post('outlets/{outlet}/tables', [\App\Http\Controllers\Api\Outlet\TableController::class, 'store']);
