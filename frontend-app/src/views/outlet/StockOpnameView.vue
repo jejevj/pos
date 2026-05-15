@@ -275,7 +275,8 @@
         </div>
         <div class="form-field full-width">
           <label>{{ $t('stockOpname.picName') }} *</label>
-          <InputText v-model="formData.pic_name" :placeholder="$t('stockOpname.picNameHelp')" fluid />
+          <Select v-model="formData.pic_user_id" :options="picOptions" optionLabel="label" optionValue="id"
+                  :placeholder="$t('stockOpname.picNameHelp')" :loading="loadingPicOptions" filter showClear fluid />
         </div>
         <div class="form-field full-width">
           <label>{{ $t('stockOpname.stockLocations') }}</label>
@@ -345,11 +346,13 @@ const createDialogVisible = ref(false)
 const approvalNotes = ref('')
 const locations = ref([])
 const detailLocationFilter = ref(null)
+const picOptions = ref([])
+const loadingPicOptions = ref(false)
 
 const formData = ref({
   tanggal_mulai: null,
   tanggal_selesai: null,
-  pic_name: '',
+  pic_user_id: null,
   notes: '',
   location_ids: []
 })
@@ -399,6 +402,18 @@ const fetchLocations = async () => {
   }
 }
 
+const fetchPicOptions = async () => {
+  loadingPicOptions.value = true
+  try {
+    const response = await api.get(`/outlets/${outletId}/stock-opname/pic-options`)
+    picOptions.value = response.data?.data || []
+  } catch (error) {
+    picOptions.value = []
+  } finally {
+    loadingPicOptions.value = false
+  }
+}
+
 const fetchStockOpnames = async () => {
   loading.value = true
   try {
@@ -415,20 +430,30 @@ const showCreateDialog = () => {
   formData.value = {
     tanggal_mulai: null,
     tanggal_selesai: null,
-    pic_name: '',
+    pic_user_id: null,
     notes: '',
     location_ids: []
   }
   createDialogVisible.value = true
+  if (!picOptions.value.length) {
+    fetchPicOptions()
+  }
 }
 
 const createSchedule = async () => {
+  if (!formData.value.pic_user_id) {
+    toast.add({ severity: 'warn', summary: t('messages.warning'), detail: t('stockOpname.picNameHelp'), life: 3000 })
+    return
+  }
   creating.value = true
   try {
+    const picOpt = picOptions.value.find(o => o.id === formData.value.pic_user_id)
     const payload = {
       tanggal_mulai: formatDateForAPI(formData.value.tanggal_mulai),
       tanggal_selesai: formatDateForAPI(formData.value.tanggal_selesai),
-      pic_name: formData.value.pic_name,
+      pic_user_id: formData.value.pic_user_id,
+      pic_source: picOpt?.source || 'outlet_user',
+      pic_name: picOpt?.name || null,
       notes: formData.value.notes,
       location_ids: Array.isArray(formData.value.location_ids) ? formData.value.location_ids : []
     }
@@ -681,6 +706,7 @@ onMounted(() => {
   fetchOutlet()
   fetchStockOpnames()
   fetchLocations()
+  fetchPicOptions()
 })
 </script>
 

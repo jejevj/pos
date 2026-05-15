@@ -19,6 +19,62 @@ class StockOpnameController extends Controller
 
 
     /**
+     * PIC options: users available in this outlet (active outlet_users plus
+     * the outlet owner from main users table). Used by the stock opname form
+     * to render a dropdown of valid PICs scoped to the current outlet.
+     */
+    public function picOptions($outletId)
+    {
+        $outlet = $this->authorizeOutlet($outletId, ['setSchema' => false]);
+
+        try {
+            DB::statement("SET search_path TO {$outlet->schema_name}, public");
+
+            $outletUsers = DB::table('outlet_users')
+                ->where('outlet_id', $outlet->id)
+                ->where('is_active', true)
+                ->whereNull('deleted_at')
+                ->select('id', 'name', 'email')
+                ->orderBy('name')
+                ->get()
+                ->map(fn ($u) => [
+                    'id'     => (int) $u->id,
+                    'name'   => $u->name,
+                    'email'  => $u->email,
+                    'source' => 'outlet_user',
+                    'label'  => $u->name . ' (' . $u->email . ')',
+                ]);
+
+            DB::statement("SET search_path TO public");
+
+            $options = $outletUsers->values()->all();
+
+            $owner = $outlet->user_id ? DB::table('users')
+                ->where('id', $outlet->user_id)
+                ->select('id', 'name', 'email')
+                ->first() : null;
+
+            if ($owner) {
+                $hasOwnerEmail = $outletUsers->contains(fn ($u) => strcasecmp($u['email'] ?? '', $owner->email) === 0);
+                if (!$hasOwnerEmail) {
+                    array_unshift($options, [
+                        'id'     => (int) $owner->id,
+                        'name'   => $owner->name,
+                        'email'  => $owner->email,
+                        'source' => 'owner',
+                        'label'  => $owner->name . ' (Owner)',
+                    ]);
+                }
+            }
+
+            return response()->json(['data' => $options]);
+        } catch (\Exception $e) {
+            DB::statement("SET search_path TO public");
+            return response()->json(['message' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
      * Get all stock opname records
      */
     public function index(Request $request, $outletId)
@@ -63,7 +119,9 @@ class StockOpnameController extends Controller
         $validator = Validator::make($request->all(), [
             'tanggal_mulai' => 'required|date',
             'tanggal_selesai' => 'required|date|after_or_equal:tanggal_mulai',
-            'pic_name' => 'required|string|max:100',
+            'pic_user_id' => 'required|integer|min:1',
+            'pic_source' => 'nullable|in:outlet_user,owner',
+            'pic_name' => 'nullable|string|max:100',
             'notes' => 'nullable|string',
             'location_ids' => 'nullable|array',
             'location_ids.*' => 'integer|min:1',
@@ -74,6 +132,40 @@ class StockOpnameController extends Controller
         }
 
         try {
+            // Resolve PIC: must be a user that belongs to this outlet (outlet_user
+            // in this schema, OR the outlet owner from main users table).
+            $picUserId = (int) $request->input('pic_user_id');
+            $picSource = $request->input('pic_source');
+            $picName = null;
+
+            if ($picSource === 'owner' || (!$picSource && $outlet->user_id === $picUserId)) {
+                if ((int) $outlet->user_id !== $picUserId) {
+                    return response()->json([
+                        'message' => 'PIC tidak valid untuk outlet ini',
+                    ], 422);
+                }
+                $owner = DB::table('users')->where('id', $picUserId)->first();
+                if (!$owner) {
+                    return response()->json(['message' => 'PIC tidak ditemukan'], 422);
+                }
+                $picName = $owner->name;
+            } else {
+                DB::statement("SET search_path TO {$outlet->schema_name}, public");
+                $picRow = DB::table('outlet_users')
+                    ->where('id', $picUserId)
+                    ->where('outlet_id', $outlet->id)
+                    ->where('is_active', true)
+                    ->whereNull('deleted_at')
+                    ->first();
+                DB::statement("SET search_path TO public");
+                if (!$picRow) {
+                    return response()->json([
+                        'message' => 'PIC tidak terdaftar sebagai user aktif di outlet ini',
+                    ], 422);
+                }
+                $picName = $picRow->name;
+            }
+
             DB::statement("SET search_path TO {$outlet->schema_name}, public");
 
             // Validate location_ids belong to this outlet schema (prevents cross-outlet ids)
@@ -106,8 +198,8 @@ class StockOpnameController extends Controller
                 'tanggal_mulai' => $request->tanggal_mulai,
                 'tanggal_selesai' => $request->tanggal_selesai,
                 'status' => 'draft',
-                'pic_name' => $request->pic_name,
-                'pic_user_id' => Auth::id(),
+                'pic_name' => $picName,
+                'pic_user_id' => $picUserId,
                 'notes' => $request->notes,
                 'created_by' => Auth::id(),
             ]);
