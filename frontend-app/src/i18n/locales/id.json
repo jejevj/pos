@@ -42,7 +42,16 @@
     "filter": "Filter",
     "reset": "Reset",
     "selectDate": "Pilih Tanggal",
-    "remove": "Hapus"
+    "remove": "Hapus",
+    "add": "Tambah",
+    "all": "Semua",
+    "allStatuses": "Semua Status",
+    "copy": "Salin",
+    "forbidden": "Akses ditolak",
+    "optional": "opsional",
+    "order": "Pesanan",
+    "submit": "Kirim",
+    "view": "Lihat"
   },
   "auth": {
     "login": "Masuk",
@@ -155,7 +164,8 @@
     "systemUpdates": "Pembaruan Sistem",
     "securityAlerts": "Peringatan Keamanan",
     "activityUpdates": "Pembaruan Aktivitas",
-    "marketing": "Pemasaran"
+    "marketing": "Pemasaran",
+    "transaction": "Transaksi"
   },
   "outlet": {
     "outlets": "Outlet",
@@ -202,6 +212,7 @@
     "materials": "Bahan Baku",
     "addBahanBaku": "Tambah Bahan Baku",
     "bahanBakuName": "Nama Bahan Baku",
+    "bahanBaku": "Bahan Baku",
     "bahanBakuCreated": "Bahan baku berhasil dibuat",
     "addCategory": "Tambah Kategori",
     "editCategory": "Edit Kategori",
@@ -243,7 +254,12 @@
     "maxStock": "Stok Maks",
     "currentStock": "Stok Saat Ini",
     "storageLocation": "Lokasi Penyimpanan",
+    "selectStorageLocation": "Pilih Lokasi Penyimpanan",
+    "noLocationsAvailable": "Belum ada lokasi penyimpanan untuk outlet ini.",
+    "addLocationHint": "Buat lokasi penyimpanan terlebih dahulu di menu Lokasi.",
     "expiryDate": "Tanggal Kadaluarsa",
+    "expiryDatePlaceholder": "Kosongkan jika tidak ada masa kedaluwarsa",
+    "expiryDateHint": "Boleh dikosongkan untuk bahan baku yang tidak memiliki tanggal kedaluwarsa.",
     "imageUrl": "URL Gambar",
     "description": "Deskripsi",
     "materialActive": "Aktif",
@@ -498,7 +514,8 @@
     "createSuccess": "Meja berhasil dibuat",
     "updateSuccess": "Meja berhasil diupdate",
     "deleteSuccess": "Meja berhasil dihapus",
-    "deleteConfirm": "Apakah Anda yakin ingin menghapus meja"
+    "deleteConfirm": "Apakah Anda yakin ingin menghapus meja",
+    "status": "Status"
   },
   "pos": {
     "cleanupTable": "Bersihkan Meja",
@@ -523,6 +540,7 @@
     "subtotal": "Subtotal",
     "discount": "Diskon",
     "tax": "Pajak",
+    "taxInclusiveNote": "Sudah termasuk pajak",
     "total": "Total",
     "clearCart": "Kosongkan Keranjang",
     "processPayment": "Proses Pembayaran",
@@ -1044,7 +1062,22 @@
     "scheduleGenerated": "Jadwal berhasil dibuat",
     "weeklyDayOffEnabled": "Aktifkan Libur Mingguan",
     "minStaffPerRole": "Minimum Staff per Role",
-    "autoScheduleHint": "Sistem akan otomatis membuat jadwal shift berdasarkan ketersediaan karyawan, hari libur mingguan, dan pengajuan cuti yang disetujui."
+    "autoScheduleHint": "Sistem akan otomatis membuat jadwal shift berdasarkan ketersediaan karyawan, hari libur mingguan, dan pengajuan cuti yang disetujui.",
+    "manageShifts": "Kelola Shift",
+    "manageShiftsHint": "Atur konfigurasi shift untuk outlet ini, misalnya Shift Pagi (08:00-16:00) atau Shift Malam (16:00-00:00).",
+    "noShiftsTitle": "Belum ada konfigurasi shift",
+    "noShiftsHint": "Buat konfigurasi shift terlebih dahulu (misal: Shift Pagi, Shift Malam) sebelum menetapkan karyawan ke kalender.",
+    "createFirstShift": "Buat Shift Sekarang",
+    "addShift": "Tambah Shift",
+    "editShift": "Ubah Shift",
+    "name": "Nama",
+    "code": "Kode",
+    "codeHint": "Kosongkan untuk dibuat otomatis dari nama.",
+    "startTime": "Mulai",
+    "endTime": "Selesai",
+    "timeHint": "Format 24 jam, contoh: 08:00, 16:00.",
+    "color": "Warna",
+    "description": "Deskripsi"
   },
   "purchase": {
     "title": "Barang Masuk",
@@ -1183,6 +1216,8 @@
     "lowAccuracy": "Akurasi lokasi terlalu rendah. Silakan pindah ke area terbuka.",
     "fakeGPSDetected": "Fake GPS terdeteksi. Silakan nonaktifkan mock location.",
     "outsideRadius": "Anda berada di luar radius yang diizinkan",
+    "retryLocation": "Coba Lagi",
+    "withinRadius": "Dalam radius absensi",
     "waitingCamera": "Menunggu kamera...",
     "permissionRequired": "Izin Diperlukan",
     "cameraPermission": "Akses Kamera",
