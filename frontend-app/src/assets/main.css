@@ -255,6 +255,88 @@ html.is-dark [style*="background:#fdf2f8"] {
   background: #2a2a36 !important;
 }
 
+
+/* ── PrimeVue CSS vars override langsung (lebih reliable dari definePreset) ─
+   PrimeVue v4 inject vars via :root {} di <style> tag runtime.
+   html.is-dark {} lebih spesifik dari :root {} sehingga selalu menang.
+   Naming: token path a.b.c → --p-a-b-c
+   ─────────────────────────────────────────────────────────────────────────── */
+html.is-dark {
+  /* Content (card body, breadcrumb, datatable, panel background) */
+  --p-content-background:       #1e1e28;
+  --p-content-hover-background: #252535;
+  --p-content-border-color:     #2e2e3e;
+  --p-content-color:            #e4e4ef;
+  --p-content-hover-color:      #ffffff;
+
+  /* Form fields (input, select, textarea, dropdown) */
+  --p-form-field-background:            #232330;
+  --p-form-field-disabled-background:   #1a1a24;
+  --p-form-field-filled-background:     #252535;
+  --p-form-field-filled-hover-background: #2a2a3a;
+  --p-form-field-filled-focus-background: #2a2a3a;
+  --p-form-field-border-color:          #3a3a50;
+  --p-form-field-hover-border-color:    #4a4a60;
+  --p-form-field-focus-border-color:    var(--primary, #41b3a3);
+  --p-form-field-color:                 #e4e4ef;
+  --p-form-field-placeholder-color:     #5a5a7a;
+  --p-form-field-disabled-color:        #5a5a7a;
+  --p-form-field-icon-color:            #7a7a9a;
+  --p-form-field-float-label-color:     #7a7a9a;
+  --p-form-field-float-label-focus-color: var(--primary, #41b3a3);
+
+  /* Overlay (dropdown panel, dialog, popover) */
+  --p-overlay-select-background:    #1e1e28;
+  --p-overlay-select-border-color:  #2e2e3e;
+  --p-overlay-select-color:         #e4e4ef;
+  --p-overlay-popover-background:   #1e1e28;
+  --p-overlay-popover-border-color: #2e2e3e;
+  --p-overlay-popover-color:        #e4e4ef;
+  --p-overlay-modal-background:     #1e1e28;
+  --p-overlay-modal-border-color:   #2e2e3e;
+  --p-overlay-modal-color:          #e4e4ef;
+
+  /* Text */
+  --p-text-color:             #e4e4ef;
+  --p-text-hover-color:       #ffffff;
+  --p-text-muted-color:       #7a7a9a;
+  --p-text-hover-muted-color: #9090b0;
+
+  /* List options (dropdown items, listbox) */
+  --p-list-option-color:                  #e4e4ef;
+  --p-list-option-focus-color:            #ffffff;
+  --p-list-option-selected-color:         #ffffff;
+  --p-list-option-selected-focus-color:   #ffffff;
+  --p-list-option-focus-background:       #252535;
+  --p-list-option-selected-background:    color-mix(in srgb, var(--primary, #41b3a3), transparent 80%);
+  --p-list-option-selected-focus-background: color-mix(in srgb, var(--primary, #41b3a3), transparent 72%);
+
+  /* Navigation (menu, breadcrumb, menubar) */
+  --p-navigation-item-color:              #9090b0;
+  --p-navigation-item-focus-color:        #e4e4ef;
+  --p-navigation-item-active-color:       #e4e4ef;
+  --p-navigation-item-focus-background:   #252535;
+  --p-navigation-item-active-background:  #252535;
+  --p-navigation-item-icon-color:         #7a7a9a;
+  --p-navigation-item-icon-focus-color:   #b0b0cc;
+
+  /* Datatable specific */
+  --p-datatable-border-color: #2e2e3e;
+
+  /* Surface fallback */
+  --p-surface-0:   #ffffff;
+  --p-surface-50:  #1a1a24;
+  --p-surface-100: #1e1e28;
+  --p-surface-200: #232330;
+  --p-surface-300: #2a2a38;
+  --p-surface-400: #3a3a52;
+  --p-surface-500: #52527a;
+  --p-surface-600: #6a6a9a;
+  --p-surface-700: #8080aa;
+  --p-surface-800: #a0a0c0;
+  --p-surface-900: #c0c0d8;
+  --p-surface-950: #e4e4ef;
+}
 /* ── PrimeVue safety overrides (yang tidak di-cover design tokens) ─ */
 html.is-dark .p-datatable-header {
   background: #1e1e28 !important;
