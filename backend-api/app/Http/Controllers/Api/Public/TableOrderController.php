@@ -153,7 +153,7 @@ class TableOrderController extends Controller
         $validator = Validator::make($request->all(), [
             'customer_name'  => 'required|string|max:255',
             'customer_phone' => 'required|string|max:50',
-            'customer_email' => 'required|email|max:255',
+            'customer_email' => 'nullable|email|max:255',
             'notes'          => 'nullable|string|max:500',
             'member_card'    => 'nullable|string|max:50',
             'payment_method_id' => 'required|integer',

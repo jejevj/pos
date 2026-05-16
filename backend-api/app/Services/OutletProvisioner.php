@@ -927,11 +927,35 @@ class OutletProvisioner
                 joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 last_transaction_at TIMESTAMP,
                 is_active BOOLEAN DEFAULT TRUE,
+                status VARCHAR(20) DEFAULT 'active',
+                phone_verified_at TIMESTAMP NULL,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 deleted_at TIMESTAMP
             )
         ");
+        // Heal columns on legacy outlets created before phone-OTP rolled out.
+        DB::statement("ALTER TABLE {$schema}.members ADD COLUMN IF NOT EXISTS status VARCHAR(20) DEFAULT 'active'");
+        DB::statement("ALTER TABLE {$schema}.members ADD COLUMN IF NOT EXISTS phone_verified_at TIMESTAMP NULL");
+
+        // OTP table for WhatsApp verification during member registration.
+        DB::statement("
+            CREATE TABLE IF NOT EXISTS {$schema}.wa_otp_codes (
+                id SERIAL PRIMARY KEY,
+                phone VARCHAR(50) NOT NULL,
+                code_hash VARCHAR(255) NOT NULL,
+                purpose VARCHAR(30) NOT NULL DEFAULT 'member_register',
+                attempts INTEGER NOT NULL DEFAULT 0,
+                payload JSONB,
+                expires_at TIMESTAMP NOT NULL,
+                verified_at TIMESTAMP NULL,
+                verify_token VARCHAR(80) NULL,
+                last_sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ");
+        DB::statement("CREATE INDEX IF NOT EXISTS idx_{$schema}_wa_otp_phone ON {$schema}.wa_otp_codes(phone, purpose)");
         $settingsExisted = $this->tableExists($schema, 'membership_settings');
         DB::statement("
             CREATE TABLE IF NOT EXISTS {$schema}.membership_settings (

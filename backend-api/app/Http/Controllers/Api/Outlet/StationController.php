@@ -300,13 +300,18 @@ class StationController extends Controller
 
     protected function dispatchProgressNotification(Outlet $outlet, int $orderId, string $event): void
     {
+        // dispatchAfterResponse runs in the same PHP worker after the HTTP
+        // response is flushed — does not require `queue:work` running, which
+        // is the common cause of "no WhatsApp arrives" in production.
+        $outletName = (string) ($outlet->nama ?? $outlet->name ?? '');
         try {
-            SendOrderProgressWhatsApp::dispatch(
+            SendOrderProgressWhatsApp::dispatchAfterResponse(
                 $outlet->schema_name,
                 $orderId,
-                (string) ($outlet->nama ?? $outlet->name ?? ''),
+                $outletName,
                 $event
             );
+            Log::info("[WAHA] Queued progress notification ({$event}) for order #{$orderId} in {$outlet->schema_name}");
         } catch (\Throwable $e) {
             Log::warning("[WAHA] Failed to dispatch progress job ({$event}) for order #{$orderId}: " . $e->getMessage());
         }

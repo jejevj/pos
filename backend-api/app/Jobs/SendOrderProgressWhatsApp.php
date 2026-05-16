@@ -49,7 +49,7 @@ class SendOrderProgressWhatsApp implements ShouldQueue
     public function handle(WahaService $waha): void
     {
         if (!$waha->isEnabled()) {
-            Log::info("[WAHA] Skip order #{$this->orderId} {$this->event}: WAHA disabled");
+            Log::info("[WAHA] Skip order #{$this->orderId} {$this->event}: WAHA disabled (set WAHA_ENABLED=true)");
             return;
         }
 
@@ -58,26 +58,34 @@ class SendOrderProgressWhatsApp implements ShouldQueue
 
             $order = DB::table('orders')->where('id', $this->orderId)->first();
             if (!$order) {
-                Log::info("[WAHA] Skip order #{$this->orderId} {$this->event}: order missing");
+                Log::info("[WAHA] Skip order #{$this->orderId} {$this->event}: order missing in schema {$this->schema}");
                 DB::statement("SET search_path TO public");
                 return;
             }
 
             $phone = trim((string) ($order->customer_phone ?? ''));
             if ($phone === '') {
-                Log::info("[WAHA] Skip order #{$this->orderId} {$this->event}: no customer phone");
+                Log::info("[WAHA] Skip order #{$this->orderId} {$this->event}: customer_phone empty");
                 DB::statement("SET search_path TO public");
                 return;
             }
 
-            $settings = DB::table('wa_settings')->first();
+            // wa_settings might not exist yet for legacy outlets — tolerate.
+            $settings = null;
+            if (DB::getSchemaBuilder()->hasTable('wa_settings')) {
+                $settings = DB::table('wa_settings')->first();
+            } else {
+                Log::info("[WAHA] wa_settings table missing for {$this->schema}; using default templates");
+            }
 
             // Allow outlet to opt-out per event
             if ($this->event === 'processing' && $settings && isset($settings->notify_processing) && !$settings->notify_processing) {
+                Log::info("[WAHA] Skip order #{$this->orderId} processing: notify_processing disabled in outlet settings");
                 DB::statement("SET search_path TO public");
                 return;
             }
             if ($this->event === 'ready' && $settings && isset($settings->notify_ready) && !$settings->notify_ready) {
+                Log::info("[WAHA] Skip order #{$this->orderId} ready: notify_ready disabled in outlet settings");
                 DB::statement("SET search_path TO public");
                 return;
             }
@@ -91,7 +99,10 @@ class SendOrderProgressWhatsApp implements ShouldQueue
             );
 
             DB::statement("SET search_path TO public");
-            $waha->sendText($phone, $message);
+            $ok = $waha->sendText($phone, $message);
+            if (!$ok) {
+                Log::warning("[WAHA] sendText returned false for order #{$this->orderId} ({$this->event}) — cek koneksi/sesi WAHA");
+            }
         } catch (\Throwable $e) {
             DB::statement("SET search_path TO public");
             Log::warning("[WAHA] Progress notify failed for order #{$this->orderId} ({$this->event}): " . $e->getMessage());

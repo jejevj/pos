@@ -20,8 +20,14 @@ use Illuminate\Support\Facades\Route;
 Route::get('/track/{outletId}/{orderCode}', [\App\Http\Controllers\Api\OrderTrackingController::class, 'show']);
 
 // ── Public membership registration (no auth required) ─────────────────────
-Route::get('/public/membership/{outletSlug}',          [\App\Http\Controllers\Api\Public\MembershipController::class, 'show']);
-Route::post('/public/membership/{outletSlug}/register', [\App\Http\Controllers\Api\Public\MembershipController::class, 'register']);
+Route::get('/public/membership/{outletSlug}',                   [\App\Http\Controllers\Api\Public\MembershipController::class, 'show']);
+// New OTP flow: 1) request OTP (via WhatsApp), 2) verify OTP + set password to finalise registration.
+Route::middleware('throttle:30,1')->group(function () {
+    Route::post('/public/membership/{outletSlug}/otp/request', [\App\Http\Controllers\Api\Public\MembershipController::class, 'requestOtp']);
+    Route::post('/public/membership/{outletSlug}/otp/verify',  [\App\Http\Controllers\Api\Public\MembershipController::class, 'verifyOtp']);
+});
+// Legacy direct-register endpoint — now returns 410 to direct clients to /otp/request.
+Route::post('/public/membership/{outletSlug}/register',         [\App\Http\Controllers\Api\Public\MembershipController::class, 'register']);
 
 // ── Public table-ordering (no auth required, rate-limited) ───────────────
 Route::middleware('throttle:60,1')->group(function () {

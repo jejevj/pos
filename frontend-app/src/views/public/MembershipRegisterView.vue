@@ -90,55 +90,39 @@
             </div>
           </div>
 
-          <!-- Form state -->
-          <form v-else @submit.prevent="submit" class="form" novalidate>
-            <div class="field">
-              <label for="name">Nama Lengkap <span class="req">*</span></label>
-              <input
-                id="name"
-                v-model="form.name"
-                type="text"
-                placeholder="Nama sesuai identitas"
-                required
-                autocomplete="name"
-              />
+          <!-- Form state: Step 1 — profile + send OTP -->
+          <form v-else-if="step === 'profile'" @submit.prevent="submitProfile" class="form" novalidate>
+            <div class="step-indicator">
+              <span class="step active">1. Data Diri</span>
+              <span class="step">2. Verifikasi OTP</span>
+              <span class="step">3. Password</span>
             </div>
 
             <div class="field">
-              <label for="email">Email</label>
-              <input
-                id="email"
-                v-model="form.email"
-                type="email"
-                placeholder="email@contoh.com"
-                autocomplete="email"
-              />
+              <label for="name">Nama Lengkap <span class="req">*</span></label>
+              <input id="name" v-model="form.name" type="text"
+                placeholder="Nama sesuai identitas" required autocomplete="name" />
             </div>
 
             <div class="field">
               <label for="phone">
-                No. Telepon
-                <span v-if="settings.require_phone" class="req">*</span>
+                No. WhatsApp <span class="req">*</span>
               </label>
-              <input
-                id="phone"
-                v-model="form.phone"
-                type="tel"
-                placeholder="0812xxxxxxxx"
-                :required="settings.require_phone"
-                autocomplete="tel"
-              />
+              <input id="phone" v-model="form.phone" type="tel"
+                placeholder="0812xxxxxxxx" required autocomplete="tel" inputmode="tel" />
+              <small class="field-hint">Kami akan mengirim kode OTP ke nomor WhatsApp ini.</small>
+            </div>
+
+            <div class="field">
+              <label for="email">Email <span class="optional">(opsional)</span></label>
+              <input id="email" v-model="form.email" type="email"
+                placeholder="email@contoh.com" autocomplete="email" />
             </div>
 
             <div v-if="settings.require_address" class="field">
               <label for="address">Alamat <span class="req">*</span></label>
-              <textarea
-                id="address"
-                v-model="form.address"
-                rows="3"
-                placeholder="Alamat lengkap"
-                required
-              ></textarea>
+              <textarea id="address" v-model="form.address" rows="3"
+                placeholder="Alamat lengkap" required></textarea>
             </div>
 
             <div v-if="formError" class="form-error">
@@ -147,12 +131,65 @@
             </div>
 
             <button type="submit" class="submit-btn" :disabled="submitting">
-              <span v-if="!submitting">DAFTAR SEKARANG</span>
-              <span v-else class="btn-loading">
-                <span class="dot-spin"></span>
-                Memproses...
-              </span>
+              <span v-if="!submitting">KIRIM KODE OTP</span>
+              <span v-else class="btn-loading"><span class="dot-spin"></span> Mengirim OTP...</span>
             </button>
+          </form>
+
+          <!-- Step 2 — verify OTP + set password -->
+          <form v-else-if="step === 'verify'" @submit.prevent="submitVerify" class="form" novalidate>
+            <div class="step-indicator">
+              <span class="step done">1. Data Diri</span>
+              <span class="step active">2. Verifikasi OTP</span>
+              <span class="step active">3. Password</span>
+            </div>
+
+            <div class="otp-banner">
+              <i class="pi pi-whatsapp"></i>
+              <div>
+                <div class="otp-banner-title">Kode OTP dikirim via WhatsApp</div>
+                <div class="otp-banner-sub">Ke nomor <strong>{{ maskedPhone }}</strong>. Berlaku 10 menit.</div>
+              </div>
+            </div>
+
+            <div class="field">
+              <label for="otp">Kode OTP (6 digit) <span class="req">*</span></label>
+              <input id="otp" v-model="form.code" type="text" inputmode="numeric"
+                maxlength="6" pattern="\d{6}" placeholder="000000" required
+                autocomplete="one-time-code" class="otp-input" />
+            </div>
+
+            <div class="field">
+              <label for="pwd">Password Baru <span class="req">*</span></label>
+              <input id="pwd" v-model="form.password" type="password" minlength="6"
+                placeholder="Minimal 6 karakter" required autocomplete="new-password" />
+            </div>
+
+            <div class="field">
+              <label for="pwd2">Konfirmasi Password <span class="req">*</span></label>
+              <input id="pwd2" v-model="form.password_confirmation" type="password" minlength="6"
+                placeholder="Ketik ulang password" required autocomplete="new-password" />
+            </div>
+
+            <div v-if="formError" class="form-error">
+              <i class="pi pi-exclamation-circle"></i>
+              <span>{{ formError }}</span>
+            </div>
+
+            <button type="submit" class="submit-btn" :disabled="submitting">
+              <span v-if="!submitting">VERIFIKASI &amp; DAFTAR</span>
+              <span v-else class="btn-loading"><span class="dot-spin"></span> Memproses...</span>
+            </button>
+
+            <div class="otp-actions">
+              <button type="button" class="link-btn" :disabled="resendCooldown > 0 || submitting" @click="resendOtp">
+                <i class="pi pi-refresh"></i>
+                {{ resendCooldown > 0 ? `Kirim ulang dalam ${resendCooldown}d` : 'Kirim ulang OTP' }}
+              </button>
+              <button type="button" class="link-btn" @click="backToProfile" :disabled="submitting">
+                <i class="pi pi-arrow-left"></i> Ubah nomor
+              </button>
+            </div>
           </form>
         </div>
 
@@ -189,12 +226,44 @@ const settings = ref({
   custom_logo_url: '',
 })
 
-const form = ref({ name: '', email: '', phone: '', address: '' })
+const form = ref({
+  name: '',
+  email: '',
+  phone: '',
+  address: '',
+  code: '',
+  password: '',
+  password_confirmation: '',
+})
+const step = ref('profile')           // 'profile' | 'verify'
 const submitting = ref(false)
 const formError = ref('')
 const success = ref(false)
 const successData = ref({ name: '', member_code: '', status: 'active' })
 const copied = ref(false)
+const verifiedPhone = ref('')
+const resendCooldown = ref(0)
+let resendTimer = null
+
+const maskedPhone = computed(() => {
+  const p = verifiedPhone.value
+  if (!p) return ''
+  if (p.length <= 4) return p
+  return p.slice(0, 3) + '*'.repeat(Math.max(0, p.length - 6)) + p.slice(-3)
+})
+
+function startCooldown(seconds) {
+  resendCooldown.value = Math.max(0, Math.floor(seconds || 0))
+  if (resendTimer) clearInterval(resendTimer)
+  resendTimer = setInterval(() => {
+    resendCooldown.value -= 1
+    if (resendCooldown.value <= 0) {
+      clearInterval(resendTimer)
+      resendTimer = null
+      resendCooldown.value = 0
+    }
+  }, 1000)
+}
 
 const heroLogo = computed(() => settings.value.custom_logo_url || outlet.value.logo || '')
 
@@ -225,7 +294,7 @@ async function fetchPage() {
   }
 }
 
-async function submit() {
+async function submitProfile() {
   if (submitting.value) return
   formError.value = ''
 
@@ -233,33 +302,118 @@ async function submit() {
     formError.value = 'Nama wajib diisi'
     return
   }
-  if (settings.value.require_phone && !form.value.phone.trim()) {
-    formError.value = 'No. telepon wajib diisi'
+  if (!form.value.phone.trim()) {
+    formError.value = 'Nomor WhatsApp wajib diisi'
     return
   }
   if (settings.value.require_address && !form.value.address.trim()) {
     formError.value = 'Alamat wajib diisi'
     return
   }
-  if (!form.value.email.trim() && !form.value.phone.trim()) {
-    formError.value = 'Isi email atau no. telepon'
+
+  submitting.value = true
+  try {
+    const { data } = await axios.post(
+      `${apiBase}/public/membership/${encodeURIComponent(outletSlug)}/otp/request`,
+      {
+        name: form.value.name,
+        phone: form.value.phone,
+        email: form.value.email || null,
+        address: form.value.address || null,
+      }
+    )
+    verifiedPhone.value = data?.phone || form.value.phone
+    step.value = 'verify'
+    startCooldown(60)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  } catch (e) {
+    formError.value = e.response?.data?.message || 'Gagal mengirim OTP. Coba lagi.'
+  } finally {
+    submitting.value = false
+  }
+}
+
+async function submitVerify() {
+  if (submitting.value) return
+  formError.value = ''
+
+  if (!/^\d{6}$/.test(String(form.value.code || ''))) {
+    formError.value = 'Kode OTP harus 6 digit angka'
+    return
+  }
+  if ((form.value.password || '').length < 6) {
+    formError.value = 'Password minimal 6 karakter'
+    return
+  }
+  if (form.value.password !== form.value.password_confirmation) {
+    formError.value = 'Konfirmasi password tidak sama'
     return
   }
 
   submitting.value = true
   try {
     const { data } = await axios.post(
-      `${apiBase}/public/membership/${encodeURIComponent(outletSlug)}/register`,
-      form.value
+      `${apiBase}/public/membership/${encodeURIComponent(outletSlug)}/otp/verify`,
+      {
+        phone: verifiedPhone.value || form.value.phone,
+        code: form.value.code,
+        password: form.value.password,
+        password_confirmation: form.value.password_confirmation,
+      }
     )
-    successData.value = data.member || { name: form.value.name, member_code: '', status: 'active' }
+    const m = data?.member || {}
+    successData.value = {
+      name: m.name || form.value.name,
+      member_code: m.member_code || m.card_number || '',
+      status: m.status || 'active',
+    }
+    // Persist member identity locally so the public-order page picks it up.
+    try {
+      if (m && m.id) {
+        const key = `pos_member_${outletSlug}`
+        localStorage.setItem(key, JSON.stringify(m))
+      }
+    } catch (e) { /* ignore */ }
     success.value = true
     window.scrollTo({ top: 0, behavior: 'smooth' })
   } catch (e) {
-    formError.value = e.response?.data?.message || 'Gagal mendaftar. Coba lagi.'
+    formError.value = e.response?.data?.message || 'Verifikasi gagal. Coba lagi.'
   } finally {
     submitting.value = false
   }
+}
+
+async function resendOtp() {
+  if (resendCooldown.value > 0 || submitting.value) return
+  formError.value = ''
+  submitting.value = true
+  try {
+    const { data } = await axios.post(
+      `${apiBase}/public/membership/${encodeURIComponent(outletSlug)}/otp/request`,
+      {
+        name: form.value.name,
+        phone: verifiedPhone.value || form.value.phone,
+        email: form.value.email || null,
+        address: form.value.address || null,
+      }
+    )
+    startCooldown(data?.cooldown_seconds || 60)
+  } catch (e) {
+    formError.value = e.response?.data?.message || 'Gagal mengirim ulang OTP.'
+    if (e.response?.data?.cooldown_seconds) {
+      startCooldown(e.response.data.cooldown_seconds)
+    }
+  } finally {
+    submitting.value = false
+  }
+}
+
+function backToProfile() {
+  step.value = 'profile'
+  formError.value = ''
+  form.value.code = ''
+  form.value.password = ''
+  form.value.password_confirmation = ''
 }
 
 async function copyCode() {
@@ -639,5 +793,90 @@ onMounted(fetchPage)
   0%   { transform: scale(0); opacity: 0; }
   60%  { transform: scale(1.1); opacity: 1; }
   100% { transform: scale(1); }
+}
+
+/* ── OTP flow ───────────────────────────────────────────────── */
+.step-indicator {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 18px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-soft);
+  flex-wrap: wrap;
+}
+.step-indicator .step {
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+}
+.step-indicator .step.active {
+  background: linear-gradient(135deg, var(--brand-1), var(--brand-2));
+  color: #fff;
+  border-color: transparent;
+}
+.step-indicator .step.done {
+  background: rgba(16, 185, 129, 0.15);
+  color: var(--success);
+  border-color: transparent;
+}
+.field-hint {
+  display: block;
+  margin-top: 4px;
+  color: var(--text-soft);
+  font-size: 11px;
+}
+.optional {
+  font-weight: 400;
+  font-size: 11px;
+  color: var(--text-soft);
+}
+.otp-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: rgba(37, 211, 102, 0.1);
+  border: 1px solid rgba(37, 211, 102, 0.25);
+  color: #166534;
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin-bottom: 14px;
+  font-size: 13px;
+}
+.otp-banner i {
+  font-size: 22px;
+  color: #25d366;
+}
+.otp-banner-title { font-weight: 700; }
+.otp-banner-sub   { color: var(--text-soft); font-size: 12px; }
+
+.otp-input {
+  letter-spacing: 0.4em;
+  font-weight: 700;
+  font-size: 18px;
+  text-align: center;
+}
+.otp-actions {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+.link-btn {
+  background: transparent;
+  border: none;
+  color: var(--brand-1);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.link-btn:disabled {
+  color: var(--text-soft);
+  cursor: not-allowed;
 }
 </style>

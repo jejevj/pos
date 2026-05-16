@@ -1287,7 +1287,9 @@ class OrderController extends Controller
             return;
         }
         try {
-            SendOrderStatusWhatsApp::dispatch(
+            // dispatchAfterResponse: send WAHA in the same PHP worker after
+            // the HTTP response is flushed. No external `queue:work` needed.
+            SendOrderStatusWhatsApp::dispatchAfterResponse(
                 $phone,
                 $payload['customerName'] ?? '',
                 $payload['orderCode'] ?? '',
@@ -1296,6 +1298,7 @@ class OrderController extends Controller
                 $reason,
                 $payload['schema'] ?? null
             );
+            Log::info("[WAHA] Queued {$status} notification for order {$payload['orderCode']}");
         } catch (\Throwable $e) {
             Log::warning('[WAHA] Failed to dispatch job: ' . $e->getMessage());
         }

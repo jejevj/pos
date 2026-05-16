@@ -274,12 +274,16 @@
               <small v-if="member" class="hint">{{ t('publicOrder.memberLockedHint') }}</small>
             </div>
             <div class="field">
-              <label>{{ t('publicOrder.email') }} <span class="req">*</span></label>
+              <label>
+                {{ t('publicOrder.email') }}
+                <span v-if="member" class="req">*</span>
+                <span v-else class="optional">(opsional)</span>
+              </label>
               <input
                 v-model="form.customer_email"
                 type="email"
                 :placeholder="t('publicOrder.emailPh')"
-                required
+                :required="!!member"
               />
             </div>
             <div v-if="member" class="member-banner">
@@ -881,7 +885,9 @@ async function submitOrder() {
     submitError.value = t('publicOrder.errPhone')
     return
   }
-  if (!form.value.customer_email) {
+  // Email wajib hanya untuk member yang login. Tamu cukup nama + nomor HP
+  // yang sudah diverifikasi via WhatsApp.
+  if (member.value && !form.value.customer_email) {
     submitError.value = t('publicOrder.errPhoneEmail')
     return
   }
