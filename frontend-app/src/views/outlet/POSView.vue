@@ -7,6 +7,10 @@
         <p class="text-muted">{{ $t('pos.title') }}</p>
       </div>
       <div style="display:flex;gap:0.5rem;align-items:center;">
+        <Button :label="$t('pos.publicOrders.title')" icon="pi pi-qrcode" outlined size="small"
+                :severity="pendingPublicOrders.length > 0 ? 'help' : 'secondary'"
+                :badge="pendingPublicOrders.length > 0 ? String(pendingPublicOrders.length) : null"
+                @click="showPublicOrdersList = true" />
         <Button v-if="tables.some(t => t.status === 'occupied')"
                 icon="pi pi-broom" :label="$t('pos.cleanupTable')" outlined size="small"
                 severity="warning" @click="openCleanupDialog" />
@@ -1212,12 +1216,38 @@ const cleanupTable = async (table) => {
   })
 }
 
-async function loadPendingPublicOrders () {
+let publicOrdersInFlight = false
+let lastSeenPendingIds = new Set()
+let publicOrdersInitialLoad = true
+
+async function loadPendingPublicOrders (opts = {}) {
+  const { silent = false } = opts
+  if (publicOrdersInFlight) return
+  publicOrdersInFlight = true
   try {
     const res = await api.get(`/outlets/${outletId}/public-orders/pending`)
-    pendingPublicOrders.value = res.data || []
+    const list = Array.isArray(res.data) ? res.data : []
+    const prevCount = pendingPublicOrders.value.length
+    pendingPublicOrders.value = list
+    const currentIds = new Set(list.map(o => o.id))
+    if (!publicOrdersInitialLoad && !silent) {
+      // Detect newly arrived orders since last poll
+      const newOnes = list.filter(o => !lastSeenPendingIds.has(o.id))
+      if (newOnes.length > 0 && list.length > prevCount) {
+        toast.add({
+          severity: 'info',
+          summary: t('pos.publicOrders.title'),
+          detail: `${newOnes.length} pesanan baru menunggu approval`,
+          life: 4000,
+        })
+      }
+    }
+    lastSeenPendingIds = currentIds
+    publicOrdersInitialLoad = false
   } catch (e) {
     // Silent for background poll
+  } finally {
+    publicOrdersInFlight = false
   }
 }
 
@@ -1259,7 +1289,7 @@ onMounted(() => {
   fetchAvailablePromos()
   fetchMembershipSettings()
   fetchTxSettings()
-  loadPendingPublicOrders()
+  loadPendingPublicOrders({ silent: true })
 
   // Refresh applicable promos every minute to handle time-based promos
   promoRefreshInterval.value = setInterval(() => {
@@ -1268,10 +1298,17 @@ onMounted(() => {
     }
   }, 60000) // 60 seconds
 
-  // Poll pending public-orders every 15s so cashier sees new ones quickly
+  // Defensive: clear any previous timer before assigning a new one to
+  // guarantee a single interval across hot-reload / re-mounts
+  if (publicOrdersPollTimer.value) {
+    clearInterval(publicOrdersPollTimer.value)
+  }
+  // Poll pending public-orders every 10s so cashier sees new ones quickly.
+  // Skip when the browser tab is hidden to avoid wasted requests.
   publicOrdersPollTimer.value = setInterval(() => {
+    if (typeof document !== 'undefined' && document.hidden) return
     loadPendingPublicOrders()
-  }, 15000)
+  }, 10000)
 })
 
 onBeforeUnmount(() => {
