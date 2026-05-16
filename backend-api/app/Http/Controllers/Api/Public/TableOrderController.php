@@ -99,6 +99,8 @@ class TableOrderController extends Controller
             $member = DB::table('membership_settings')->first();
             $registrationOpen = $member ? (bool) ($member->registration_open ?? false) : false;
             $paymentMethods = $this->onlineOrderablePaymentMethods();
+            $this->healSelfOrderPromoColumn();
+            $promos = $this->listSelfOrderPromos();
 
             $this->resetSchema();
 
@@ -122,6 +124,7 @@ class TableOrderController extends Controller
                 'categories' => $categories,
                 'menu' => $menu,
                 'payment_methods' => $paymentMethods,
+                'promos'   => $promos,
                 'settings' => [
                     'tax_enabled'              => $tx ? (bool) $tx->tax_enabled : false,
                     'tax_percentage'           => $tx ? (float) $tx->tax_percentage : 0,
@@ -155,6 +158,7 @@ class TableOrderController extends Controller
             'member_card'    => 'nullable|string|max:50',
             'payment_method_id' => 'required|integer',
             'payment_proof'  => 'required|file|mimes:jpg,jpeg,png,webp,pdf|max:5120',
+            'promo_code'     => 'nullable|string|max:50',
             // Items come in as JSON string when multipart/form-data; the
             // frontend will JSON-encode before sending. Decoded below.
             'items'          => 'required',
@@ -223,12 +227,26 @@ class TableOrderController extends Controller
 
             [$itemsPayload, $subtotal] = $this->priceItems($items);
 
+            // Server-side promo validation: never trust client discount.
+            $this->healSelfOrderPromoColumn();
+            $promoResult = $this->applySelfOrderPromo($request->input('promo_code'), (float) $subtotal);
+            if ($promoResult['error']) {
+                DB::rollBack();
+                $this->resetSchema();
+                return response()->json(['message' => $promoResult['error']], 422);
+            }
+            $discountAmount = $promoResult['discount'];
+            $appliedPromos  = $promoResult['applied'] ? [$promoResult['applied']] : [];
+            $primaryPromo   = $promoResult['promo'];
+
+            $subtotalAfterDiscount = max(0, $subtotal - $discountAmount);
+
             $tx = DB::table('transaction_settings')->first();
             $taxPct = ($tx && $tx->tax_enabled) ? (float) $tx->tax_percentage : 0;
             $scPct  = ($tx && $tx->service_charge_enabled) ? (float) $tx->service_charge_percentage : 0;
-            $taxAmount = round($subtotal * $taxPct / 100, 2);
-            $scAmount  = round($subtotal * $scPct  / 100, 2);
-            $total     = $subtotal + $taxAmount + $scAmount;
+            $taxAmount = round($subtotalAfterDiscount * $taxPct / 100, 2);
+            $scAmount  = round($subtotalAfterDiscount * $scPct  / 100, 2);
+            $total     = $subtotalAfterDiscount + $taxAmount + $scAmount;
 
             $kode = $this->generateOrderCode();
 
@@ -236,7 +254,7 @@ class TableOrderController extends Controller
             $proofPath = $this->storePaymentProof($request->file('payment_proof'), $outlet, $kode);
 
             $now = now();
-            $orderId = DB::table('orders')->insertGetId([
+            $orderRow = [
                 'kode'             => $kode,
                 'order_type'       => 'dine_in',
                 'table_id'         => $table->id,
@@ -262,7 +280,16 @@ class TableOrderController extends Controller
                 'cashier_id'       => null,
                 'created_at'       => $now,
                 'updated_at'       => $now,
-            ]);
+            ];
+            if ($primaryPromo) {
+                $orderRow['promo_id']        = $primaryPromo->id;
+                $orderRow['promo_code']      = $primaryPromo->kode;
+                $orderRow['discount_type']   = $primaryPromo->tipe;
+                $orderRow['discount_value']  = $primaryPromo->nilai;
+                $orderRow['discount_amount'] = $discountAmount;
+                $orderRow['applied_promos']  = json_encode($appliedPromos);
+            }
+            $orderId = DB::table('orders')->insertGetId($orderRow);
 
             foreach ($itemsPayload as $row) {
                 $row['order_id']   = $orderId;
@@ -353,6 +380,7 @@ class TableOrderController extends Controller
             'items.*.quantity'     => 'required|integer|min:1|max:50',
             'items.*.notes'        => 'nullable|string|max:255',
             'notes'                => 'nullable|string|max:500',
+            'promo_code'           => 'nullable|string|max:50',
         ]);
         if ($validator->fails()) {
             return response()->json(['message' => 'Data tidak valid', 'errors' => $validator->errors()], 422);
@@ -410,11 +438,26 @@ class TableOrderController extends Controller
                 ]);
             }
 
+            // Re-validate/re-apply promo against new subtotal. If the request
+            // explicitly carries promo_code we use that; otherwise we keep the
+            // existing promo on the order if it is still valid.
+            $this->healSelfOrderPromoColumn();
+            $promoCode = $request->has('promo_code')
+                ? $request->input('promo_code')
+                : ($order->promo_code ?? null);
+            $promoResult = $this->applySelfOrderPromo($promoCode, (float) $subtotal);
+            // For update, treat ineligible promo silently (drop it) rather
+            // than 422 — items might have changed making min-purchase fail.
+            $discountAmount = $promoResult['discount'];
+            $appliedPromos  = $promoResult['applied'] ? [$promoResult['applied']] : [];
+            $primaryPromo   = $promoResult['promo'];
+
+            $subtotalAfterDiscount = max(0, $subtotal - $discountAmount);
             $taxPct = (float) ($order->tax_percentage ?? 0);
             $scPct  = (float) ($order->service_charge_percentage ?? 0);
-            $taxAmount = round($subtotal * $taxPct / 100, 2);
-            $scAmount  = round($subtotal * $scPct  / 100, 2);
-            $total     = $subtotal + $taxAmount + $scAmount;
+            $taxAmount = round($subtotalAfterDiscount * $taxPct / 100, 2);
+            $scAmount  = round($subtotalAfterDiscount * $scPct  / 100, 2);
+            $total     = $subtotalAfterDiscount + $taxAmount + $scAmount;
 
             DB::table('orders')->where('id', $order->id)->update([
                 'subtotal'              => $subtotal,
@@ -422,6 +465,12 @@ class TableOrderController extends Controller
                 'service_charge_amount' => $scAmount,
                 'total_amount'          => $total,
                 'notes'                 => $request->notes ?? $order->notes,
+                'promo_id'              => $primaryPromo->id ?? null,
+                'promo_code'            => $primaryPromo->kode ?? null,
+                'discount_type'         => $primaryPromo->tipe ?? null,
+                'discount_value'        => $primaryPromo->nilai ?? null,
+                'discount_amount'       => $discountAmount,
+                'applied_promos'        => $primaryPromo ? json_encode($appliedPromos) : null,
                 'updated_at'            => $now,
             ]);
 

@@ -213,6 +213,51 @@
               ></textarea>
             </div>
 
+            <h4>{{ t('publicOrder.promoTitle') }}</h4>
+            <div v-if="!promos.length" class="empty-promo">
+              <i class="pi pi-tag"></i>
+              <span>{{ t('publicOrder.promoNoneAvailable') }}</span>
+            </div>
+            <div v-else class="promo-list">
+              <label class="promo-card" :class="{ active: form.promo_code === null }">
+                <input type="radio" name="promo" :value="null" v-model="form.promo_code" />
+                <div class="promo-card-body">
+                  <strong>{{ t('publicOrder.promoNone') }}</strong>
+                </div>
+              </label>
+              <label
+                v-for="p in promos"
+                :key="p.id"
+                class="promo-card"
+                :class="{
+                  active: form.promo_code === p.kode,
+                  disabled: !isPromoEligible(p),
+                }"
+              >
+                <input
+                  type="radio"
+                  name="promo"
+                  :value="p.kode"
+                  v-model="form.promo_code"
+                  :disabled="!isPromoEligible(p)"
+                />
+                <div class="promo-card-body">
+                  <div class="promo-row">
+                    <strong>{{ p.nama }}</strong>
+                    <span class="promo-value">{{ formatPromoValue(p) }}</span>
+                  </div>
+                  <div v-if="p.deskripsi" class="promo-desc">{{ p.deskripsi }}</div>
+                  <div v-if="p.minimum_pembelian" class="promo-min">
+                    {{ t('publicOrder.promoMinPurchase', { amount: formatIdr(p.minimum_pembelian) }) }}
+                  </div>
+                  <div v-if="!isPromoEligible(p)" class="promo-warn">
+                    <i class="pi pi-exclamation-circle"></i>
+                    {{ t('publicOrder.promoInvalid') }}
+                  </div>
+                </div>
+              </label>
+            </div>
+
             <h4>{{ t('publicOrder.payment') }}</h4>
             <div v-if="!paymentMethods.length" class="warn-box">
               <i class="pi pi-exclamation-triangle"></i>
@@ -278,6 +323,10 @@
               <div class="row">
                 <span>{{ t('publicOrder.subtotal') }}</span>
                 <span>{{ formatIdr(cartSubtotal) }}</span>
+              </div>
+              <div v-if="promoDiscount > 0" class="row discount-row">
+                <span>{{ t('publicOrder.promoDiscount') }}</span>
+                <span>- {{ formatIdr(promoDiscount) }}</span>
               </div>
               <div v-if="settings.tax_enabled" class="row">
                 <span>{{ t('publicOrder.tax') }} ({{ settings.tax_percentage }}%)</span>
@@ -368,6 +417,7 @@ const submitting = ref(false)
 const submitError = ref('')
 
 const paymentMethods = ref([])
+const promos = ref([])
 const proofFile = ref(null)
 const proofPreview = ref('')
 const proofPreviewType = ref('image')
@@ -412,6 +462,7 @@ const form = ref({
   member_card: '',
   notes: '',
   payment_method_id: null,
+  promo_code: null,
 })
 
 function onProofPicked (e) {
@@ -451,6 +502,7 @@ onMounted(async () => {
     if (paymentMethods.value.length === 1) {
       form.value.payment_method_id = paymentMethods.value[0].id
     }
+    promos.value = res.data.promos || []
     settings.value = { ...settings.value, ...(res.data.settings || {}) }
     isOrderable.value = res.data.is_orderable !== false
     unavailableReason.value = res.data.unavailable_reason || ''
@@ -527,20 +579,48 @@ const cartCount = computed(() =>
 const cartSubtotal = computed(() =>
   cart.value.reduce((s, c) => s + c.menu_price * c.quantity, 0)
 )
+function isPromoEligible(p) {
+  if (!p) return false
+  if (p.eligible === false) return false
+  const min = Number(p.minimum_pembelian || 0)
+  return cartSubtotal.value >= min
+}
+function formatPromoValue(p) {
+  if (!p) return ''
+  if (p.tipe === 'percentage') return `${Number(p.nilai)}%`
+  return formatIdr(p.nilai)
+}
+const selectedPromo = computed(() =>
+  promos.value.find((p) => p.kode === form.value.promo_code) || null
+)
+const promoDiscount = computed(() => {
+  const p = selectedPromo.value
+  if (!p) return 0
+  if (!isPromoEligible(p)) return 0
+  let d = 0
+  if (p.tipe === 'percentage') {
+    d = cartSubtotal.value * (Number(p.nilai) / 100)
+    if (p.maksimum_diskon && d > Number(p.maksimum_diskon)) d = Number(p.maksimum_diskon)
+  } else {
+    d = Number(p.nilai)
+  }
+  return Math.min(Math.round(d), cartSubtotal.value)
+})
+const subtotalAfterDiscount = computed(() => Math.max(0, cartSubtotal.value - promoDiscount.value))
 const taxAmount = computed(() =>
   settings.value.tax_enabled
-    ? Math.round((cartSubtotal.value * Number(settings.value.tax_percentage)) / 100)
+    ? Math.round((subtotalAfterDiscount.value * Number(settings.value.tax_percentage)) / 100)
     : 0
 )
 const serviceAmount = computed(() =>
   settings.value.service_charge_enabled
     ? Math.round(
-        (cartSubtotal.value * Number(settings.value.service_charge_percentage)) / 100
+        (subtotalAfterDiscount.value * Number(settings.value.service_charge_percentage)) / 100
       )
     : 0
 )
 const grandTotal = computed(
-  () => cartSubtotal.value + taxAmount.value + serviceAmount.value
+  () => subtotalAfterDiscount.value + taxAmount.value + serviceAmount.value
 )
 
 function formatIdr(v) {
@@ -583,6 +663,9 @@ async function submitOrder() {
     if (form.value.notes) fd.append('notes', form.value.notes)
     fd.append('payment_method_id', String(form.value.payment_method_id))
     fd.append('payment_proof', proofFile.value)
+    if (form.value.promo_code && selectedPromo.value && isPromoEligible(selectedPromo.value)) {
+      fd.append('promo_code', form.value.promo_code)
+    }
     fd.append('items', JSON.stringify(cart.value.map((c) => ({
       menu_id: c.menu_id,
       quantity: c.quantity,
@@ -792,6 +875,29 @@ async function submitOrder() {
 .totals-detail .row { display:flex; justify-content:space-between; padding:3px 0; }
 .totals-detail .total { border-top:1px dashed #e5e7eb; padding-top:8px; margin-top:6px; font-size:14px; }
 .totals-detail .total strong { color:#6366f1; }
+.totals-detail .discount-row { color:#16a34a; font-weight:600; }
+
+.promo-list { display:flex; flex-direction:column; gap:8px; margin-bottom:12px; }
+.promo-card {
+  display:flex; align-items:flex-start; gap:8px;
+  padding:10px 12px; border:1px solid #e5e7eb; border-radius:10px;
+  background:#fff; cursor:pointer; transition:all 0.15s;
+}
+.promo-card input { margin-top:3px; }
+.promo-card.active { border-color:#16a34a; background:#f0fdf4; }
+.promo-card.disabled { background:#f9fafb; opacity:0.7; cursor:not-allowed; }
+.promo-card-body { flex:1; display:flex; flex-direction:column; gap:2px; font-size:13px; }
+.promo-row { display:flex; justify-content:space-between; align-items:center; gap:8px; }
+.promo-value { color:#16a34a; font-weight:700; font-size:13px; }
+.promo-desc { font-size:12px; color:#6b7280; }
+.promo-min { font-size:11px; color:#9ca3af; }
+.promo-warn { font-size:11px; color:#b45309; display:flex; align-items:center; gap:4px; }
+.empty-promo {
+  display:flex; align-items:center; gap:6px;
+  padding:10px 12px; background:#f9fafb; border:1px dashed #e5e7eb;
+  border-radius:10px; color:#6b7280; font-size:12px; margin-bottom:12px;
+}
+.empty-promo i { color:#9ca3af; }
 .error-msg { color:#ef4444; font-size:13px; margin: 8px 0 0; }
 .note { font-size:12px; color:#9ca3af; text-align:center; margin-top:8px; }
 

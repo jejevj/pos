@@ -498,7 +498,10 @@
     "stackable": "Dapat Ditumpuk",
     "stackableHelp": "Promo ini dapat dikombinasikan dengan promo lain",
     "memberOnly": "Khusus Member",
-    "memberOnlyHelp": "Promo ini hanya tersedia untuk member"
+    "memberOnlyHelp": "Promo ini hanya tersedia untuk member",
+    "selfOrder": "Tampil di Self Order",
+    "selfOrderHelp": "Promo ini dapat dipilih oleh pelanggan pada halaman self order (QR meja & takeaway online)",
+    "selfOrderBadge": "Self Order"
   },
   "table": {
     "title": "Manajemen Meja",
@@ -1652,7 +1655,17 @@
     "downloadQr": "Unduh QR",
     "qrAvailable": "QR tersedia",
     "qrInstructionPay": "Klik \"Lihat QR\" atau unduh untuk membayar via e-wallet, lalu unggah bukti pembayaran di bawah.",
-    "qrNotConfigured": "QRIS belum dikonfigurasi oleh outlet. Silakan hubungi kasir untuk informasi pembayaran."
+    "qrNotConfigured": "QRIS belum dikonfigurasi oleh outlet. Silakan hubungi kasir untuk informasi pembayaran.",
+    "promoTitle": "Promo",
+    "promoChoose": "Pilih Promo",
+    "promoNone": "Tanpa Promo",
+    "promoNoneAvailable": "Tidak ada promo tersedia saat ini.",
+    "promoApply": "Pakai",
+    "promoApplied": "Promo digunakan",
+    "promoRemove": "Hapus promo",
+    "promoMinPurchase": "Min. pembelian {amount}",
+    "promoInvalid": "Promo tidak berlaku",
+    "promoDiscount": "Diskon"
   },
   "tableQr": {
     "qrCode": "QR Code",

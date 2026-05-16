@@ -896,9 +896,13 @@ class OutletProvisioner
         if (!$this->columnExists($schema, 'promos', 'is_stackable')) {
             DB::statement("ALTER TABLE {$schema}.promos ADD COLUMN is_stackable BOOLEAN DEFAULT false");
         }
+        if (!$this->columnExists($schema, 'promos', 'is_self_order_available')) {
+            DB::statement("ALTER TABLE {$schema}.promos ADD COLUMN is_self_order_available BOOLEAN DEFAULT false");
+        }
         DB::statement("CREATE INDEX IF NOT EXISTS idx_promos_kode ON {$schema}.promos(kode)");
         DB::statement("CREATE INDEX IF NOT EXISTS idx_promos_active ON {$schema}.promos(is_active)");
         DB::statement("CREATE INDEX IF NOT EXISTS idx_promos_dates ON {$schema}.promos(tanggal_mulai, tanggal_selesai)");
+        DB::statement("CREATE INDEX IF NOT EXISTS idx_promos_self_order ON {$schema}.promos(is_self_order_available)");
     }
 
     private function ensureMembershipTables(Outlet $outlet): void

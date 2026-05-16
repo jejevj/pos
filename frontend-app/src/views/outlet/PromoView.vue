@@ -65,11 +65,17 @@
                    :severity="data.is_active ? 'success' : 'secondary'" />
             </template>
           </Column>
-          <Column :header="$t('promo.options')" style="width: 150px">
+          <Column :header="$t('promo.options')" style="width: 180px">
             <template #body="{ data }">
               <div class="promo-badges">
                 <Tag v-if="data.is_stackable" value="Stackable" severity="warn" size="small" />
                 <Tag v-if="data.is_member_only" value="Member" severity="info" size="small" />
+                <Tag
+                  v-if="data.is_self_order_available"
+                  :value="$t('promo.selfOrderBadge')"
+                  severity="success"
+                  size="small"
+                />
               </div>
             </template>
           </Column>
@@ -170,6 +176,13 @@
                 <p class="text-muted-sm">{{ $t('promo.memberOnlyHelp') }}</p>
               </label>
             </div>
+            <div class="promo-option-item">
+              <Checkbox v-model="formData.is_self_order_available" :binary="true" inputId="selfOrder" />
+              <label for="selfOrder" class="ml-2">
+                <strong>{{ $t('promo.selfOrder') }}</strong>
+                <p class="text-muted-sm">{{ $t('promo.selfOrderHelp') }}</p>
+              </label>
+            </div>
           </div>
         </div>
       </div>
@@ -243,7 +256,8 @@ const formData = ref({
   kuota_penggunaan: null,
   is_active: true,
   is_stackable: false,
-  is_member_only: false
+  is_member_only: false,
+  is_self_order_available: false
 })
 
 const discountTypes = [
@@ -323,7 +337,8 @@ const editPromo = (promo) => {
     kuota_penggunaan: promo.kuota_penggunaan,
     is_active: promo.is_active,
     is_stackable: promo.is_stackable || false,
-    is_member_only: promo.is_member_only || false
+    is_member_only: promo.is_member_only || false,
+    is_self_order_available: promo.is_self_order_available || false
   }
   dialogVisible.value = true
 }

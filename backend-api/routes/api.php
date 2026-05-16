@@ -35,6 +35,10 @@ Route::middleware('throttle:60,1')->group(function () {
     // Public takeaway-ordering: one URL per outlet, no table token.
     Route::get('/public/outlet/{outletSlug}/takeaway',        [\App\Http\Controllers\Api\Public\TakeawayOrderController::class, 'show']);
     Route::post('/public/outlet/{outletSlug}/takeaway/order', [\App\Http\Controllers\Api\Public\TakeawayOrderController::class, 'store']);
+
+    // Public promo lookup/validation for self-order checkout.
+    Route::get('/public/outlet/{outletSlug}/promos',          [\App\Http\Controllers\Api\Public\PromoLookupController::class, 'index']);
+    Route::post('/public/outlet/{outletSlug}/promo/validate', [\App\Http\Controllers\Api\Public\PromoLookupController::class, 'validateCode']);
 });
 
 // ── Site Settings — public read so frontend can load branding ────────────

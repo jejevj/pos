@@ -55,6 +55,8 @@ class TakeawayOrderController extends Controller
             $member = DB::table('membership_settings')->first();
             $registrationOpen = $member ? (bool) ($member->registration_open ?? false) : false;
             $paymentMethods = $this->onlineOrderablePaymentMethods();
+            $this->healSelfOrderPromoColumn();
+            $promos = $this->listSelfOrderPromos();
 
             $this->resetSchema();
 
@@ -70,6 +72,7 @@ class TakeawayOrderController extends Controller
                 'categories'      => $categories,
                 'menu'            => $menu,
                 'payment_methods' => $paymentMethods,
+                'promos'          => $promos,
                 'settings' => [
                     'tax_enabled'              => $tx ? (bool) $tx->tax_enabled : false,
                     'tax_percentage'           => $tx ? (float) $tx->tax_percentage : 0,
@@ -99,6 +102,7 @@ class TakeawayOrderController extends Controller
             'member_card'     => 'nullable|string|max:50',
             'payment_method_id' => 'required|integer',
             'payment_proof'   => 'required|file|mimes:jpg,jpeg,png,webp,pdf|max:5120',
+            'promo_code'      => 'nullable|string|max:50',
             'items'           => 'required',
         ]);
         if ($validator->fails()) {
@@ -173,12 +177,25 @@ class TakeawayOrderController extends Controller
                 ];
             }
 
+            // Server-side promo validation
+            $this->healSelfOrderPromoColumn();
+            $promoResult = $this->applySelfOrderPromo($request->input('promo_code'), (float) $subtotal);
+            if ($promoResult['error']) {
+                DB::rollBack();
+                $this->resetSchema();
+                return response()->json(['message' => $promoResult['error']], 422);
+            }
+            $discountAmount = $promoResult['discount'];
+            $appliedPromos  = $promoResult['applied'] ? [$promoResult['applied']] : [];
+            $primaryPromo   = $promoResult['promo'];
+            $subtotalAfterDiscount = max(0, $subtotal - $discountAmount);
+
             $tx = DB::table('transaction_settings')->first();
             $taxPct = ($tx && $tx->tax_enabled) ? (float) $tx->tax_percentage : 0;
             $scPct  = ($tx && $tx->service_charge_enabled) ? (float) $tx->service_charge_percentage : 0;
-            $taxAmount = round($subtotal * $taxPct / 100, 2);
-            $scAmount  = round($subtotal * $scPct  / 100, 2);
-            $total     = $subtotal + $taxAmount + $scAmount;
+            $taxAmount = round($subtotalAfterDiscount * $taxPct / 100, 2);
+            $scAmount  = round($subtotalAfterDiscount * $scPct  / 100, 2);
+            $total     = $subtotalAfterDiscount + $taxAmount + $scAmount;
 
             // Generate kode
             $datePrefix = 'ORD' . date('Ymd');
@@ -195,7 +212,7 @@ class TakeawayOrderController extends Controller
             $proofPath = $this->storePaymentProof($request->file('payment_proof'), $outlet, $kode);
 
             $now = now();
-            $orderId = DB::table('orders')->insertGetId([
+            $orderRow = [
                 'kode'             => $kode,
                 'order_type'       => 'takeaway',
                 'table_id'         => null,
@@ -221,7 +238,16 @@ class TakeawayOrderController extends Controller
                 'cashier_id'       => null,
                 'created_at'       => $now,
                 'updated_at'       => $now,
-            ]);
+            ];
+            if ($primaryPromo) {
+                $orderRow['promo_id']        = $primaryPromo->id;
+                $orderRow['promo_code']      = $primaryPromo->kode;
+                $orderRow['discount_type']   = $primaryPromo->tipe;
+                $orderRow['discount_value']  = $primaryPromo->nilai;
+                $orderRow['discount_amount'] = $discountAmount;
+                $orderRow['applied_promos']  = json_encode($appliedPromos);
+            }
+            $orderId = DB::table('orders')->insertGetId($orderRow);
 
             foreach ($payload as $row) {
                 $row['order_id']   = $orderId;

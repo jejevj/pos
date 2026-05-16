@@ -498,7 +498,10 @@
     "stackable": "Stackable",
     "stackableHelp": "This promo can be combined with other promos",
     "memberOnly": "Member Only",
-    "memberOnlyHelp": "This promo is only available for members"
+    "memberOnlyHelp": "This promo is only available for members",
+    "selfOrder": "Show on Self Order",
+    "selfOrderHelp": "Allow this promo to be selected by customers on the public self-order page (table QR & online takeaway)",
+    "selfOrderBadge": "Self Order"
   },
   "table": {
     "title": "Table Management",
@@ -1653,7 +1656,17 @@
     "downloadQr": "Download QR",
     "qrAvailable": "QR available",
     "qrInstructionPay": "Tap \"View QR\" or download it to pay via e-wallet, then upload your payment proof below.",
-    "qrNotConfigured": "QRIS is not yet configured by the outlet. Please contact the cashier for payment details."
+    "qrNotConfigured": "QRIS is not yet configured by the outlet. Please contact the cashier for payment details.",
+    "promoTitle": "Promo",
+    "promoChoose": "Choose a Promo",
+    "promoNone": "No Promo",
+    "promoNoneAvailable": "No promos available right now.",
+    "promoApply": "Apply",
+    "promoApplied": "Promo applied",
+    "promoRemove": "Remove promo",
+    "promoMinPurchase": "Min. purchase {amount}",
+    "promoInvalid": "Promo not applicable",
+    "promoDiscount": "Discount"
   },
   "tableQr": {
     "qrCode": "QR Code",

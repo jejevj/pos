@@ -207,6 +207,8 @@ class PromoController extends Controller
             'hari_aktif' => 'nullable|string',
             'kuota_penggunaan' => 'nullable|integer|min:1',
             'is_stackable' => 'nullable|boolean',
+            'is_member_only' => 'nullable|boolean',
+            'is_self_order_available' => 'nullable|boolean',
         ]);
 
         if ($validator->fails()) {
@@ -215,7 +217,7 @@ class PromoController extends Controller
 
         try {
             DB::statement("SET search_path TO {$outlet->schema_name}, public");
-            
+
             $promo = Promo::create([
                 'kode' => $request->kode ?? Promo::generateKode(),
                 'nama' => $request->nama,
@@ -233,10 +235,11 @@ class PromoController extends Controller
                 'is_active' => $request->is_active ?? true,
                 'is_stackable' => $request->is_stackable ?? false,
                 'is_member_only' => $request->is_member_only ?? false,
+                'is_self_order_available' => $request->is_self_order_available ?? false,
             ]);
-            
+
             DB::statement("SET search_path TO public");
-            
+
             return response()->json([
                 'message' => 'Promo created successfully',
                 'data' => $promo
@@ -289,6 +292,8 @@ class PromoController extends Controller
             'hari_aktif' => 'nullable|string',
             'kuota_penggunaan' => 'nullable|integer|min:1',
             'is_stackable' => 'nullable|boolean',
+            'is_member_only' => 'nullable|boolean',
+            'is_self_order_available' => 'nullable|boolean',
         ]);
 
         if ($validator->fails()) {
@@ -297,7 +302,7 @@ class PromoController extends Controller
 
         try {
             DB::statement("SET search_path TO {$outlet->schema_name}, public");
-            
+
             $promo = Promo::findOrFail($id);
             
             $promo->update([
@@ -316,6 +321,9 @@ class PromoController extends Controller
                 'is_active' => $request->is_active ?? $promo->is_active,
                 'is_stackable' => $request->is_stackable ?? $promo->is_stackable,
                 'is_member_only' => $request->is_member_only ?? $promo->is_member_only,
+                'is_self_order_available' => $request->has('is_self_order_available')
+                    ? (bool) $request->is_self_order_available
+                    : $promo->is_self_order_available,
             ]);
             
             DB::statement("SET search_path TO public");

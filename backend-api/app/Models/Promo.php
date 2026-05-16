@@ -30,6 +30,7 @@ class Promo extends Model
         'is_active',
         'is_stackable',
         'is_member_only',
+        'is_self_order_available',
     ];
 
     protected $casts = [
@@ -41,6 +42,7 @@ class Promo extends Model
         'is_active' => 'boolean',
         'is_stackable' => 'boolean',
         'is_member_only' => 'boolean',
+        'is_self_order_available' => 'boolean',
         'tanggal_mulai' => 'date',
         'tanggal_selesai' => 'date',
     ];
@@ -53,6 +55,11 @@ class Promo extends Model
     public function scopeActive($query)
     {
         return $query->where('is_active', true);
+    }
+
+    public function scopeSelfOrderAvailable($query)
+    {
+        return $query->where('is_self_order_available', true);
     }
 
     public function scopeAvailable($query)
