@@ -12,6 +12,7 @@
     "@primeuix/themes": "^2.0.3",
     "@vueuse/core": "^14.3.0",
     "axios": "^1.16.0",
+    "browser-image-compression": "^2.0.2",
     "chart.js": "^4.5.1",
     "leaflet": "^1.9.4",
     "pinia": "^3.0.4",

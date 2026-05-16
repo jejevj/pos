@@ -15,6 +15,7 @@ class OrderMessageTemplate
      * Sensible defaults used when an outlet has not customized the template.
      */
     public const DEFAULTS = [
+        // Shared / legacy fallbacks (used when no type-specific template exists)
         'approved' =>
             "Halo {nama_pelanggan},\n" .
             "Pesanan Anda dengan kode *{kode_pesanan}* di *{nama_outlet}* telah *DISETUJUI* dan sedang diproses.\n" .
@@ -29,6 +30,37 @@ class OrderMessageTemplate
             "Pesanan Anda *{kode_pesanan}* di *{nama_outlet}* sedang *DIPROSES* oleh dapur/bar kami.\n" .
             "Pantau status pesanan Anda di sini:\n{link_tracking}\n" .
             "Mohon ditunggu sebentar lagi.",
+        // Dine-in (meja) / takeaway variants for approved / rejected / processing.
+        'approved_dinein' =>
+            "Halo {nama_pelanggan},\n" .
+            "Pesanan meja Anda dengan kode *{kode_pesanan}* di *{nama_outlet}* telah *DISETUJUI* dan akan segera disiapkan untuk meja {nomor_meja}.\n" .
+            "Pantau status pesanan Anda di sini:\n{link_tracking}\n" .
+            "Terima kasih sudah memesan!",
+        'approved_takeaway' =>
+            "Halo {nama_pelanggan},\n" .
+            "Pesanan *takeaway* Anda dengan kode *{kode_pesanan}* di *{nama_outlet}* telah *DISETUJUI* dan sedang disiapkan untuk diambil.\n" .
+            "Pantau status pesanan Anda di sini:\n{link_tracking}\n" .
+            "Terima kasih sudah memesan!",
+        'rejected_dinein' =>
+            "Halo {nama_pelanggan},\n" .
+            "Mohon maaf, pesanan meja Anda *{kode_pesanan}* di *{nama_outlet}* *DITOLAK*.\n" .
+            "{alasan}\n" .
+            "Silakan menghubungi kasir di lokasi untuk informasi lebih lanjut. Terima kasih.",
+        'rejected_takeaway' =>
+            "Halo {nama_pelanggan},\n" .
+            "Mohon maaf, pesanan takeaway Anda *{kode_pesanan}* di *{nama_outlet}* *DITOLAK*.\n" .
+            "{alasan}\n" .
+            "Jika sudah melakukan pembayaran, silakan hubungi kasir untuk proses refund. Terima kasih.",
+        'processing_dinein' =>
+            "Halo {nama_pelanggan},\n" .
+            "Pesanan meja Anda *{kode_pesanan}* di *{nama_outlet}* sedang *DIPROSES* untuk meja {nomor_meja}.\n" .
+            "Pantau status pesanan Anda di sini:\n{link_tracking}\n" .
+            "Mohon ditunggu sebentar lagi.",
+        'processing_takeaway' =>
+            "Halo {nama_pelanggan},\n" .
+            "Pesanan *takeaway* Anda *{kode_pesanan}* di *{nama_outlet}* sedang *DIPROSES*.\n" .
+            "Pantau status pesanan Anda di sini:\n{link_tracking}\n" .
+            "Kami akan kabari lagi saat pesanan siap diambil.",
         'ready_dinein' =>
             "Halo {nama_pelanggan},\n" .
             "Pesanan Anda *{kode_pesanan}* di *{nama_outlet}* sudah *SIAP* dan akan segera diantar ke meja {nomor_meja}.\n" .

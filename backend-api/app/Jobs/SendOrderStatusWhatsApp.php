@@ -36,6 +36,9 @@ class SendOrderStatusWhatsApp implements ShouldQueue
     public string $status; // 'approved' | 'rejected'
     public ?string $reason;
     public ?string $schema;
+    public ?string $orderType;   // 'dine_in' | 'takeaway' | 'delivery' | null
+    public ?string $tableNumber;
+    public ?int    $outletDbId;
 
     public function __construct(
         string $phone,
@@ -44,7 +47,10 @@ class SendOrderStatusWhatsApp implements ShouldQueue
         string $outletName,
         string $status,
         ?string $reason = null,
-        ?string $schema = null
+        ?string $schema = null,
+        ?string $orderType = null,
+        ?string $tableNumber = null,
+        ?int $outletDbId = null
     ) {
         $this->phone        = $phone;
         $this->customerName = $customerName;
@@ -53,6 +59,9 @@ class SendOrderStatusWhatsApp implements ShouldQueue
         $this->status       = $status;
         $this->reason       = $reason;
         $this->schema       = $schema;
+        $this->orderType    = $orderType;
+        $this->tableNumber  = $tableNumber;
+        $this->outletDbId   = $outletDbId;
     }
 
     public function handle(WahaService $waha): void
@@ -74,50 +83,75 @@ class SendOrderStatusWhatsApp implements ShouldQueue
 
     protected function buildMessage(): string
     {
-        $template = $this->resolveTemplate();
-        $key = $this->status === 'approved' ? 'approved' : 'rejected';
+        [$tplKey, $template] = $this->resolveTemplate();
 
         // Build a synthetic order object since this job is dispatched with
         // primitive fields only (avoids serializing Eloquent models).
         $pseudoOrder = (object) [
             'customer_name' => $this->customerName,
             'kode'          => $this->orderCode,
-            'order_type'    => '',
-            'table_number'  => '',
+            'order_type'    => (string) ($this->orderType ?? ''),
+            'table_number'  => (string) ($this->tableNumber ?? ''),
             'total_amount'  => 0,
             'status'        => $this->status,
         ];
 
+        $trackingUrl = $this->outletDbId
+            ? OrderMessageTemplate::buildTrackingUrl($this->outletDbId, $this->orderCode)
+            : null;
+
         return OrderMessageTemplate::render(
             $template,
-            OrderMessageTemplate::vars($pseudoOrder, $this->outletName, $this->reason),
-            $key
+            OrderMessageTemplate::vars($pseudoOrder, $this->outletName, $this->reason, $trackingUrl),
+            $tplKey
         );
     }
 
     /**
-     * Pull the outlet's custom template if a schema was provided and
-     * wa_settings exists. Returns null to fall back to the default.
+     * Resolve the (key, template) pair for the outlet. Picks the
+     * order-type-specific template first, then falls back to the shared
+     * tpl_approved / tpl_rejected, then to the default in OrderMessageTemplate.
+     *
+     * @return array{0:string,1:?string}
      */
-    protected function resolveTemplate(): ?string
+    protected function resolveTemplate(): array
     {
-        if (!$this->schema) return null;
+        $status = $this->status === 'approved' ? 'approved' : 'rejected';
+        $type = (string) ($this->orderType ?? '');
+        $isTakeaway = ($type === 'takeaway' || $type === 'delivery');
+        $variant = $isTakeaway ? 'takeaway' : 'dinein';
+        $variantKey = "{$status}_{$variant}";
+
+        if (!$this->schema) {
+            return [$variantKey, null]; // falls back to default for variant
+        }
 
         try {
             DB::statement("SET search_path TO {$this->schema}, public");
             if (!DB::getSchemaBuilder()->hasTable('wa_settings')) {
                 DB::statement("SET search_path TO public");
-                return null;
+                return [$variantKey, null];
             }
             $row = DB::table('wa_settings')->first();
             DB::statement("SET search_path TO public");
-            if (!$row) return null;
-            return $this->status === 'approved'
-                ? ($row->tpl_approved ?? null)
-                : ($row->tpl_rejected ?? null);
+            if (!$row) return [$variantKey, null];
+
+            $variantCol = "tpl_{$status}_{$variant}";
+            $sharedCol  = "tpl_{$status}";
+
+            $tpl = $row->{$variantCol} ?? null;
+            if (trim((string) $tpl) !== '') {
+                return [$variantKey, $tpl];
+            }
+            // Backward-compat: outlet only set the shared tpl_approved/tpl_rejected.
+            $shared = $row->{$sharedCol} ?? null;
+            if (trim((string) $shared) !== '') {
+                return [$status, $shared];
+            }
+            return [$variantKey, null];
         } catch (\Throwable $e) {
             try { DB::statement("SET search_path TO public"); } catch (\Throwable $ignored) {}
-            return null;
+            return [$variantKey, null];
         }
     }
 

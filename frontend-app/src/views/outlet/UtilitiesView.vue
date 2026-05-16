@@ -730,11 +730,49 @@
                 <i class="pi pi-cog"></i>
                 Template Persetujuan Kasir
               </div>
+              <p class="setting-description" style="margin: 0 0 .5rem 0;">
+                Template dipisah antara pesanan <strong>meja (dine-in)</strong> dan <strong>takeaway</strong>.
+                Jika template per-jenis kosong, sistem otomatis memakai template umum di bawahnya — dan jika itu juga kosong, pesan default bawaan akan digunakan.
+              </p>
               <div class="settings-section">
                 <div class="setting-item setting-item-block">
                   <div class="setting-info">
-                    <label class="setting-label">Pesanan Disetujui</label>
-                    <p class="setting-description">Dikirim saat kasir menyetujui pesanan publik (table/takeaway).</p>
+                    <label class="setting-label">Pesanan Disetujui — Meja (Dine-in)</label>
+                    <p class="setting-description">Dikirim saat kasir menyetujui pesanan meja.</p>
+                  </div>
+                  <Textarea
+                    v-model="waSettings.tpl_approved_dinein"
+                    rows="4"
+                    autoResize
+                    class="setting-control full"
+                    placeholder="Kosongkan untuk pakai template umum / pesan default."
+                    :ref="el => registerWaField('tpl_approved_dinein', el)"
+                    @focus="waActiveField = 'tpl_approved_dinein'"
+                    @drop="onTemplateDrop($event, 'tpl_approved_dinein')"
+                  />
+                </div>
+
+                <div class="setting-item setting-item-block">
+                  <div class="setting-info">
+                    <label class="setting-label">Pesanan Disetujui — Takeaway / Pickup</label>
+                    <p class="setting-description">Dikirim saat kasir menyetujui pesanan takeaway.</p>
+                  </div>
+                  <Textarea
+                    v-model="waSettings.tpl_approved_takeaway"
+                    rows="4"
+                    autoResize
+                    class="setting-control full"
+                    placeholder="Kosongkan untuk pakai template umum / pesan default."
+                    :ref="el => registerWaField('tpl_approved_takeaway', el)"
+                    @focus="waActiveField = 'tpl_approved_takeaway'"
+                    @drop="onTemplateDrop($event, 'tpl_approved_takeaway')"
+                  />
+                </div>
+
+                <div class="setting-item setting-item-block">
+                  <div class="setting-info">
+                    <label class="setting-label">Pesanan Disetujui — Umum (Fallback)</label>
+                    <p class="setting-description">Dipakai bila template Meja/Takeaway di atas kosong. Biarkan kosong untuk memakai pesan default bawaan.</p>
                   </div>
                   <Textarea
                     v-model="waSettings.tpl_approved"
@@ -750,8 +788,42 @@
 
                 <div class="setting-item setting-item-block">
                   <div class="setting-info">
-                    <label class="setting-label">Pesanan Ditolak</label>
-                    <p class="setting-description">Dikirim saat kasir menolak pesanan. Placeholder <code>{alasan}</code> berisi alasan penolakan.</p>
+                    <label class="setting-label">Pesanan Ditolak — Meja (Dine-in)</label>
+                    <p class="setting-description">Dikirim saat kasir menolak pesanan meja. Placeholder <code>{alasan}</code> berisi alasan penolakan.</p>
+                  </div>
+                  <Textarea
+                    v-model="waSettings.tpl_rejected_dinein"
+                    rows="4"
+                    autoResize
+                    class="setting-control full"
+                    placeholder="Kosongkan untuk pakai template umum / pesan default."
+                    :ref="el => registerWaField('tpl_rejected_dinein', el)"
+                    @focus="waActiveField = 'tpl_rejected_dinein'"
+                    @drop="onTemplateDrop($event, 'tpl_rejected_dinein')"
+                  />
+                </div>
+
+                <div class="setting-item setting-item-block">
+                  <div class="setting-info">
+                    <label class="setting-label">Pesanan Ditolak — Takeaway / Pickup</label>
+                    <p class="setting-description">Dikirim saat kasir menolak pesanan takeaway. Placeholder <code>{alasan}</code> berisi alasan penolakan.</p>
+                  </div>
+                  <Textarea
+                    v-model="waSettings.tpl_rejected_takeaway"
+                    rows="4"
+                    autoResize
+                    class="setting-control full"
+                    placeholder="Kosongkan untuk pakai template umum / pesan default."
+                    :ref="el => registerWaField('tpl_rejected_takeaway', el)"
+                    @focus="waActiveField = 'tpl_rejected_takeaway'"
+                    @drop="onTemplateDrop($event, 'tpl_rejected_takeaway')"
+                  />
+                </div>
+
+                <div class="setting-item setting-item-block">
+                  <div class="setting-info">
+                    <label class="setting-label">Pesanan Ditolak — Umum (Fallback)</label>
+                    <p class="setting-description">Dipakai bila template Meja/Takeaway di atas kosong.</p>
                   </div>
                   <Textarea
                     v-model="waSettings.tpl_rejected"
@@ -772,11 +844,48 @@
                 <i class="pi pi-clock"></i>
                 Template Progres Pesanan
               </div>
+              <p class="setting-description" style="margin: 0 0 .5rem 0;">
+                Status <em>processing</em> juga dipisah meja vs takeaway. Bagian <em>ready</em> dan <em>completed</em> di bawah sudah punya template tersendiri per jenis.
+              </p>
               <div class="settings-section">
                 <div class="setting-item setting-item-block">
                   <div class="setting-info">
-                    <label class="setting-label">Pesanan Mulai Diproses</label>
-                    <p class="setting-description">Dikirim sekali ketika bar atau kitchen mulai memproses pesanan (mana yang lebih dulu).</p>
+                    <label class="setting-label">Pesanan Diproses — Meja (Dine-in)</label>
+                    <p class="setting-description">Dikirim sekali ketika bar/kitchen mulai memproses pesanan meja.</p>
+                  </div>
+                  <Textarea
+                    v-model="waSettings.tpl_processing_dinein"
+                    rows="4"
+                    autoResize
+                    class="setting-control full"
+                    placeholder="Kosongkan untuk pakai template umum / pesan default."
+                    :ref="el => registerWaField('tpl_processing_dinein', el)"
+                    @focus="waActiveField = 'tpl_processing_dinein'"
+                    @drop="onTemplateDrop($event, 'tpl_processing_dinein')"
+                  />
+                </div>
+
+                <div class="setting-item setting-item-block">
+                  <div class="setting-info">
+                    <label class="setting-label">Pesanan Diproses — Takeaway / Pickup</label>
+                    <p class="setting-description">Dikirim sekali ketika bar/kitchen mulai memproses pesanan takeaway.</p>
+                  </div>
+                  <Textarea
+                    v-model="waSettings.tpl_processing_takeaway"
+                    rows="4"
+                    autoResize
+                    class="setting-control full"
+                    placeholder="Kosongkan untuk pakai template umum / pesan default."
+                    :ref="el => registerWaField('tpl_processing_takeaway', el)"
+                    @focus="waActiveField = 'tpl_processing_takeaway'"
+                    @drop="onTemplateDrop($event, 'tpl_processing_takeaway')"
+                  />
+                </div>
+
+                <div class="setting-item setting-item-block">
+                  <div class="setting-info">
+                    <label class="setting-label">Pesanan Diproses — Umum (Fallback)</label>
+                    <p class="setting-description">Dipakai bila template Meja/Takeaway di atas kosong.</p>
                   </div>
                   <Textarea
                     v-model="waSettings.tpl_processing"
@@ -878,6 +987,7 @@ import { useToast } from 'primevue/usetoast'
 import { useI18n } from 'vue-i18n'
 import api from '@/services/api'
 import { decodeOutletId } from '@/utils/outletId'
+import { compressForUpload } from '@/utils/imageCompression'
 import Card from 'primevue/card'
 import InputText from 'primevue/inputtext'
 import InputNumber from 'primevue/inputnumber'
@@ -1133,17 +1243,18 @@ const calcPreviewTotal = () => {
 }
 
 async function handleLogoUpload(event) {
-  const file = event.target.files[0]
-  if (!file) return
+  const raw = event.target.files[0]
+  if (!raw) return
 
-  if (file.size > 2_000_000) {
-    toast.add({ severity: 'error', summary: 'Error', detail: 'File terlalu besar. Maksimal 2MB', life: 3000 })
+  if (raw.size > 10_000_000) {
+    toast.add({ severity: 'error', summary: 'Error', detail: 'File terlalu besar. Maksimal 10MB sebelum kompresi.', life: 3000 })
     event.target.value = ''
     return
   }
 
   uploadingLogo.value = true
   try {
+    const { file } = await compressForUpload(raw, { maxSizeMB: 0.5, maxWidthOrHeight: 1200 })
     const formData = new FormData()
     formData.append('image', file)
 
@@ -1259,15 +1370,16 @@ const openMemberUrl = () => {
 }
 
 async function handleMemberLogoUpload(event) {
-  const file = event.target.files[0]
-  if (!file) return
-  if (file.size > 2_000_000) {
-    toast.add({ severity: 'error', summary: 'Error', detail: 'File terlalu besar. Maksimal 2MB', life: 3000 })
+  const raw = event.target.files[0]
+  if (!raw) return
+  if (raw.size > 10_000_000) {
+    toast.add({ severity: 'error', summary: 'Error', detail: 'File terlalu besar. Maksimal 10MB sebelum kompresi.', life: 3000 })
     event.target.value = ''
     return
   }
   memberLogoUploading.value = true
   try {
+    const { file } = await compressForUpload(raw, { maxSizeMB: 0.5, maxWidthOrHeight: 1200 })
     const formData = new FormData()
     formData.append('image', file)
     const response = await api.post(
@@ -1293,13 +1405,19 @@ const waSettings = ref({
   notify_processing:      true,
   notify_ready:           true,
   notify_completed:       true,
-  tpl_approved:           '',
-  tpl_rejected:           '',
-  tpl_processing:         '',
-  tpl_ready_dinein:       '',
-  tpl_ready_takeaway:     '',
-  tpl_completed_dinein:   '',
-  tpl_completed_takeaway: '',
+  tpl_approved:             '',
+  tpl_rejected:             '',
+  tpl_processing:           '',
+  tpl_approved_dinein:      '',
+  tpl_approved_takeaway:    '',
+  tpl_rejected_dinein:      '',
+  tpl_rejected_takeaway:    '',
+  tpl_processing_dinein:    '',
+  tpl_processing_takeaway:  '',
+  tpl_ready_dinein:         '',
+  tpl_ready_takeaway:       '',
+  tpl_completed_dinein:     '',
+  tpl_completed_takeaway:   '',
 })
 
 // Placeholder chips: dragged/clicked to insert tokens into the active
@@ -1391,13 +1509,19 @@ const fetchWaSettings = async () => {
       notify_processing:      Boolean(d.notify_processing ?? true),
       notify_ready:           Boolean(d.notify_ready ?? true),
       notify_completed:       Boolean(d.notify_completed ?? true),
-      tpl_approved:           d.tpl_approved             || '',
-      tpl_rejected:           d.tpl_rejected             || '',
-      tpl_processing:         d.tpl_processing           || '',
-      tpl_ready_dinein:       d.tpl_ready_dinein         || '',
-      tpl_ready_takeaway:     d.tpl_ready_takeaway       || '',
-      tpl_completed_dinein:   d.tpl_completed_dinein     || '',
-      tpl_completed_takeaway: d.tpl_completed_takeaway   || '',
+      tpl_approved:             d.tpl_approved              || '',
+      tpl_rejected:             d.tpl_rejected              || '',
+      tpl_processing:           d.tpl_processing            || '',
+      tpl_approved_dinein:      d.tpl_approved_dinein       || '',
+      tpl_approved_takeaway:    d.tpl_approved_takeaway     || '',
+      tpl_rejected_dinein:      d.tpl_rejected_dinein       || '',
+      tpl_rejected_takeaway:    d.tpl_rejected_takeaway     || '',
+      tpl_processing_dinein:    d.tpl_processing_dinein     || '',
+      tpl_processing_takeaway:  d.tpl_processing_takeaway   || '',
+      tpl_ready_dinein:         d.tpl_ready_dinein          || '',
+      tpl_ready_takeaway:       d.tpl_ready_takeaway        || '',
+      tpl_completed_dinein:     d.tpl_completed_dinein      || '',
+      tpl_completed_takeaway:   d.tpl_completed_takeaway    || '',
     }
   } catch (e) {
     toast.add({ severity: 'error', summary: 'Error', detail: 'Gagal memuat template WhatsApp', life: 3000 })

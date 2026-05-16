@@ -316,6 +316,7 @@ import { useToast } from 'primevue/usetoast'
 import { useConfirm } from 'primevue/useconfirm'
 import { useI18n } from 'vue-i18n'
 import api from '@/services/api'
+import { compressForUpload } from '@/utils/imageCompression'
 import Card from 'primevue/card'
 import Breadcrumb from 'primevue/breadcrumb'
 import Button from 'primevue/button'
@@ -482,15 +483,16 @@ const getInitials = (name) => {
 }
 
 const onImageSelect = async (event) => {
-  const file = event.files[0]
-  if (!file) return
+  const raw = event.files[0]
+  if (!raw) return
 
   uploadingImage.value = true
-  
+
   try {
+    const { file } = await compressForUpload(raw, { maxSizeMB: 0.6, maxWidthOrHeight: 1600 })
     const formData = new FormData()
     formData.append('image', file)
-    
+
     const response = await api.post(`/outlets/${outletId}/menu/upload-image`, formData, {
       headers: {
         'Content-Type': 'multipart/form-data'

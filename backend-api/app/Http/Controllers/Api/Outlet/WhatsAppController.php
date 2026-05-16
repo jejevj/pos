@@ -103,6 +103,12 @@ class WhatsAppController extends Controller
             'tpl_approved'             => 'nullable|string|max:2000',
             'tpl_rejected'             => 'nullable|string|max:2000',
             'tpl_processing'           => 'nullable|string|max:2000',
+            'tpl_approved_dinein'      => 'nullable|string|max:2000',
+            'tpl_approved_takeaway'    => 'nullable|string|max:2000',
+            'tpl_rejected_dinein'      => 'nullable|string|max:2000',
+            'tpl_rejected_takeaway'    => 'nullable|string|max:2000',
+            'tpl_processing_dinein'    => 'nullable|string|max:2000',
+            'tpl_processing_takeaway'  => 'nullable|string|max:2000',
             'tpl_ready_dinein'         => 'nullable|string|max:2000',
             'tpl_ready_takeaway'       => 'nullable|string|max:2000',
             'tpl_completed_dinein'     => 'nullable|string|max:2000',
@@ -123,14 +129,20 @@ class WhatsAppController extends Controller
                 'notify_processing'     => $request->boolean('notify_processing', true),
                 'notify_ready'          => $request->boolean('notify_ready', true),
                 'notify_completed'      => $request->boolean('notify_completed', true),
-                'tpl_approved'          => $request->input('tpl_approved'),
-                'tpl_rejected'          => $request->input('tpl_rejected'),
-                'tpl_processing'        => $request->input('tpl_processing'),
-                'tpl_ready_dinein'      => $request->input('tpl_ready_dinein'),
-                'tpl_ready_takeaway'    => $request->input('tpl_ready_takeaway'),
-                'tpl_completed_dinein'  => $request->input('tpl_completed_dinein'),
-                'tpl_completed_takeaway'=> $request->input('tpl_completed_takeaway'),
-                'updated_at'            => now(),
+                'tpl_approved'             => $request->input('tpl_approved'),
+                'tpl_rejected'             => $request->input('tpl_rejected'),
+                'tpl_processing'           => $request->input('tpl_processing'),
+                'tpl_approved_dinein'      => $request->input('tpl_approved_dinein'),
+                'tpl_approved_takeaway'    => $request->input('tpl_approved_takeaway'),
+                'tpl_rejected_dinein'      => $request->input('tpl_rejected_dinein'),
+                'tpl_rejected_takeaway'    => $request->input('tpl_rejected_takeaway'),
+                'tpl_processing_dinein'    => $request->input('tpl_processing_dinein'),
+                'tpl_processing_takeaway'  => $request->input('tpl_processing_takeaway'),
+                'tpl_ready_dinein'         => $request->input('tpl_ready_dinein'),
+                'tpl_ready_takeaway'       => $request->input('tpl_ready_takeaway'),
+                'tpl_completed_dinein'     => $request->input('tpl_completed_dinein'),
+                'tpl_completed_takeaway'   => $request->input('tpl_completed_takeaway'),
+                'updated_at'               => now(),
             ];
 
             if ($existing) {
@@ -185,13 +197,19 @@ class WhatsAppController extends Controller
             'notify_processing'      => (bool) ($row->notify_processing ?? true),
             'notify_ready'           => (bool) ($row->notify_ready ?? true),
             'notify_completed'       => (bool) ($row->notify_completed ?? true),
-            'tpl_approved'           => $row->tpl_approved ?? null,
-            'tpl_rejected'           => $row->tpl_rejected ?? null,
-            'tpl_processing'         => $row->tpl_processing ?? null,
-            'tpl_ready_dinein'       => $row->tpl_ready_dinein ?? null,
-            'tpl_ready_takeaway'     => $row->tpl_ready_takeaway ?? null,
-            'tpl_completed_dinein'   => $row->tpl_completed_dinein ?? null,
-            'tpl_completed_takeaway' => $row->tpl_completed_takeaway ?? null,
+            'tpl_approved'             => $row->tpl_approved ?? null,
+            'tpl_rejected'             => $row->tpl_rejected ?? null,
+            'tpl_processing'           => $row->tpl_processing ?? null,
+            'tpl_approved_dinein'      => $row->tpl_approved_dinein ?? null,
+            'tpl_approved_takeaway'    => $row->tpl_approved_takeaway ?? null,
+            'tpl_rejected_dinein'      => $row->tpl_rejected_dinein ?? null,
+            'tpl_rejected_takeaway'    => $row->tpl_rejected_takeaway ?? null,
+            'tpl_processing_dinein'    => $row->tpl_processing_dinein ?? null,
+            'tpl_processing_takeaway'  => $row->tpl_processing_takeaway ?? null,
+            'tpl_ready_dinein'         => $row->tpl_ready_dinein ?? null,
+            'tpl_ready_takeaway'       => $row->tpl_ready_takeaway ?? null,
+            'tpl_completed_dinein'     => $row->tpl_completed_dinein ?? null,
+            'tpl_completed_takeaway'   => $row->tpl_completed_takeaway ?? null,
         ];
     }
 
@@ -229,5 +247,14 @@ class WhatsAppController extends Controller
         DB::statement("ALTER TABLE wa_settings ADD COLUMN IF NOT EXISTS notify_completed BOOLEAN DEFAULT TRUE");
         DB::statement("ALTER TABLE wa_settings ADD COLUMN IF NOT EXISTS tpl_completed_dinein TEXT");
         DB::statement("ALTER TABLE wa_settings ADD COLUMN IF NOT EXISTS tpl_completed_takeaway TEXT");
+        // Per-order-type variants for approved / rejected / processing.
+        // Existing tpl_approved / tpl_rejected / tpl_processing columns stay
+        // as the shared fallback so legacy outlets keep working unchanged.
+        DB::statement("ALTER TABLE wa_settings ADD COLUMN IF NOT EXISTS tpl_approved_dinein TEXT");
+        DB::statement("ALTER TABLE wa_settings ADD COLUMN IF NOT EXISTS tpl_approved_takeaway TEXT");
+        DB::statement("ALTER TABLE wa_settings ADD COLUMN IF NOT EXISTS tpl_rejected_dinein TEXT");
+        DB::statement("ALTER TABLE wa_settings ADD COLUMN IF NOT EXISTS tpl_rejected_takeaway TEXT");
+        DB::statement("ALTER TABLE wa_settings ADD COLUMN IF NOT EXISTS tpl_processing_dinein TEXT");
+        DB::statement("ALTER TABLE wa_settings ADD COLUMN IF NOT EXISTS tpl_processing_takeaway TEXT");
     }
 }

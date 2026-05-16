@@ -133,12 +133,25 @@ class SendOrderProgressWhatsApp implements ShouldQueue
      */
     protected function pickTemplate(object $order, ?object $settings): array
     {
-        if ($this->event === 'processing') {
-            return ['processing', $settings->tpl_processing ?? null];
-        }
-
         $type = (string) ($order->order_type ?? '');
         $isTakeaway = ($type === 'takeaway' || $type === 'delivery');
+        $variant = $isTakeaway ? 'takeaway' : 'dinein';
+
+        if ($this->event === 'processing') {
+            // Prefer the per-type template; fall back to the shared tpl_processing
+            // so outlets that customized only the legacy column keep working.
+            $variantCol = "tpl_processing_{$variant}";
+            $variantKey = "processing_{$variant}";
+            $variantTpl = $settings->{$variantCol} ?? null;
+            if (trim((string) $variantTpl) !== '') {
+                return [$variantKey, $variantTpl];
+            }
+            $shared = $settings->tpl_processing ?? null;
+            if (trim((string) $shared) !== '') {
+                return ['processing', $shared];
+            }
+            return [$variantKey, null];
+        }
 
         if ($this->event === 'completed') {
             return $isTakeaway

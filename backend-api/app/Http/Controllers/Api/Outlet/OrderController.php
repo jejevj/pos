@@ -1254,6 +1254,9 @@ class OrderController extends Controller
                 'orderCode'    => (string) ($order->kode ?? ''),
                 'outletName'   => (string) ($outlet->nama ?? $outlet->name ?? ''),
                 'schema'       => (string) $outlet->schema_name,
+                'orderType'    => (string) ($order->order_type ?? ''),
+                'tableNumber'  => (string) ($order->table_number ?? ''),
+                'outletDbId'   => (int) $outlet->id,
             ];
             DB::statement("SET search_path TO public");
             $this->dispatchWahaNotification($notifyPayload, 'approved', null);
@@ -1297,6 +1300,9 @@ class OrderController extends Controller
                 'orderCode'    => (string) ($order->kode ?? ''),
                 'outletName'   => (string) ($outlet->nama ?? $outlet->name ?? ''),
                 'schema'       => (string) $outlet->schema_name,
+                'orderType'    => (string) ($order->order_type ?? ''),
+                'tableNumber'  => (string) ($order->table_number ?? ''),
+                'outletDbId'   => (int) $outlet->id,
             ];
             DB::statement("SET search_path TO public");
             $this->dispatchWahaNotification($notifyPayload, 'rejected', $reason ?: null);
@@ -1329,7 +1335,10 @@ class OrderController extends Controller
                 $payload['outletName'] ?? '',
                 $status,
                 $reason,
-                $payload['schema'] ?? null
+                $payload['schema'] ?? null,
+                $payload['orderType'] ?? null,
+                $payload['tableNumber'] ?? null,
+                isset($payload['outletDbId']) ? (int) $payload['outletDbId'] : null
             );
             Log::info("[WAHA] Queued {$status} notification for order {$payload['orderCode']}");
         } catch (\Throwable $e) {

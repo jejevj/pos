@@ -257,6 +257,7 @@ import { useToast } from 'primevue/usetoast'
 import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '@/stores/auth'
 import api from '@/services/api'
+import { compressForUpload } from '@/utils/imageCompression'
 
 import Card from 'primevue/card'
 import Breadcrumb from 'primevue/breadcrumb'
@@ -361,8 +362,14 @@ const saveAll = async () => {
 }
 
 const uploadImage = async (event, key) => {
-  const file = event.files?.[0]
-  if (!file) return
+  const raw = event.files?.[0]
+  if (!raw) return
+  // Favicons must stay small + crisp; logos can tolerate slightly more.
+  const isFavicon = /favicon/i.test(String(key || ''))
+  const compressOpts = isFavicon
+    ? { maxSizeMB: 0.1, maxWidthOrHeight: 256 }
+    : { maxSizeMB: 0.5, maxWidthOrHeight: 1200 }
+  const { file } = await compressForUpload(raw, compressOpts)
   const fd = new FormData()
   fd.append('image', file)
   fd.append('key', key)
