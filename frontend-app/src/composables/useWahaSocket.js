@@ -11,10 +11,10 @@ const PLACEHOLDER_KEYS = new Set(['', 'change-me', 'your-waha-api-key'])
 export const wahaEnabled =
   (RAW_ENABLED === 'true' || RAW_ENABLED === '1') && !PLACEHOLDER_KEYS.has(WAHA_KEY)
 
-// Singleton
+// Singleton WS connection + shared state
 let socket = null
 let reconnectTimer = null
-const listeners = new Set()
+let consumerCount = 0
 
 // Shared reactive state
 const connected   = ref(false)
@@ -22,6 +22,41 @@ const unreadCount = ref(0)
 
 // Extra callbacks for components that want raw message events
 const messageCallbacks = new Set()
+
+// ── Dedupe ──────────────────────────────────────────────────────────────────
+// WAHA can emit the same incoming message multiple times (e.g. broadcast per
+// active session when subscribing with session=*, or duplicated payloads on
+// reconnect). Without dedupe each repeat would increment unreadCount and fire
+// another toast, so a single incoming chat shows up as 3× toasts and 3× badge.
+//
+// We remember recently-seen message keys in a bounded ring buffer and skip
+// anything we've already processed.
+const seenIds = new Set()
+const seenOrder = []
+const SEEN_MAX = 500
+
+function messageKey(payload) {
+  if (!payload) return null
+  if (payload.id) return String(payload.id)
+  // Fallback: chat + timestamp (sec) + short body hash. Good enough to
+  // collapse near-simultaneous duplicates without colliding across users.
+  const from = payload.from || ''
+  const ts   = payload.timestamp || 0
+  const body = (payload.body || '').slice(0, 64)
+  return `${from}|${ts}|${body}`
+}
+
+function markSeen(key) {
+  if (!key) return false
+  if (seenIds.has(key)) return false
+  seenIds.add(key)
+  seenOrder.push(key)
+  if (seenOrder.length > SEEN_MAX) {
+    const drop = seenOrder.shift()
+    seenIds.delete(drop)
+  }
+  return true
+}
 
 function buildWsUrl() {
   const params = new URLSearchParams({ 'x-api-key': WAHA_KEY, session: '*' })
@@ -41,7 +76,7 @@ function connect() {
     socket.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data)
-        listeners.forEach(fn => fn(data))
+        dispatchEvent(data)
       } catch { /* ignore */ }
     }
     socket.onclose = () => {
@@ -60,55 +95,77 @@ function disconnect() {
   if (socket) { socket.onclose = null; socket.close(); socket = null }
 }
 
-export function useWahaSocket() {
-  const toast = useToast()
+// Centralised event dispatch — runs ONCE per WS frame, no matter how many
+// components have called useWahaSocket(). Components subscribe to derived
+// state (unreadCount) or raw payloads via onWahaMessage(), but counting,
+// dedupe and toasting all happen here exactly once.
+let centralToast = null
+function dispatchEvent(data) {
+  if (data.event === 'session.status') {
+    connected.value = data.payload?.status === 'WORKING'
+    return
+  }
+  if (data.event !== 'message') return
 
-  function handleMessage(data) {
-    if (data.event === 'session.status') {
-      connected.value = data.payload?.status === 'WORKING'
-      return
-    }
+  const payload = data.payload
+  if (!payload || payload.fromMe) return
 
-    if (data.event !== 'message') return
-    const payload = data.payload
-    if (!payload || payload.fromMe) return
+  // Ignore status/story broadcasts
+  const from = payload.from || ''
+  if (from.includes('@broadcast') || from.includes('status@') || from.includes('@newsletter')) return
 
-    // Ignore status/story broadcasts
-    const from = payload.from || ''
-    if (from.includes('@broadcast') || from.includes('status@') || from.includes('@newsletter')) return
+  // Dedupe — same logical message must only count once across all surfaces
+  const key = messageKey(payload)
+  if (!markSeen(key)) return
 
-    unreadCount.value++
+  unreadCount.value++
 
+  if (centralToast) {
     const sender = payload.pushName || payload.from?.replace(/@.*$/, '') || 'Unknown'
     const body   = payload.body || (payload.hasMedia ? '📎 Media' : '')
-
-    toast.add({
+    centralToast.add({
       severity: 'info',
       summary: `💬 ${sender}`,
       detail: body?.substring(0, 100) || '',
       life: 6000,
       group: 'wa',
     })
+  }
 
-    // Notify any component-level subscribers
-    messageCallbacks.forEach(cb => cb(payload))
+  // Notify any component-level subscribers (chat view, etc.) — these may run
+  // many times, but receive the same already-deduped payload.
+  messageCallbacks.forEach(cb => {
+    try { cb(payload) } catch (e) { console.error('[WAHA] subscriber error', e) }
+  })
+}
+
+export function useWahaSocket() {
+  // First mounted consumer "owns" the toast service — subsequent mounts
+  // reuse it. This guarantees one toast per incoming message regardless of
+  // how many components call useWahaSocket().
+  if (!centralToast) {
+    try { centralToast = useToast() } catch { /* outside provider */ }
   }
 
   if (wahaEnabled) {
-    listeners.add(handleMessage)
+    consumerCount++
     connect()
   }
 
   onUnmounted(() => {
-    listeners.delete(handleMessage)
-    if (listeners.size === 0) disconnect()
+    if (!wahaEnabled) return
+    consumerCount = Math.max(0, consumerCount - 1)
+    if (consumerCount === 0) {
+      disconnect()
+      centralToast = null
+    }
   })
 
   return { connected, unreadCount, wahaEnabled }
 }
 
 /**
- * Subscribe to raw incoming message payloads.
+ * Subscribe to raw incoming message payloads (already deduped).
  * Returns an unsubscribe function — call it in onUnmounted.
  */
 export function onWahaMessage(callback) {
