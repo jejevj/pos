@@ -673,13 +673,26 @@
             <div class="wa-placeholder-hint">
               <i class="pi pi-info-circle"></i>
               <div>
-                <strong>Placeholder yang tersedia:</strong>
-                <code>{nama_pelanggan}</code>, <code>{kode_pesanan}</code>,
-                <code>{nama_outlet}</code>, <code>{tipe_pesanan}</code>,
-                <code>{nomor_meja}</code>, <code>{total}</code>,
-                <code>{status}</code>, <code>{alasan}</code>.
-                Kosongkan untuk pakai pesan default.
+                <strong>Placeholder yang tersedia.</strong>
+                Tarik chip ke dalam kotak template, atau klik untuk menyisipkan di posisi kursor pada template yang sedang difokus.
+                Kosongkan template untuk pakai pesan default.
               </div>
+            </div>
+
+            <div class="wa-placeholder-bar" role="toolbar" aria-label="Placeholder template WhatsApp">
+              <span
+                v-for="ph in waPlaceholders"
+                :key="ph.token"
+                class="wa-chip"
+                draggable="true"
+                :title="ph.hint"
+                @dragstart="onChipDragStart($event, ph.token)"
+                @click="insertPlaceholder(ph.token)"
+              >
+                <i class="pi pi-bars wa-chip-grip" aria-hidden="true"></i>
+                <span class="wa-chip-label">{{ ph.label }}</span>
+                <code class="wa-chip-token">{{ ph.token }}</code>
+              </span>
             </div>
 
             <div class="tx-section">
@@ -723,7 +736,16 @@
                     <label class="setting-label">Pesanan Disetujui</label>
                     <p class="setting-description">Dikirim saat kasir menyetujui pesanan publik (table/takeaway).</p>
                   </div>
-                  <Textarea v-model="waSettings.tpl_approved" rows="4" autoResize class="setting-control full" placeholder="Kosongkan untuk pakai pesan default." />
+                  <Textarea
+                    v-model="waSettings.tpl_approved"
+                    rows="4"
+                    autoResize
+                    class="setting-control full"
+                    placeholder="Kosongkan untuk pakai pesan default."
+                    :ref="el => registerWaField('tpl_approved', el)"
+                    @focus="waActiveField = 'tpl_approved'"
+                    @drop="onTemplateDrop($event, 'tpl_approved')"
+                  />
                 </div>
 
                 <div class="setting-item setting-item-block">
@@ -731,7 +753,16 @@
                     <label class="setting-label">Pesanan Ditolak</label>
                     <p class="setting-description">Dikirim saat kasir menolak pesanan. Placeholder <code>{alasan}</code> berisi alasan penolakan.</p>
                   </div>
-                  <Textarea v-model="waSettings.tpl_rejected" rows="4" autoResize class="setting-control full" placeholder="Kosongkan untuk pakai pesan default." />
+                  <Textarea
+                    v-model="waSettings.tpl_rejected"
+                    rows="4"
+                    autoResize
+                    class="setting-control full"
+                    placeholder="Kosongkan untuk pakai pesan default."
+                    :ref="el => registerWaField('tpl_rejected', el)"
+                    @focus="waActiveField = 'tpl_rejected'"
+                    @drop="onTemplateDrop($event, 'tpl_rejected')"
+                  />
                 </div>
               </div>
             </div>
@@ -747,7 +778,16 @@
                     <label class="setting-label">Pesanan Mulai Diproses</label>
                     <p class="setting-description">Dikirim sekali ketika bar atau kitchen mulai memproses pesanan (mana yang lebih dulu).</p>
                   </div>
-                  <Textarea v-model="waSettings.tpl_processing" rows="4" autoResize class="setting-control full" placeholder="Kosongkan untuk pakai pesan default." />
+                  <Textarea
+                    v-model="waSettings.tpl_processing"
+                    rows="4"
+                    autoResize
+                    class="setting-control full"
+                    placeholder="Kosongkan untuk pakai pesan default."
+                    :ref="el => registerWaField('tpl_processing', el)"
+                    @focus="waActiveField = 'tpl_processing'"
+                    @drop="onTemplateDrop($event, 'tpl_processing')"
+                  />
                 </div>
 
                 <div class="setting-item setting-item-block">
@@ -755,7 +795,16 @@
                     <label class="setting-label">Pesanan Siap (Dine-in / Delivery)</label>
                     <p class="setting-description">Dikirim saat pesanan siap diantar ke meja. Cocok dipakai untuk dine-in dan delivery.</p>
                   </div>
-                  <Textarea v-model="waSettings.tpl_ready_dinein" rows="4" autoResize class="setting-control full" placeholder="Kosongkan untuk pakai pesan default." />
+                  <Textarea
+                    v-model="waSettings.tpl_ready_dinein"
+                    rows="4"
+                    autoResize
+                    class="setting-control full"
+                    placeholder="Kosongkan untuk pakai pesan default."
+                    :ref="el => registerWaField('tpl_ready_dinein', el)"
+                    @focus="waActiveField = 'tpl_ready_dinein'"
+                    @drop="onTemplateDrop($event, 'tpl_ready_dinein')"
+                  />
                 </div>
 
                 <div class="setting-item setting-item-block">
@@ -763,7 +812,16 @@
                     <label class="setting-label">Pesanan Siap (Takeaway / Pickup)</label>
                     <p class="setting-description">Dikirim saat pesanan takeaway siap diambil di kasir.</p>
                   </div>
-                  <Textarea v-model="waSettings.tpl_ready_takeaway" rows="4" autoResize class="setting-control full" placeholder="Kosongkan untuk pakai pesan default." />
+                  <Textarea
+                    v-model="waSettings.tpl_ready_takeaway"
+                    rows="4"
+                    autoResize
+                    class="setting-control full"
+                    placeholder="Kosongkan untuk pakai pesan default."
+                    :ref="el => registerWaField('tpl_ready_takeaway', el)"
+                    @focus="waActiveField = 'tpl_ready_takeaway'"
+                    @drop="onTemplateDrop($event, 'tpl_ready_takeaway')"
+                  />
                 </div>
 
                 <div class="setting-item setting-item-block">
@@ -771,7 +829,16 @@
                     <label class="setting-label">Pesanan Selesai (Dine-in / Delivery)</label>
                     <p class="setting-description">Dikirim sekali ketika seluruh item pesanan dine-in/delivery sudah ditandai <em>served</em> (telah diantar ke pelanggan).</p>
                   </div>
-                  <Textarea v-model="waSettings.tpl_completed_dinein" rows="4" autoResize class="setting-control full" placeholder="Kosongkan untuk pakai pesan default." />
+                  <Textarea
+                    v-model="waSettings.tpl_completed_dinein"
+                    rows="4"
+                    autoResize
+                    class="setting-control full"
+                    placeholder="Kosongkan untuk pakai pesan default."
+                    :ref="el => registerWaField('tpl_completed_dinein', el)"
+                    @focus="waActiveField = 'tpl_completed_dinein'"
+                    @drop="onTemplateDrop($event, 'tpl_completed_dinein')"
+                  />
                 </div>
 
                 <div class="setting-item setting-item-block">
@@ -779,7 +846,16 @@
                     <label class="setting-label">Pesanan Selesai (Takeaway / Pickup)</label>
                     <p class="setting-description">Dikirim sekali ketika seluruh item pesanan takeaway sudah ditandai <em>served</em> (diserahkan ke pelanggan).</p>
                   </div>
-                  <Textarea v-model="waSettings.tpl_completed_takeaway" rows="4" autoResize class="setting-control full" placeholder="Kosongkan untuk pakai pesan default." />
+                  <Textarea
+                    v-model="waSettings.tpl_completed_takeaway"
+                    rows="4"
+                    autoResize
+                    class="setting-control full"
+                    placeholder="Kosongkan untuk pakai pesan default."
+                    :ref="el => registerWaField('tpl_completed_takeaway', el)"
+                    @focus="waActiveField = 'tpl_completed_takeaway'"
+                    @drop="onTemplateDrop($event, 'tpl_completed_takeaway')"
+                  />
                 </div>
               </div>
             </div>
@@ -796,7 +872,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, nextTick } from 'vue'
 import { useRoute } from 'vue-router'
 import { useToast } from 'primevue/usetoast'
 import { useI18n } from 'vue-i18n'
@@ -1225,6 +1301,85 @@ const waSettings = ref({
   tpl_completed_dinein:   '',
   tpl_completed_takeaway: '',
 })
+
+// Placeholder chips: dragged/clicked to insert tokens into the active
+// template textarea. Tokens must match OrderMessageTemplate::vars() keys.
+const waPlaceholders = [
+  { token: '{nama_pelanggan}', label: 'Nama Pelanggan', hint: 'Nama pelanggan dari pesanan' },
+  { token: '{link_tracking}',  label: 'Link Tracking',  hint: 'URL publik untuk pantau status pesanan' },
+  { token: '{kode_pesanan}',   label: 'Kode Pesanan',   hint: 'Kode unik pesanan' },
+  { token: '{nama_outlet}',    label: 'Nama Outlet',    hint: 'Nama outlet pengirim pesan' },
+  { token: '{tipe_pesanan}',   label: 'Tipe Pesanan',   hint: 'Dine-in / Takeaway / Delivery' },
+  { token: '{nomor_meja}',     label: 'Nomor Meja',     hint: 'Nomor meja untuk dine-in' },
+  { token: '{total}',          label: 'Total',          hint: 'Total tagihan pesanan' },
+  { token: '{status}',         label: 'Status',         hint: 'Status pesanan saat ini' },
+  { token: '{alasan}',         label: 'Alasan',         hint: 'Alasan penolakan (jika ada)' },
+]
+
+const waActiveField = ref('tpl_processing')
+const waFieldRefs = {}
+
+const registerWaField = (key, comp) => {
+  // PrimeVue Textarea wraps a native <textarea>; expose either the
+  // component instance or the raw DOM element so we can read selection.
+  waFieldRefs[key] = comp || null
+}
+
+const resolveTextarea = (key) => {
+  const ref = waFieldRefs[key]
+  if (!ref) return null
+  // PrimeVue exposes the underlying <textarea> as `.$el` (component) or
+  // the element itself if a plain element was passed.
+  const el = ref.$el || ref
+  if (!el) return null
+  if (el.tagName === 'TEXTAREA') return el
+  return el.querySelector ? el.querySelector('textarea') : null
+}
+
+const insertPlaceholder = (token, explicitKey = null) => {
+  const key = explicitKey || waActiveField.value
+  if (!key || !(key in waSettings.value)) return
+  const ta = resolveTextarea(key)
+  const current = waSettings.value[key] || ''
+  if (ta && typeof ta.selectionStart === 'number') {
+    const start = ta.selectionStart
+    const end = ta.selectionEnd
+    const next = current.slice(0, start) + token + current.slice(end)
+    waSettings.value[key] = next
+    // Restore caret position right after the inserted token
+    nextTick(() => {
+      ta.focus()
+      const caret = start + token.length
+      try { ta.setSelectionRange(caret, caret) } catch (_) { /* ignore */ }
+    })
+  } else {
+    waSettings.value[key] = current + token
+  }
+  waActiveField.value = key
+}
+
+const onChipDragStart = (event, token) => {
+  // Native textareas accept dropped text/plain payloads, which inserts
+  // them at the drop position automatically — so we just hand off the
+  // token and let the browser handle the insertion.
+  if (event.dataTransfer) {
+    event.dataTransfer.setData('text/plain', token)
+    event.dataTransfer.effectAllowed = 'copy'
+  }
+}
+
+const onTemplateDrop = (event, key) => {
+  // The browser will already drop the text/plain payload at the cursor.
+  // We just keep `waActiveField` in sync so the next chip-click targets
+  // this textarea, and read back the value after the native drop.
+  waActiveField.value = key
+  nextTick(() => {
+    const ta = resolveTextarea(key)
+    if (ta && typeof ta.value === 'string' && ta.value !== waSettings.value[key]) {
+      waSettings.value[key] = ta.value
+    }
+  })
+}
 
 const fetchWaSettings = async () => {
   if (!numericOutletId) return
@@ -1771,5 +1926,42 @@ html.is-dark .url-display code { color: #60a5fa; }
   border-radius: 3px;
   font-size: 0.85em;
   margin: 0 0.1rem;
+}
+
+.wa-placeholder-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 1.25rem;
+  padding: 0.75rem;
+  border: 1px dashed #cbd5e1;
+  border-radius: 6px;
+  background: #f8fafc;
+}
+.wa-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.35rem 0.65rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 999px;
+  background: #fff;
+  font-size: 0.8125rem;
+  color: #0f172a;
+  cursor: grab;
+  user-select: none;
+  transition: background 0.12s ease, border-color 0.12s ease, transform 0.05s ease;
+}
+.wa-chip:hover { background: #e0f2fe; border-color: #0284c7; }
+.wa-chip:active { cursor: grabbing; transform: translateY(1px); }
+.wa-chip-grip { font-size: 0.7rem; color: #94a3b8; }
+.wa-chip-label { font-weight: 600; }
+.wa-chip-token {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
+  font-size: 0.75rem;
+  color: #475569;
+  padding: 0 0.3rem;
+  background: #f1f5f9;
+  border-radius: 3px;
 }
 </style>

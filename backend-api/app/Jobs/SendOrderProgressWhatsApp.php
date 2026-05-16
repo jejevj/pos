@@ -37,13 +37,20 @@ class SendOrderProgressWhatsApp implements ShouldQueue
     public int $orderId;
     public string $outletName;
     public string $event;
+    public ?int $outletDbId;
 
-    public function __construct(string $schema, int $orderId, string $outletName, string $event)
-    {
+    public function __construct(
+        string $schema,
+        int $orderId,
+        string $outletName,
+        string $event,
+        ?int $outletDbId = null
+    ) {
         $this->schema     = $schema;
         $this->orderId    = $orderId;
         $this->outletName = $outletName;
         $this->event      = $event;
+        $this->outletDbId = $outletDbId;
     }
 
     public function handle(WahaService $waha): void
@@ -97,9 +104,16 @@ class SendOrderProgressWhatsApp implements ShouldQueue
 
             [$tplKey, $tpl] = $this->pickTemplate($order, $settings);
 
+            $trackingUrl = $this->outletDbId
+                ? OrderMessageTemplate::buildTrackingUrl(
+                    $this->outletDbId,
+                    (string) ($order->kode ?? '')
+                )
+                : null;
+
             $message = OrderMessageTemplate::render(
                 $tpl,
-                OrderMessageTemplate::vars($order, $this->outletName),
+                OrderMessageTemplate::vars($order, $this->outletName, null, $trackingUrl),
                 $tplKey
             );
 

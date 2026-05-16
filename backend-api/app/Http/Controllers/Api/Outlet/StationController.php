@@ -332,7 +332,8 @@ class StationController extends Controller
                 $outlet->schema_name,
                 $orderId,
                 $outletName,
-                $event
+                $event,
+                (int) $outlet->id
             );
             Log::info("[WAHA] Queued progress notification ({$event}) for order #{$orderId} in {$outlet->schema_name}");
         } catch (\Throwable $e) {

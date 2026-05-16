@@ -27,6 +27,7 @@ class OrderMessageTemplate
         'processing' =>
             "Halo {nama_pelanggan},\n" .
             "Pesanan Anda *{kode_pesanan}* di *{nama_outlet}* sedang *DIPROSES* oleh dapur/bar kami.\n" .
+            "Pantau status pesanan Anda di sini:\n{link_tracking}\n" .
             "Mohon ditunggu sebentar lagi.",
         'ready_dinein' =>
             "Halo {nama_pelanggan},\n" .
@@ -74,8 +75,12 @@ class OrderMessageTemplate
      * Build the variable map used by all templates from an order row.
      * Expects $order to be the orders table row (object with same fields).
      */
-    public static function vars(object $order, string $outletName, ?string $reason = null): array
-    {
+    public static function vars(
+        object $order,
+        string $outletName,
+        ?string $reason = null,
+        ?string $trackingUrl = null
+    ): array {
         $type = (string) ($order->order_type ?? '');
         $tipeLabel = match ($type) {
             'dine_in'  => 'Dine-in',
@@ -95,6 +100,31 @@ class OrderMessageTemplate
                 : '',
             'status'         => (string) ($order->status ?? ''),
             'alasan'         => $reason ? 'Alasan: ' . $reason : '',
+            'link_tracking'  => (string) ($trackingUrl ?? ''),
         ];
+    }
+
+    /**
+     * Build the public tracking URL for an order. The hash matches
+     * frontend-app/src/utils/outletId.js (XOR with the same seed) so the
+     * link can be opened anonymously by the customer.
+     */
+    public static function buildTrackingUrl(int $outletId, string $orderCode): string
+    {
+        $base = rtrim((string) env('FRONTEND_URL', config('app.url', '')), '/');
+        if ($base === '') {
+            return '';
+        }
+        $encoded = self::encodeOutletId($outletId);
+        return $base . '/track/' . $encoded . '/' . rawurlencode($orderCode);
+    }
+
+    /** Must match SEED in frontend-app/src/utils/outletId.js */
+    private const OUTLET_ID_SEED = 0x504F5300;
+
+    private static function encodeOutletId(int $id): string
+    {
+        $n = ($id ^ self::OUTLET_ID_SEED) & 0xFFFFFFFF;
+        return str_pad(dechex($n), 8, '0', STR_PAD_LEFT);
     }
 }
