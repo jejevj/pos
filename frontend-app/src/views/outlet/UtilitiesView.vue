@@ -702,6 +702,13 @@
                   </div>
                   <ToggleSwitch v-model="waSettings.notify_ready" />
                 </div>
+                <div class="setting-item">
+                  <div class="setting-info">
+                    <label class="setting-label">Kirim saat pesanan selesai (sudah diantar/diambil)</label>
+                    <p class="setting-description">Notifikasi dikirim ketika seluruh item dalam satu pesanan telah ditandai <em>served</em> oleh staff (selesai dilayani).</p>
+                  </div>
+                  <ToggleSwitch v-model="waSettings.notify_completed" />
+                </div>
               </div>
             </div>
 
@@ -757,6 +764,22 @@
                     <p class="setting-description">Dikirim saat pesanan takeaway siap diambil di kasir.</p>
                   </div>
                   <Textarea v-model="waSettings.tpl_ready_takeaway" rows="4" autoResize class="setting-control full" placeholder="Kosongkan untuk pakai pesan default." />
+                </div>
+
+                <div class="setting-item setting-item-block">
+                  <div class="setting-info">
+                    <label class="setting-label">Pesanan Selesai (Dine-in / Delivery)</label>
+                    <p class="setting-description">Dikirim sekali ketika seluruh item pesanan dine-in/delivery sudah ditandai <em>served</em> (telah diantar ke pelanggan).</p>
+                  </div>
+                  <Textarea v-model="waSettings.tpl_completed_dinein" rows="4" autoResize class="setting-control full" placeholder="Kosongkan untuk pakai pesan default." />
+                </div>
+
+                <div class="setting-item setting-item-block">
+                  <div class="setting-info">
+                    <label class="setting-label">Pesanan Selesai (Takeaway / Pickup)</label>
+                    <p class="setting-description">Dikirim sekali ketika seluruh item pesanan takeaway sudah ditandai <em>served</em> (diserahkan ke pelanggan).</p>
+                  </div>
+                  <Textarea v-model="waSettings.tpl_completed_takeaway" rows="4" autoResize class="setting-control full" placeholder="Kosongkan untuk pakai pesan default." />
                 </div>
               </div>
             </div>
@@ -1191,13 +1214,16 @@ async function handleMemberLogoUpload(event) {
 const waLoading = ref(false)
 const waSaving = ref(false)
 const waSettings = ref({
-  notify_processing:   true,
-  notify_ready:        true,
-  tpl_approved:        '',
-  tpl_rejected:        '',
-  tpl_processing:      '',
-  tpl_ready_dinein:    '',
-  tpl_ready_takeaway:  '',
+  notify_processing:      true,
+  notify_ready:           true,
+  notify_completed:       true,
+  tpl_approved:           '',
+  tpl_rejected:           '',
+  tpl_processing:         '',
+  tpl_ready_dinein:       '',
+  tpl_ready_takeaway:     '',
+  tpl_completed_dinein:   '',
+  tpl_completed_takeaway: '',
 })
 
 const fetchWaSettings = async () => {
@@ -1207,13 +1233,16 @@ const fetchWaSettings = async () => {
     const res = await api.get(`/outlets/${numericOutletId}/whatsapp/settings`)
     const d = res.data || {}
     waSettings.value = {
-      notify_processing:   Boolean(d.notify_processing ?? true),
-      notify_ready:        Boolean(d.notify_ready ?? true),
-      tpl_approved:        d.tpl_approved       || '',
-      tpl_rejected:        d.tpl_rejected       || '',
-      tpl_processing:      d.tpl_processing     || '',
-      tpl_ready_dinein:    d.tpl_ready_dinein   || '',
-      tpl_ready_takeaway:  d.tpl_ready_takeaway || '',
+      notify_processing:      Boolean(d.notify_processing ?? true),
+      notify_ready:           Boolean(d.notify_ready ?? true),
+      notify_completed:       Boolean(d.notify_completed ?? true),
+      tpl_approved:           d.tpl_approved             || '',
+      tpl_rejected:           d.tpl_rejected             || '',
+      tpl_processing:         d.tpl_processing           || '',
+      tpl_ready_dinein:       d.tpl_ready_dinein         || '',
+      tpl_ready_takeaway:     d.tpl_ready_takeaway       || '',
+      tpl_completed_dinein:   d.tpl_completed_dinein     || '',
+      tpl_completed_takeaway: d.tpl_completed_takeaway   || '',
     }
   } catch (e) {
     toast.add({ severity: 'error', summary: 'Error', detail: 'Gagal memuat template WhatsApp', life: 3000 })

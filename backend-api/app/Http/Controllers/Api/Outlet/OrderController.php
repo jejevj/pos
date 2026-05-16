@@ -1203,13 +1203,46 @@ class OrderController extends Controller
                 DB::statement("SET search_path TO public");
                 return response()->json(['message' => 'Pesanan sudah diproses'], 409);
             }
+            // Approving a public order also locks in the customer's online
+            // payment proof — flip status from 'draft' to 'paid' so the order
+            // shows up correctly in Daftar Transaksi (it was previously
+            // stuck as 'draft' because the standard POS payment endpoint was
+            // never called for self-ordered transactions).
+            $now = now();
             $order->approval_status = 'approved';
             $order->approved_by     = Auth::id();
-            $order->approved_at     = now();
+            $order->approved_at     = $now;
             $order->cashier_id      = Auth::id();
+            $order->status          = 'paid';
+            $order->payment_status  = 'paid';
+            $order->paid_at         = $now;
+            // The customer paid the full total online; no change expected.
+            $order->paid_amount     = $order->total_amount;
+            $order->change_amount   = 0;
             $order->save();
 
-            // Mark table occupied (same effect as POS dine-in store)
+            // Bump promo usage counters (mirrors POS payment flow).
+            $appliedPromos = is_string($order->applied_promos)
+                ? json_decode($order->applied_promos, true)
+                : ($order->applied_promos ?? []);
+            if (is_array($appliedPromos) && !empty($appliedPromos)) {
+                foreach ($appliedPromos as $appliedPromo) {
+                    $pid = is_array($appliedPromo) ? ($appliedPromo['id'] ?? null) : null;
+                    if ($pid) {
+                        $promo = \App\Models\Promo::find($pid);
+                        $promo?->incrementUsage();
+                    }
+                }
+            } elseif ($order->promo_id) {
+                $promo = \App\Models\Promo::find($order->promo_id);
+                $promo?->incrementUsage();
+            }
+
+            // Mark table occupied so the floor view reflects the dining state.
+            // We intentionally do NOT call markAsAvailable here (unlike the
+            // standard POS payment flow) because the customer is still
+            // dining — the table will be freed via the cashier's settle/serve
+            // workflow.
             if ($order->table_id && $order->table) {
                 $order->table->markAsOccupied();
             }

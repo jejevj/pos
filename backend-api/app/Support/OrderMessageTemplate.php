@@ -36,6 +36,14 @@ class OrderMessageTemplate
             "Halo {nama_pelanggan},\n" .
             "Pesanan takeaway Anda *{kode_pesanan}* di *{nama_outlet}* sudah *SIAP DIAMBIL* di kasir.\n" .
             "Terima kasih sudah memesan!",
+        'completed_dinein' =>
+            "Halo {nama_pelanggan},\n" .
+            "Seluruh pesanan Anda *{kode_pesanan}* di *{nama_outlet}* sudah *SELESAI* dan telah diantar ke meja {nomor_meja}.\n" .
+            "Selamat menikmati & terima kasih sudah memesan!",
+        'completed_takeaway' =>
+            "Halo {nama_pelanggan},\n" .
+            "Seluruh pesanan takeaway Anda *{kode_pesanan}* di *{nama_outlet}* sudah *SELESAI* dan telah diserahkan ke pelanggan.\n" .
+            "Terima kasih sudah memesan!",
     ];
 
     /**

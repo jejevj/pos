@@ -211,6 +211,7 @@ class StationController extends Controller
         $outlet = $this->authorizeOutlet($outletId);
 
         DB::statement("SET search_path TO {$outlet->schema_name}, public");
+        $this->ensureNotificationColumns();
 
         // Mark all items of this station as 'served'
         $now = \Carbon\Carbon::now();
@@ -230,11 +231,32 @@ class StationController extends Controller
             WHERE oi.order_id = ? AND m.station_id IS NOT NULL AND oi.status != 'served'
         ", [$orderId]);
 
+        $dispatchCompleted = false;
         if ($pendingStationItems && $pendingStationItems->cnt == 0) {
-            DB::statement("UPDATE orders SET kitchen_status = 'served' WHERE id = ?", [$orderId]);
+            // Atomically claim the "completed" notification slot so concurrent
+            // serveOrder calls (multi-station) or staff double-clicks do not
+            // both dispatch the WhatsApp notification.
+            $affected = DB::update("
+                UPDATE orders
+                   SET kitchen_status = 'served',
+                       wa_completed_notified_at = ?
+                 WHERE id = ?
+                   AND wa_completed_notified_at IS NULL
+            ", [$now, $orderId]);
+
+            if ($affected > 0) {
+                $dispatchCompleted = true;
+            } else {
+                // Already notified — still ensure kitchen_status is set
+                DB::statement("UPDATE orders SET kitchen_status = 'served' WHERE id = ?", [$orderId]);
+            }
         }
 
         DB::statement("SET search_path TO public");
+
+        if ($dispatchCompleted) {
+            $this->dispatchProgressNotification($outlet, (int) $orderId, 'completed');
+        }
 
         return response()->json(['message' => 'Order marked as served']);
     }
@@ -293,6 +315,7 @@ class StationController extends Controller
         try {
             DB::statement("ALTER TABLE orders ADD COLUMN IF NOT EXISTS wa_processing_notified_at TIMESTAMP NULL");
             DB::statement("ALTER TABLE orders ADD COLUMN IF NOT EXISTS wa_ready_notified_at TIMESTAMP NULL");
+            DB::statement("ALTER TABLE orders ADD COLUMN IF NOT EXISTS wa_completed_notified_at TIMESTAMP NULL");
         } catch (\Throwable $e) {
             // Older PostgreSQL without IF NOT EXISTS — best-effort, ignore.
         }

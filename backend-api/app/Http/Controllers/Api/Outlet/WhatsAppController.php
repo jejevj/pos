@@ -99,11 +99,14 @@ class WhatsAppController extends Controller
             'notify_order'             => 'boolean',
             'notify_processing'        => 'boolean',
             'notify_ready'             => 'boolean',
+            'notify_completed'         => 'boolean',
             'tpl_approved'             => 'nullable|string|max:2000',
             'tpl_rejected'             => 'nullable|string|max:2000',
             'tpl_processing'           => 'nullable|string|max:2000',
             'tpl_ready_dinein'         => 'nullable|string|max:2000',
             'tpl_ready_takeaway'       => 'nullable|string|max:2000',
+            'tpl_completed_dinein'     => 'nullable|string|max:2000',
+            'tpl_completed_takeaway'   => 'nullable|string|max:2000',
         ]);
 
         try {
@@ -117,14 +120,17 @@ class WhatsAppController extends Controller
                 'notify_kasbon'      => $request->boolean('notify_kasbon', true),
                 'notify_low_stock'   => $request->boolean('notify_low_stock', true),
                 'notify_order'       => $request->boolean('notify_order', false),
-                'notify_processing'  => $request->boolean('notify_processing', true),
-                'notify_ready'       => $request->boolean('notify_ready', true),
-                'tpl_approved'       => $request->input('tpl_approved'),
-                'tpl_rejected'       => $request->input('tpl_rejected'),
-                'tpl_processing'     => $request->input('tpl_processing'),
-                'tpl_ready_dinein'   => $request->input('tpl_ready_dinein'),
-                'tpl_ready_takeaway' => $request->input('tpl_ready_takeaway'),
-                'updated_at'         => now(),
+                'notify_processing'     => $request->boolean('notify_processing', true),
+                'notify_ready'          => $request->boolean('notify_ready', true),
+                'notify_completed'      => $request->boolean('notify_completed', true),
+                'tpl_approved'          => $request->input('tpl_approved'),
+                'tpl_rejected'          => $request->input('tpl_rejected'),
+                'tpl_processing'        => $request->input('tpl_processing'),
+                'tpl_ready_dinein'      => $request->input('tpl_ready_dinein'),
+                'tpl_ready_takeaway'    => $request->input('tpl_ready_takeaway'),
+                'tpl_completed_dinein'  => $request->input('tpl_completed_dinein'),
+                'tpl_completed_takeaway'=> $request->input('tpl_completed_takeaway'),
+                'updated_at'            => now(),
             ];
 
             if ($existing) {
@@ -176,13 +182,16 @@ class WhatsAppController extends Controller
             'notify_kasbon'       => (bool) ($row->notify_kasbon ?? true),
             'notify_low_stock'    => (bool) ($row->notify_low_stock ?? true),
             'notify_order'        => (bool) ($row->notify_order ?? false),
-            'notify_processing'   => (bool) ($row->notify_processing ?? true),
-            'notify_ready'        => (bool) ($row->notify_ready ?? true),
-            'tpl_approved'        => $row->tpl_approved ?? null,
-            'tpl_rejected'        => $row->tpl_rejected ?? null,
-            'tpl_processing'      => $row->tpl_processing ?? null,
-            'tpl_ready_dinein'    => $row->tpl_ready_dinein ?? null,
-            'tpl_ready_takeaway'  => $row->tpl_ready_takeaway ?? null,
+            'notify_processing'      => (bool) ($row->notify_processing ?? true),
+            'notify_ready'           => (bool) ($row->notify_ready ?? true),
+            'notify_completed'       => (bool) ($row->notify_completed ?? true),
+            'tpl_approved'           => $row->tpl_approved ?? null,
+            'tpl_rejected'           => $row->tpl_rejected ?? null,
+            'tpl_processing'         => $row->tpl_processing ?? null,
+            'tpl_ready_dinein'       => $row->tpl_ready_dinein ?? null,
+            'tpl_ready_takeaway'     => $row->tpl_ready_takeaway ?? null,
+            'tpl_completed_dinein'   => $row->tpl_completed_dinein ?? null,
+            'tpl_completed_takeaway' => $row->tpl_completed_takeaway ?? null,
         ];
     }
 
@@ -217,5 +226,8 @@ class WhatsAppController extends Controller
         DB::statement("ALTER TABLE wa_settings ADD COLUMN IF NOT EXISTS tpl_processing TEXT");
         DB::statement("ALTER TABLE wa_settings ADD COLUMN IF NOT EXISTS tpl_ready_dinein TEXT");
         DB::statement("ALTER TABLE wa_settings ADD COLUMN IF NOT EXISTS tpl_ready_takeaway TEXT");
+        DB::statement("ALTER TABLE wa_settings ADD COLUMN IF NOT EXISTS notify_completed BOOLEAN DEFAULT TRUE");
+        DB::statement("ALTER TABLE wa_settings ADD COLUMN IF NOT EXISTS tpl_completed_dinein TEXT");
+        DB::statement("ALTER TABLE wa_settings ADD COLUMN IF NOT EXISTS tpl_completed_takeaway TEXT");
     }
 }

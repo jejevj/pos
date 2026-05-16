@@ -24,7 +24,7 @@ use Illuminate\Support\Facades\Log;
  * @property-read string $schema    Outlet schema to read wa_settings from
  * @property-read int    $orderId   Order id (in $schema)
  * @property-read string $outletName Display name (already resolved)
- * @property-read string $event     'processing' | 'ready'
+ * @property-read string $event     'processing' | 'ready' | 'completed'
  */
 class SendOrderProgressWhatsApp implements ShouldQueue
 {
@@ -89,6 +89,11 @@ class SendOrderProgressWhatsApp implements ShouldQueue
                 DB::statement("SET search_path TO public");
                 return;
             }
+            if ($this->event === 'completed' && $settings && isset($settings->notify_completed) && !$settings->notify_completed) {
+                Log::info("[WAHA] Skip order #{$this->orderId} completed: notify_completed disabled in outlet settings");
+                DB::statement("SET search_path TO public");
+                return;
+            }
 
             [$tplKey, $tpl] = $this->pickTemplate($order, $settings);
 
@@ -118,9 +123,17 @@ class SendOrderProgressWhatsApp implements ShouldQueue
             return ['processing', $settings->tpl_processing ?? null];
         }
 
-        // ready — pick dine-in vs takeaway template
         $type = (string) ($order->order_type ?? '');
-        if ($type === 'takeaway' || $type === 'delivery') {
+        $isTakeaway = ($type === 'takeaway' || $type === 'delivery');
+
+        if ($this->event === 'completed') {
+            return $isTakeaway
+                ? ['completed_takeaway', $settings->tpl_completed_takeaway ?? null]
+                : ['completed_dinein',   $settings->tpl_completed_dinein   ?? null];
+        }
+
+        // ready — pick dine-in vs takeaway template
+        if ($isTakeaway) {
             return ['ready_takeaway', $settings->tpl_ready_takeaway ?? null];
         }
         return ['ready_dinein', $settings->tpl_ready_dinein ?? null];
