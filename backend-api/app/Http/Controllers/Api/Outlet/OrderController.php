@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\Outlet;
 
 use App\Http\Controllers\Concerns\AuthorizesOutletAccess;
 use App\Http\Controllers\Controller;
+use App\Jobs\SendOrderStatusWhatsApp;
 use App\Models\Outlet;
 use App\Models\Order;
 use App\Models\OrderItem;
@@ -12,6 +13,7 @@ use App\Models\Table;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -1211,7 +1213,16 @@ class OrderController extends Controller
             if ($order->table_id && $order->table) {
                 $order->table->markAsOccupied();
             }
+            // Capture customer/outlet info while still in outlet schema, then
+            // dispatch the WAHA notification to the queue (non-blocking).
+            $notifyPayload = [
+                'phone'        => (string) ($order->customer_phone ?? ''),
+                'customerName' => (string) ($order->customer_name ?? ''),
+                'orderCode'    => (string) ($order->kode ?? ''),
+                'outletName'   => (string) ($outlet->nama ?? $outlet->name ?? ''),
+            ];
             DB::statement("SET search_path TO public");
+            $this->dispatchWahaNotification($notifyPayload, 'approved', null);
             return response()->json(['message' => 'Pesanan disetujui', 'data' => $order]);
         } catch (\Exception $e) {
             DB::statement("SET search_path TO public");
@@ -1246,11 +1257,44 @@ class OrderController extends Controller
             $order->cancelled_by      = Auth::id();
             $order->cancellation_reason = $reason ?: 'Ditolak oleh kasir';
             $order->save();
+            $notifyPayload = [
+                'phone'        => (string) ($order->customer_phone ?? ''),
+                'customerName' => (string) ($order->customer_name ?? ''),
+                'orderCode'    => (string) ($order->kode ?? ''),
+                'outletName'   => (string) ($outlet->nama ?? $outlet->name ?? ''),
+            ];
             DB::statement("SET search_path TO public");
+            $this->dispatchWahaNotification($notifyPayload, 'rejected', $reason ?: null);
             return response()->json(['message' => 'Pesanan ditolak', 'data' => $order]);
         } catch (\Exception $e) {
             DB::statement("SET search_path TO public");
             return response()->json(['message' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Dispatch the WhatsApp notification job for a public order status change.
+     * Wrapped in try/catch so a queue-driver misconfiguration cannot break the
+     * staff approve/reject HTTP response.
+     */
+    protected function dispatchWahaNotification(array $payload, string $status, ?string $reason): void
+    {
+        $phone = trim($payload['phone'] ?? '');
+        if ($phone === '') {
+            Log::info("[WAHA] Skip dispatch order {$payload['orderCode']}: no customer phone");
+            return;
+        }
+        try {
+            SendOrderStatusWhatsApp::dispatch(
+                $phone,
+                $payload['customerName'] ?? '',
+                $payload['orderCode'] ?? '',
+                $payload['outletName'] ?? '',
+                $status,
+                $reason
+            );
+        } catch (\Throwable $e) {
+            Log::warning('[WAHA] Failed to dispatch job: ' . $e->getMessage());
         }
     }
 }

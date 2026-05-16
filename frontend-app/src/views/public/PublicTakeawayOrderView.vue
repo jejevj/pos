@@ -208,12 +208,29 @@
           <form v-if="cart.length" class="form" @submit.prevent="submitOrder">
             <h4>{{ t('publicOrder.contact') }}</h4>
             <div class="field">
-              <label>{{ t('publicOrder.name') }}</label>
-              <input v-model="form.customer_name" type="text" :placeholder="t('publicOrder.namePh')" />
+              <label>{{ t('publicOrder.name') }} <span class="req">*</span></label>
+              <input
+                v-model="form.customer_name"
+                type="text"
+                :placeholder="t('publicOrder.namePh')"
+                :readonly="!!member"
+                :disabled="!!member"
+                required
+              />
+              <small v-if="member" class="hint">{{ t('publicOrder.memberLockedHint') }}</small>
             </div>
             <div class="field">
               <label>{{ t('publicOrder.phone') }} <span class="req">*</span></label>
-              <input v-model="form.customer_phone" type="tel" inputmode="tel" :placeholder="t('publicOrder.phonePh')" required />
+              <input
+                v-model="form.customer_phone"
+                type="tel"
+                inputmode="tel"
+                :placeholder="t('publicOrder.phonePh')"
+                :readonly="!!member"
+                :disabled="!!member"
+                required
+              />
+              <small v-if="member" class="hint">{{ t('publicOrder.memberLockedHint') }}</small>
             </div>
             <div class="field">
               <label>{{ t('publicOrder.email') }} <span class="req">*</span></label>
@@ -666,10 +683,17 @@ watch(cart, (val) => {
 
 function syncMember() {
   member.value = loadMember()
-  if (member.value && member.value.email) {
-    if (!form.value.customer_name)  form.value.customer_name  = member.value.nama || ''
-    if (!form.value.customer_email) form.value.customer_email = member.value.email || ''
-    if (!form.value.customer_phone) form.value.customer_phone = member.value.phone || ''
+  if (member.value) {
+    // When member is logged in, ALWAYS overwrite name & phone from member profile
+    // (these fields are read-only on the form). Email is filled if available but
+    // doesn't gate the sync.
+    const memberName  = member.value.nama || member.value.name || ''
+    const memberPhone = member.value.phone || member.value.no_hp || ''
+    form.value.customer_name  = memberName
+    form.value.customer_phone = memberPhone
+    if (member.value.email && !form.value.customer_email) {
+      form.value.customer_email = member.value.email
+    }
     form.value.member_card = member.value.card_number || ''
   }
 }
@@ -731,7 +755,21 @@ function removeMenuDetail() {
 
 async function submitOrder () {
   submitError.value = ''
-  if (!form.value.customer_phone || !form.value.customer_email) {
+  const name  = String(form.value.customer_name  || '').trim()
+  const phone = String(form.value.customer_phone || '').trim()
+  if (!name && !phone) {
+    submitError.value = t('publicOrder.errNamePhone')
+    return
+  }
+  if (!name) {
+    submitError.value = t('publicOrder.errName')
+    return
+  }
+  if (!phone) {
+    submitError.value = t('publicOrder.errPhone')
+    return
+  }
+  if (!form.value.customer_email) {
     submitError.value = t('publicOrder.errPhoneEmail')
     return
   }
@@ -748,8 +786,8 @@ async function submitOrder () {
   submitting.value = true
   try {
     const fd = new FormData()
-    fd.append('customer_name', form.value.customer_name || '')
-    fd.append('customer_phone', form.value.customer_phone)
+    fd.append('customer_name', name)
+    fd.append('customer_phone', phone)
     fd.append('customer_email', form.value.customer_email)
     const memberCard = (member.value && member.value.card_number) || form.value.member_card
     if (memberCard) fd.append('member_card', memberCard)

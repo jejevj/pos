@@ -95,7 +95,7 @@ class TakeawayOrderController extends Controller
         }
 
         $validator = Validator::make($request->all(), [
-            'customer_name'   => 'nullable|string|max:255',
+            'customer_name'   => 'required|string|max:255',
             'customer_phone'  => 'required|string|max:50',
             'customer_email'  => 'required|email|max:255',
             'notes'           => 'nullable|string|max:500',
