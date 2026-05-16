@@ -34,6 +34,14 @@
           <i class="pi pi-id-card"></i>
           Membership
         </button>
+        <button
+          class="tab"
+          :class="{ active: activeTab === 'whatsapp' }"
+          @click="activeTab = 'whatsapp'"
+        >
+          <i class="pi pi-whatsapp" style="color:#25d366"></i>
+          WhatsApp
+        </button>
       </div>
     </div>
 
@@ -647,6 +655,120 @@
         </template>
       </Card>
     </div>
+
+    <!-- WhatsApp Tab -->
+    <div v-show="activeTab === 'whatsapp'" class="tab-content settings-view">
+      <Card>
+        <template #header>
+          <div class="card-header">
+            <h3>Template Pesan WhatsApp Pesanan</h3>
+          </div>
+        </template>
+        <template #content>
+          <div v-if="waLoading" class="flex justify-center py-8">
+            <ProgressSpinner style="width:40px;height:40px" strokeWidth="4" />
+          </div>
+
+          <template v-else>
+            <div class="wa-placeholder-hint">
+              <i class="pi pi-info-circle"></i>
+              <div>
+                <strong>Placeholder yang tersedia:</strong>
+                <code>{nama_pelanggan}</code>, <code>{kode_pesanan}</code>,
+                <code>{nama_outlet}</code>, <code>{tipe_pesanan}</code>,
+                <code>{nomor_meja}</code>, <code>{total}</code>,
+                <code>{status}</code>, <code>{alasan}</code>.
+                Kosongkan untuk pakai pesan default.
+              </div>
+            </div>
+
+            <div class="tx-section">
+              <div class="tx-section-title">
+                <i class="pi pi-bell"></i>
+                Notifikasi Aktif
+              </div>
+              <div class="settings-section">
+                <div class="setting-item">
+                  <div class="setting-info">
+                    <label class="setting-label">Kirim saat pesanan mulai diproses</label>
+                    <p class="setting-description">Notifikasi dikirim sekali ketika bar atau kitchen pertama kali mulai memproses pesanan.</p>
+                  </div>
+                  <ToggleSwitch v-model="waSettings.notify_processing" />
+                </div>
+                <div class="setting-item">
+                  <div class="setting-info">
+                    <label class="setting-label">Kirim saat pesanan siap</label>
+                    <p class="setting-description">Notifikasi dikirim ketika semua item pesanan sudah selesai disiapkan.</p>
+                  </div>
+                  <ToggleSwitch v-model="waSettings.notify_ready" />
+                </div>
+              </div>
+            </div>
+
+            <div class="tx-section">
+              <div class="tx-section-title">
+                <i class="pi pi-cog"></i>
+                Template Persetujuan Kasir
+              </div>
+              <div class="settings-section">
+                <div class="setting-item setting-item-block">
+                  <div class="setting-info">
+                    <label class="setting-label">Pesanan Disetujui</label>
+                    <p class="setting-description">Dikirim saat kasir menyetujui pesanan publik (table/takeaway).</p>
+                  </div>
+                  <Textarea v-model="waSettings.tpl_approved" rows="4" autoResize class="setting-control full" placeholder="Kosongkan untuk pakai pesan default." />
+                </div>
+
+                <div class="setting-item setting-item-block">
+                  <div class="setting-info">
+                    <label class="setting-label">Pesanan Ditolak</label>
+                    <p class="setting-description">Dikirim saat kasir menolak pesanan. Placeholder <code>{alasan}</code> berisi alasan penolakan.</p>
+                  </div>
+                  <Textarea v-model="waSettings.tpl_rejected" rows="4" autoResize class="setting-control full" placeholder="Kosongkan untuk pakai pesan default." />
+                </div>
+              </div>
+            </div>
+
+            <div class="tx-section">
+              <div class="tx-section-title">
+                <i class="pi pi-clock"></i>
+                Template Progres Pesanan
+              </div>
+              <div class="settings-section">
+                <div class="setting-item setting-item-block">
+                  <div class="setting-info">
+                    <label class="setting-label">Pesanan Mulai Diproses</label>
+                    <p class="setting-description">Dikirim sekali ketika bar atau kitchen mulai memproses pesanan (mana yang lebih dulu).</p>
+                  </div>
+                  <Textarea v-model="waSettings.tpl_processing" rows="4" autoResize class="setting-control full" placeholder="Kosongkan untuk pakai pesan default." />
+                </div>
+
+                <div class="setting-item setting-item-block">
+                  <div class="setting-info">
+                    <label class="setting-label">Pesanan Siap (Dine-in / Delivery)</label>
+                    <p class="setting-description">Dikirim saat pesanan siap diantar ke meja. Cocok dipakai untuk dine-in dan delivery.</p>
+                  </div>
+                  <Textarea v-model="waSettings.tpl_ready_dinein" rows="4" autoResize class="setting-control full" placeholder="Kosongkan untuk pakai pesan default." />
+                </div>
+
+                <div class="setting-item setting-item-block">
+                  <div class="setting-info">
+                    <label class="setting-label">Pesanan Siap (Takeaway / Pickup)</label>
+                    <p class="setting-description">Dikirim saat pesanan takeaway siap diambil di kasir.</p>
+                  </div>
+                  <Textarea v-model="waSettings.tpl_ready_takeaway" rows="4" autoResize class="setting-control full" placeholder="Kosongkan untuk pakai pesan default." />
+                </div>
+              </div>
+            </div>
+
+            <div class="form-actions">
+              <Button label="Simpan Template WhatsApp" icon="pi pi-check" :loading="waSaving" @click="saveWaSettings" />
+              <Button label="Reset" icon="pi pi-refresh" severity="secondary" outlined @click="fetchWaSettings" />
+            </div>
+          </template>
+        </template>
+      </Card>
+    </div>
   </div>
 </template>
 
@@ -1065,10 +1187,63 @@ async function handleMemberLogoUpload(event) {
   }
 }
 
+// ── WhatsApp Templates ────────────────────────────────────────────────
+const waLoading = ref(false)
+const waSaving = ref(false)
+const waSettings = ref({
+  notify_processing:   true,
+  notify_ready:        true,
+  tpl_approved:        '',
+  tpl_rejected:        '',
+  tpl_processing:      '',
+  tpl_ready_dinein:    '',
+  tpl_ready_takeaway:  '',
+})
+
+const fetchWaSettings = async () => {
+  if (!numericOutletId) return
+  waLoading.value = true
+  try {
+    const res = await api.get(`/outlets/${numericOutletId}/whatsapp/settings`)
+    const d = res.data || {}
+    waSettings.value = {
+      notify_processing:   Boolean(d.notify_processing ?? true),
+      notify_ready:        Boolean(d.notify_ready ?? true),
+      tpl_approved:        d.tpl_approved       || '',
+      tpl_rejected:        d.tpl_rejected       || '',
+      tpl_processing:      d.tpl_processing     || '',
+      tpl_ready_dinein:    d.tpl_ready_dinein   || '',
+      tpl_ready_takeaway:  d.tpl_ready_takeaway || '',
+    }
+  } catch (e) {
+    toast.add({ severity: 'error', summary: 'Error', detail: 'Gagal memuat template WhatsApp', life: 3000 })
+  } finally {
+    waLoading.value = false
+  }
+}
+
+const saveWaSettings = async () => {
+  if (!numericOutletId) {
+    toast.add({ severity: 'warn', summary: 'Perhatian', detail: 'Buka halaman ini dari menu outlet.', life: 4000 })
+    return
+  }
+  waSaving.value = true
+  try {
+    await api.put(`/outlets/${numericOutletId}/whatsapp/settings`, waSettings.value)
+    toast.add({ severity: 'success', summary: 'Berhasil', detail: 'Template WhatsApp disimpan.', life: 3000 })
+  } catch (e) {
+    const msg = e.response?.data?.message || 'Gagal menyimpan template WhatsApp'
+    toast.add({ severity: 'error', summary: 'Error', detail: msg, life: 3000 })
+  } finally {
+    waSaving.value = false
+  }
+}
+
 onMounted(() => {
   loadOutletData()
   fetchTxSettings()
   fetchMemberSettings()
+  fetchWaSettings()
 })
 </script>
 
@@ -1547,4 +1722,25 @@ html.is-dark .url-display code { color: #60a5fa; }
 }
 .setting-control.full { width: 100%; }
 .member-url-row { align-items: flex-start; }
+
+.wa-placeholder-hint {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.875rem 1rem;
+  margin-bottom: 1rem;
+  border: 1px solid #e0f2fe;
+  background: #f0f9ff;
+  color: #0c4a6e;
+  border-radius: 6px;
+  font-size: 0.875rem;
+}
+.wa-placeholder-hint i { font-size: 1.25rem; line-height: 1.4; color: #0284c7; }
+.wa-placeholder-hint code {
+  padding: 0 0.25rem;
+  background: rgba(2, 132, 199, 0.1);
+  border-radius: 3px;
+  font-size: 0.85em;
+  margin: 0 0.1rem;
+}
 </style>

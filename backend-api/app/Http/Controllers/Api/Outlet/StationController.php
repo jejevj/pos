@@ -4,11 +4,13 @@ namespace App\Http\Controllers\Api\Outlet;
 
 use App\Http\Controllers\Concerns\AuthorizesOutletAccess;
 use App\Http\Controllers\Controller;
+use App\Jobs\SendOrderProgressWhatsApp;
 use App\Models\Outlet;
 use App\Models\Station;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class StationController extends Controller
 {
@@ -148,6 +150,7 @@ class StationController extends Controller
         $outlet = $this->authorizeOutlet($outletId);
 
         DB::statement("SET search_path TO {$outlet->schema_name}, public");
+        $this->ensureNotificationColumns();
 
         // Update item status to 'ready'
         // Use PHP now() (respects APP_TIMEZONE) instead of SQL NOW() to keep
@@ -161,6 +164,7 @@ class StationController extends Controller
 
         // Check if ALL items in this order (across all stations) are ready
         $orderId = DB::selectOne("SELECT order_id FROM order_items WHERE id = ?", [$itemId])?->order_id;
+        $dispatchReady = false;
 
         if ($orderId) {
             $pendingItems = DB::selectOne("
@@ -170,11 +174,30 @@ class StationController extends Controller
             ", [$orderId]);
 
             if ($pendingItems && $pendingItems->cnt == 0) {
-                DB::statement("UPDATE orders SET kitchen_status = 'ready' WHERE id = ?", [$orderId]);
+                // Atomically claim the "ready" notification slot so concurrent
+                // confirmItem calls from kitchen+bar do not both dispatch.
+                $affected = DB::update("
+                    UPDATE orders
+                       SET kitchen_status = 'ready',
+                           wa_ready_notified_at = ?
+                     WHERE id = ?
+                       AND wa_ready_notified_at IS NULL
+                ", [$now, $orderId]);
+
+                if ($affected > 0) {
+                    $dispatchReady = true;
+                } else {
+                    // Already notified — still ensure kitchen_status is set
+                    DB::statement("UPDATE orders SET kitchen_status = 'ready' WHERE id = ?", [$orderId]);
+                }
             }
         }
 
         DB::statement("SET search_path TO public");
+
+        if ($dispatchReady && $orderId) {
+            $this->dispatchProgressNotification($outlet, (int) $orderId, 'ready');
+        }
 
         return response()->json(['message' => 'Item confirmed as ready']);
     }
@@ -224,23 +247,68 @@ class StationController extends Controller
         $outlet = $this->authorizeOutlet($outletId);
 
         DB::statement("SET search_path TO {$outlet->schema_name}, public");
+        $this->ensureNotificationColumns();
 
         $now = \Carbon\Carbon::now();
         DB::statement("
             UPDATE order_items SET status = 'preparing', preparing_at = ? WHERE id = ?
         ", [$now, $itemId]);
 
-        // Update order kitchen_status to 'preparing' if still pending
         $orderId = DB::selectOne("SELECT order_id FROM order_items WHERE id = ?", [$itemId])?->order_id;
+        $dispatchProcessing = false;
+
         if ($orderId) {
             DB::statement("
                 UPDATE orders SET kitchen_status = 'preparing'
                 WHERE id = ? AND kitchen_status = 'pending'
             ", [$orderId]);
+
+            // Atomically claim the "processing" notification slot. Whether
+            // kitchen or bar starts first, only the first staffer wins the
+            // race and triggers the WhatsApp message.
+            $affected = DB::update("
+                UPDATE orders
+                   SET wa_processing_notified_at = ?
+                 WHERE id = ?
+                   AND wa_processing_notified_at IS NULL
+            ", [$now, $orderId]);
+            $dispatchProcessing = $affected > 0;
         }
 
         DB::statement("SET search_path TO public");
 
+        if ($dispatchProcessing && $orderId) {
+            $this->dispatchProgressNotification($outlet, (int) $orderId, 'processing');
+        }
+
         return response()->json(['message' => 'Item marked as preparing']);
+    }
+
+    /**
+     * Heal-on-write: add notification idempotency columns for outlets
+     * provisioned before the per-outlet template feature shipped.
+     */
+    protected function ensureNotificationColumns(): void
+    {
+        try {
+            DB::statement("ALTER TABLE orders ADD COLUMN IF NOT EXISTS wa_processing_notified_at TIMESTAMP NULL");
+            DB::statement("ALTER TABLE orders ADD COLUMN IF NOT EXISTS wa_ready_notified_at TIMESTAMP NULL");
+        } catch (\Throwable $e) {
+            // Older PostgreSQL without IF NOT EXISTS — best-effort, ignore.
+        }
+    }
+
+    protected function dispatchProgressNotification(Outlet $outlet, int $orderId, string $event): void
+    {
+        try {
+            SendOrderProgressWhatsApp::dispatch(
+                $outlet->schema_name,
+                $orderId,
+                (string) ($outlet->nama ?? $outlet->name ?? ''),
+                $event
+            );
+        } catch (\Throwable $e) {
+            Log::warning("[WAHA] Failed to dispatch progress job ({$event}) for order #{$orderId}: " . $e->getMessage());
+        }
     }
 }

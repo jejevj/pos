@@ -746,6 +746,9 @@ class OutletProvisioner
         if (!$this->columnExists($schema, 'orders', 'kitchen_status')) {
             DB::statement("ALTER TABLE {$schema}.orders ADD COLUMN kitchen_status VARCHAR(20) DEFAULT 'pending'");
         }
+        // Idempotency markers for WhatsApp notifications dispatched from KDS.
+        DB::statement("ALTER TABLE {$schema}.orders ADD COLUMN IF NOT EXISTS wa_processing_notified_at TIMESTAMP NULL");
+        DB::statement("ALTER TABLE {$schema}.orders ADD COLUMN IF NOT EXISTS wa_ready_notified_at TIMESTAMP NULL");
         DB::statement("CREATE INDEX IF NOT EXISTS idx_stations_active ON {$schema}.stations(is_active)");
         DB::statement("CREATE INDEX IF NOT EXISTS idx_menu_station ON {$schema}.menu(station_id)");
         DB::statement("CREATE INDEX IF NOT EXISTS idx_order_items_status ON {$schema}.order_items(status)");

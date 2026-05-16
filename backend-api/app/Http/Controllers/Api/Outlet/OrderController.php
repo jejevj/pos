@@ -1220,6 +1220,7 @@ class OrderController extends Controller
                 'customerName' => (string) ($order->customer_name ?? ''),
                 'orderCode'    => (string) ($order->kode ?? ''),
                 'outletName'   => (string) ($outlet->nama ?? $outlet->name ?? ''),
+                'schema'       => (string) $outlet->schema_name,
             ];
             DB::statement("SET search_path TO public");
             $this->dispatchWahaNotification($notifyPayload, 'approved', null);
@@ -1262,6 +1263,7 @@ class OrderController extends Controller
                 'customerName' => (string) ($order->customer_name ?? ''),
                 'orderCode'    => (string) ($order->kode ?? ''),
                 'outletName'   => (string) ($outlet->nama ?? $outlet->name ?? ''),
+                'schema'       => (string) $outlet->schema_name,
             ];
             DB::statement("SET search_path TO public");
             $this->dispatchWahaNotification($notifyPayload, 'rejected', $reason ?: null);
@@ -1291,7 +1293,8 @@ class OrderController extends Controller
                 $payload['orderCode'] ?? '',
                 $payload['outletName'] ?? '',
                 $status,
-                $reason
+                $reason,
+                $payload['schema'] ?? null
             );
         } catch (\Throwable $e) {
             Log::warning('[WAHA] Failed to dispatch job: ' . $e->getMessage());

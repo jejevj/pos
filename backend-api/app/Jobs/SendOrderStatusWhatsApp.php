@@ -3,11 +3,13 @@
 namespace App\Jobs;
 
 use App\Services\WahaService;
+use App\Support\OrderMessageTemplate;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -33,6 +35,7 @@ class SendOrderStatusWhatsApp implements ShouldQueue
     public string $outletName;
     public string $status; // 'approved' | 'rejected'
     public ?string $reason;
+    public ?string $schema;
 
     public function __construct(
         string $phone,
@@ -40,7 +43,8 @@ class SendOrderStatusWhatsApp implements ShouldQueue
         string $orderCode,
         string $outletName,
         string $status,
-        ?string $reason = null
+        ?string $reason = null,
+        ?string $schema = null
     ) {
         $this->phone        = $phone;
         $this->customerName = $customerName;
@@ -48,6 +52,7 @@ class SendOrderStatusWhatsApp implements ShouldQueue
         $this->outletName   = $outletName;
         $this->status       = $status;
         $this->reason       = $reason;
+        $this->schema       = $schema;
     }
 
     public function handle(WahaService $waha): void
@@ -69,25 +74,51 @@ class SendOrderStatusWhatsApp implements ShouldQueue
 
     protected function buildMessage(): string
     {
-        $hi = $this->customerName !== ''
-            ? "Halo {$this->customerName},"
-            : "Halo,";
+        $template = $this->resolveTemplate();
+        $key = $this->status === 'approved' ? 'approved' : 'rejected';
 
-        if ($this->status === 'approved') {
-            return implode("\n", array_filter([
-                $hi,
-                "Pesanan Anda dengan kode *{$this->orderCode}* di *{$this->outletName}* telah *DISETUJUI* dan sedang diproses oleh dapur.",
-                "Mohon ditunggu, terima kasih telah memesan di {$this->outletName}!",
-            ]));
+        // Build a synthetic order object since this job is dispatched with
+        // primitive fields only (avoids serializing Eloquent models).
+        $pseudoOrder = (object) [
+            'customer_name' => $this->customerName,
+            'kode'          => $this->orderCode,
+            'order_type'    => '',
+            'table_number'  => '',
+            'total_amount'  => 0,
+            'status'        => $this->status,
+        ];
+
+        return OrderMessageTemplate::render(
+            $template,
+            OrderMessageTemplate::vars($pseudoOrder, $this->outletName, $this->reason),
+            $key
+        );
+    }
+
+    /**
+     * Pull the outlet's custom template if a schema was provided and
+     * wa_settings exists. Returns null to fall back to the default.
+     */
+    protected function resolveTemplate(): ?string
+    {
+        if (!$this->schema) return null;
+
+        try {
+            DB::statement("SET search_path TO {$this->schema}, public");
+            if (!DB::getSchemaBuilder()->hasTable('wa_settings')) {
+                DB::statement("SET search_path TO public");
+                return null;
+            }
+            $row = DB::table('wa_settings')->first();
+            DB::statement("SET search_path TO public");
+            if (!$row) return null;
+            return $this->status === 'approved'
+                ? ($row->tpl_approved ?? null)
+                : ($row->tpl_rejected ?? null);
+        } catch (\Throwable $e) {
+            try { DB::statement("SET search_path TO public"); } catch (\Throwable $ignored) {}
+            return null;
         }
-
-        $reasonLine = $this->reason ? "Alasan: {$this->reason}" : null;
-        return implode("\n", array_filter([
-            $hi,
-            "Mohon maaf, pesanan Anda dengan kode *{$this->orderCode}* di *{$this->outletName}* tidak dapat kami proses (*DITOLAK*).",
-            $reasonLine,
-            "Silakan hubungi kasir untuk informasi pengembalian dana atau pemesanan ulang. Terima kasih atas pengertiannya.",
-        ]));
     }
 
     /**

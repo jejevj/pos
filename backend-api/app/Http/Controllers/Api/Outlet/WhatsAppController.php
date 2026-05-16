@@ -97,6 +97,13 @@ class WhatsAppController extends Controller
             'notify_kasbon'            => 'boolean',
             'notify_low_stock'         => 'boolean',
             'notify_order'             => 'boolean',
+            'notify_processing'        => 'boolean',
+            'notify_ready'             => 'boolean',
+            'tpl_approved'             => 'nullable|string|max:2000',
+            'tpl_rejected'             => 'nullable|string|max:2000',
+            'tpl_processing'           => 'nullable|string|max:2000',
+            'tpl_ready_dinein'         => 'nullable|string|max:2000',
+            'tpl_ready_takeaway'       => 'nullable|string|max:2000',
         ]);
 
         try {
@@ -105,12 +112,19 @@ class WhatsAppController extends Controller
 
             $existing = DB::table('wa_settings')->first();
             $data = [
-                'owner_phone'      => $request->owner_phone,
-                'notify_payroll'   => $request->boolean('notify_payroll', true),
-                'notify_kasbon'    => $request->boolean('notify_kasbon', true),
-                'notify_low_stock' => $request->boolean('notify_low_stock', true),
-                'notify_order'     => $request->boolean('notify_order', false),
-                'updated_at'       => now(),
+                'owner_phone'        => $request->owner_phone,
+                'notify_payroll'     => $request->boolean('notify_payroll', true),
+                'notify_kasbon'      => $request->boolean('notify_kasbon', true),
+                'notify_low_stock'   => $request->boolean('notify_low_stock', true),
+                'notify_order'       => $request->boolean('notify_order', false),
+                'notify_processing'  => $request->boolean('notify_processing', true),
+                'notify_ready'       => $request->boolean('notify_ready', true),
+                'tpl_approved'       => $request->input('tpl_approved'),
+                'tpl_rejected'       => $request->input('tpl_rejected'),
+                'tpl_processing'     => $request->input('tpl_processing'),
+                'tpl_ready_dinein'   => $request->input('tpl_ready_dinein'),
+                'tpl_ready_takeaway' => $request->input('tpl_ready_takeaway'),
+                'updated_at'         => now(),
             ];
 
             if ($existing) {
@@ -157,11 +171,18 @@ class WhatsAppController extends Controller
         $row = DB::table('wa_settings')->first();
 
         return [
-            'owner_phone'      => $row->owner_phone ?? null,
-            'notify_payroll'   => (bool) ($row->notify_payroll ?? true),
-            'notify_kasbon'    => (bool) ($row->notify_kasbon ?? true),
-            'notify_low_stock' => (bool) ($row->notify_low_stock ?? true),
-            'notify_order'     => (bool) ($row->notify_order ?? false),
+            'owner_phone'         => $row->owner_phone ?? null,
+            'notify_payroll'      => (bool) ($row->notify_payroll ?? true),
+            'notify_kasbon'       => (bool) ($row->notify_kasbon ?? true),
+            'notify_low_stock'    => (bool) ($row->notify_low_stock ?? true),
+            'notify_order'        => (bool) ($row->notify_order ?? false),
+            'notify_processing'   => (bool) ($row->notify_processing ?? true),
+            'notify_ready'        => (bool) ($row->notify_ready ?? true),
+            'tpl_approved'        => $row->tpl_approved ?? null,
+            'tpl_rejected'        => $row->tpl_rejected ?? null,
+            'tpl_processing'      => $row->tpl_processing ?? null,
+            'tpl_ready_dinein'    => $row->tpl_ready_dinein ?? null,
+            'tpl_ready_takeaway'  => $row->tpl_ready_takeaway ?? null,
         ];
     }
 
@@ -176,10 +197,25 @@ class WhatsAppController extends Controller
                     notify_kasbon BOOLEAN DEFAULT TRUE,
                     notify_low_stock BOOLEAN DEFAULT TRUE,
                     notify_order BOOLEAN DEFAULT FALSE,
+                    notify_processing BOOLEAN DEFAULT TRUE,
+                    notify_ready BOOLEAN DEFAULT TRUE,
+                    tpl_approved TEXT,
+                    tpl_rejected TEXT,
+                    tpl_processing TEXT,
+                    tpl_ready_dinein TEXT,
+                    tpl_ready_takeaway TEXT,
                     created_at TIMESTAMP,
                     updated_at TIMESTAMP
                 )
             ");
         }
+        // Heal columns for outlets provisioned before template support
+        DB::statement("ALTER TABLE wa_settings ADD COLUMN IF NOT EXISTS notify_processing BOOLEAN DEFAULT TRUE");
+        DB::statement("ALTER TABLE wa_settings ADD COLUMN IF NOT EXISTS notify_ready BOOLEAN DEFAULT TRUE");
+        DB::statement("ALTER TABLE wa_settings ADD COLUMN IF NOT EXISTS tpl_approved TEXT");
+        DB::statement("ALTER TABLE wa_settings ADD COLUMN IF NOT EXISTS tpl_rejected TEXT");
+        DB::statement("ALTER TABLE wa_settings ADD COLUMN IF NOT EXISTS tpl_processing TEXT");
+        DB::statement("ALTER TABLE wa_settings ADD COLUMN IF NOT EXISTS tpl_ready_dinein TEXT");
+        DB::statement("ALTER TABLE wa_settings ADD COLUMN IF NOT EXISTS tpl_ready_takeaway TEXT");
     }
 }
