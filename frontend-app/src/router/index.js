@@ -48,6 +48,13 @@ const router = createRouter({
       component: () => import('@/views/public/PublicTakeawayOrderView.vue'),
       meta: { public: true }
     },
+    // Public member login (self-order flow) — scoped to outlet
+    {
+      path: '/o/:outletSlug/member-login',
+      name: 'public-member-login',
+      component: () => import('@/views/public/PublicMemberLoginView.vue'),
+      meta: { public: true }
+    },
     {
       path: '/register',
       name: 'register',

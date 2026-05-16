@@ -39,6 +39,10 @@ Route::middleware('throttle:60,1')->group(function () {
     // Public promo lookup/validation for self-order checkout.
     Route::get('/public/outlet/{outletSlug}/promos',          [\App\Http\Controllers\Api\Public\PromoLookupController::class, 'index']);
     Route::post('/public/outlet/{outletSlug}/promo/validate', [\App\Http\Controllers\Api\Public\PromoLookupController::class, 'validateCode']);
+
+    // Public member-side login for self-order (no Sanctum token; lightweight identity)
+    Route::post('/public/outlet/{outletSlug}/member/login',        [\App\Http\Controllers\Api\Public\MemberAuthController::class, 'login']);
+    Route::post('/public/outlet/{outletSlug}/member/set-password', [\App\Http\Controllers\Api\Public\MemberAuthController::class, 'setPassword']);
 });
 
 // ── Site Settings — public read so frontend can load branding ────────────

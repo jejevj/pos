@@ -29,6 +29,40 @@
         </button>
       </header>
 
+      <!-- Membership CTA (always visible) -->
+      <section class="member-cta" :class="{ 'is-logged': !!member }">
+        <template v-if="!member">
+          <div class="cta-icon"><i class="pi pi-id-card"></i></div>
+          <div class="cta-body">
+            <div class="cta-title">{{ t('publicOrder.memberCtaTitle') }}</div>
+            <div class="cta-sub">{{ t('publicOrder.memberCtaSubtitle') }}</div>
+          </div>
+          <div class="cta-actions">
+            <button class="cta-btn primary" @click="goMemberLogin">
+              <i class="pi pi-sign-in"></i> {{ t('publicOrder.memberCtaLogin') }}
+            </button>
+            <a v-if="settings.membership_open" class="cta-btn ghost" :href="`/m/${outletSlug}`" target="_blank">
+              <i class="pi pi-user-plus"></i> {{ t('publicOrder.memberCtaRegister') }}
+            </a>
+          </div>
+        </template>
+        <template v-else>
+          <div class="cta-icon"><i class="pi pi-verified"></i></div>
+          <div class="cta-body">
+            <div class="cta-title">{{ t('publicOrder.memberLoggedInTitle') }}</div>
+            <div class="cta-sub">
+              <strong>{{ member.nama }}</strong> · {{ member.card_number }} ·
+              {{ t('publicOrder.memberLoggedInPoints') }}: <strong>{{ member.points || 0 }}</strong>
+            </div>
+          </div>
+          <div class="cta-actions">
+            <button class="cta-btn ghost" @click="logoutMember">
+              <i class="pi pi-sign-out"></i> {{ t('publicOrder.memberLogout') }}
+            </button>
+          </div>
+        </template>
+      </section>
+
       <div class="pto-controls">
         <div class="search">
           <i class="pi pi-search"></i>
@@ -56,10 +90,10 @@
 
       <main class="pto-menu">
         <div v-for="m in filteredMenu" :key="m.id" class="menu-card">
-          <div class="menu-img">
+          <button class="menu-img" type="button" @click="openMenuDetail(m)" :aria-label="m.nama">
             <img v-if="m.gambar_url" :src="m.gambar_url" :alt="m.nama" />
             <div v-else class="img-fallback">{{ initials(m.nama) }}</div>
-          </div>
+          </button>
           <div class="menu-body">
             <div class="menu-name">{{ m.nama }}</div>
             <div v-if="m.deskripsi" class="menu-desc">{{ m.deskripsi }}</div>
@@ -82,6 +116,55 @@
           <p>{{ t('publicOrder.noMenu') }}</p>
         </div>
       </main>
+
+      <!-- Menu detail modal -->
+      <div v-if="menuDetailOpen" class="md-backdrop" @click.self="closeMenuDetail">
+        <div class="md-sheet">
+          <button class="md-close" @click="closeMenuDetail" :aria-label="t('publicOrder.menuDetailClose')">
+            <i class="pi pi-times"></i>
+          </button>
+          <div class="md-img-wrap">
+            <img v-if="menuDetail.gambar_url" :src="menuDetail.gambar_url" :alt="menuDetail.nama" />
+            <div v-else class="md-img-fallback">{{ initials(menuDetail.nama) }}</div>
+          </div>
+          <div class="md-body">
+            <h3 class="md-name">{{ menuDetail.nama }}</h3>
+            <div class="md-price">{{ formatIdr(menuDetail.harga_jual) }}</div>
+            <p v-if="menuDetail.deskripsi" class="md-desc">{{ menuDetail.deskripsi }}</p>
+
+            <div class="md-field">
+              <label>{{ t('publicOrder.menuDetailQty') }}</label>
+              <div class="qty-control md-qty">
+                <button class="qty-btn" :disabled="detailQty <= 1" @click="detailQty = Math.max(1, detailQty - 1)">
+                  <i class="pi pi-minus"></i>
+                </button>
+                <span class="qty">{{ detailQty }}</span>
+                <button class="qty-btn add" @click="detailQty++"><i class="pi pi-plus"></i></button>
+              </div>
+            </div>
+
+            <div class="md-field">
+              <label>{{ t('publicOrder.menuDetailNotes') }}</label>
+              <textarea v-model="detailNotes" rows="2" :placeholder="t('publicOrder.menuDetailNotesPh')"></textarea>
+            </div>
+
+            <div class="md-actions">
+              <button
+                v-if="getQty(menuDetail.id)"
+                class="primary big danger-outline"
+                type="button"
+                @click="removeMenuDetail"
+              >
+                <i class="pi pi-trash"></i> {{ t('publicOrder.menuDetailRemove') }}
+              </button>
+              <button class="primary big" type="button" @click="confirmMenuDetail">
+                <i class="pi pi-cart-plus"></i>
+                {{ getQty(menuDetail.id) ? t('publicOrder.menuDetailUpdate') : t('publicOrder.menuDetailAdd') }}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
 
       <footer v-if="cartCount" class="pto-footer">
         <div class="totals">
@@ -136,9 +219,23 @@
               <label>{{ t('publicOrder.email') }} <span class="req">*</span></label>
               <input v-model="form.customer_email" type="email" :placeholder="t('publicOrder.emailPh')" required />
             </div>
-            <div class="field">
+            <div v-if="member" class="member-banner">
+              <i class="pi pi-verified"></i>
+              <div>
+                <div class="member-banner-title">
+                  {{ t('publicOrder.memberLoggedInTitle') }}: <strong>{{ member.nama }}</strong>
+                </div>
+                <div class="member-banner-sub">
+                  {{ member.card_number }} · {{ t('publicOrder.memberLoggedInPoints') }}: <strong>{{ member.points || 0 }}</strong>
+                </div>
+              </div>
+            </div>
+            <div v-else class="field">
               <label>{{ t('publicOrder.memberCardOptional') }}</label>
               <input v-model="form.member_card" type="text" :placeholder="t('publicOrder.memberCardPh')" />
+              <button type="button" class="link" @click="goMemberLogin">
+                {{ t('publicOrder.memberCtaLogin') }} →
+              </button>
             </div>
             <div class="field">
               <label>{{ t('publicOrder.notes') }}</label>
@@ -308,7 +405,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import api from '@/services/api'
@@ -318,6 +415,30 @@ const router = useRouter()
 const { t } = useI18n()
 
 const outletSlug = route.params.outletSlug
+
+// Persist draft cart in localStorage so accidental reloads don't wipe it.
+// Cleared after successful order submit.
+const CART_KEY   = `pos_cart_takeaway_${outletSlug}`
+const MEMBER_KEY = `pos_member_${outletSlug}`
+
+function loadCart() {
+  try {
+    const raw = localStorage.getItem(CART_KEY)
+    if (!raw) return []
+    const arr = JSON.parse(raw)
+    return Array.isArray(arr) ? arr : []
+  } catch (e) { return [] }
+}
+function loadMember() {
+  try {
+    const raw = localStorage.getItem(MEMBER_KEY)
+    if (!raw) return null
+    const m = JSON.parse(raw)
+    return m && m.id ? m : null
+  } catch (e) { return null }
+}
+
+const member = ref(loadMember())
 
 const loading = ref(true)
 const loadError = ref('')
@@ -336,8 +457,14 @@ const settings = ref({
 
 const search = ref('')
 const activeCategory = ref(null)
-const cart = ref([])
+const cart = ref(loadCart())
 const cartOpen = ref(false)
+
+// Menu detail modal state
+const menuDetailOpen = ref(false)
+const menuDetail = ref({})
+const detailQty = ref(1)
+const detailNotes = ref('')
 const submitting = ref(false)
 const submitError = ref('')
 
@@ -402,6 +529,7 @@ onMounted(async () => {
     if (outlet.value.name) {
       document.title = `${outlet.value.name} • Takeaway`
     }
+    syncMember()
   } catch (e) {
     loadError.value = e.response?.data?.message || 'Halaman tidak ditemukan'
   } finally {
@@ -531,6 +659,76 @@ function onProofPicked (e) {
   }
 }
 
+// Persist cart on change
+watch(cart, (val) => {
+  try { localStorage.setItem(CART_KEY, JSON.stringify(val)) } catch (e) {}
+}, { deep: true })
+
+function syncMember() {
+  member.value = loadMember()
+  if (member.value && member.value.email) {
+    if (!form.value.customer_name)  form.value.customer_name  = member.value.nama || ''
+    if (!form.value.customer_email) form.value.customer_email = member.value.email || ''
+    if (!form.value.customer_phone) form.value.customer_phone = member.value.phone || ''
+    form.value.member_card = member.value.card_number || ''
+  }
+}
+if (typeof window !== 'undefined') {
+  window.addEventListener('focus', syncMember)
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) syncMember()
+  })
+}
+
+function goMemberLogin() {
+  router.push({
+    name: 'public-member-login',
+    params: { outletSlug },
+    // takeaway has no table token — pass return path so the login view can navigate back here.
+    query: { return: route.fullPath },
+  })
+}
+
+function logoutMember() {
+  localStorage.removeItem(MEMBER_KEY)
+  member.value = null
+  form.value.member_card = ''
+}
+
+function openMenuDetail(m) {
+  menuDetail.value = m
+  const existing = cart.value.find((c) => c.menu_id === m.id)
+  detailQty.value = existing ? existing.quantity : 1
+  detailNotes.value = existing ? (existing.notes || '') : ''
+  menuDetailOpen.value = true
+}
+function closeMenuDetail() { menuDetailOpen.value = false }
+function confirmMenuDetail() {
+  const m = menuDetail.value
+  if (!m || !m.id) return closeMenuDetail()
+  const qty = Math.max(1, parseInt(detailQty.value, 10) || 1)
+  const idx = cart.value.findIndex((c) => c.menu_id === m.id)
+  if (idx >= 0) {
+    cart.value[idx].quantity = qty
+    cart.value[idx].notes    = detailNotes.value || ''
+  } else {
+    cart.value.push({
+      menu_id: m.id,
+      menu_name: m.nama,
+      menu_price: Number(m.harga_jual),
+      quantity: qty,
+      notes: detailNotes.value || '',
+    })
+  }
+  closeMenuDetail()
+}
+function removeMenuDetail() {
+  const m = menuDetail.value
+  if (!m || !m.id) return closeMenuDetail()
+  cart.value = cart.value.filter((c) => c.menu_id !== m.id)
+  closeMenuDetail()
+}
+
 async function submitOrder () {
   submitError.value = ''
   if (!form.value.customer_phone || !form.value.customer_email) {
@@ -553,7 +751,8 @@ async function submitOrder () {
     fd.append('customer_name', form.value.customer_name || '')
     fd.append('customer_phone', form.value.customer_phone)
     fd.append('customer_email', form.value.customer_email)
-    if (form.value.member_card) fd.append('member_card', form.value.member_card)
+    const memberCard = (member.value && member.value.card_number) || form.value.member_card
+    if (memberCard) fd.append('member_card', memberCard)
     if (form.value.notes) fd.append('notes', form.value.notes)
     fd.append('payment_method_id', String(form.value.payment_method_id))
     fd.append('payment_proof', proofFile.value)
@@ -572,6 +771,8 @@ async function submitOrder () {
     )
     const kode = res.data?.data?.order?.kode
     if (kode) {
+      try { localStorage.removeItem(CART_KEY) } catch (e) {}
+      cart.value = []
       router.push({ name: 'public-order-status', params: { outletSlug, orderCode: kode } })
     }
   } catch (e) {
@@ -813,4 +1014,129 @@ async function submitOrder () {
 }
 .qr-modal-body img { max-width: 100%; max-height: 360px; border-radius: 6px; }
 .qr-modal-hint { font-size: 12px; color: #6b7280; margin: 0; text-align: center; }
+
+/* Membership CTA */
+.member-cta {
+  margin: 12px 12px 0;
+  background: linear-gradient(135deg, #fef3c7 0%, #fff7ed 100%);
+  border: 1px solid #fdba74;
+  border-radius: 12px;
+  padding: 12px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.member-cta.is-logged {
+  background: linear-gradient(135deg, #ecfdf5 0%, #f0fdf4 100%);
+  border-color: #86efac;
+}
+.member-cta .cta-icon {
+  width: 36px; height: 36px;
+  border-radius: 50%;
+  background: #f59e0b;
+  color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px;
+  flex-shrink: 0;
+}
+.member-cta.is-logged .cta-icon { background: #16a34a; }
+.member-cta .cta-body { flex: 1; min-width: 160px; }
+.member-cta .cta-title { font-weight: 700; font-size: 13px; color: #1f2937; }
+.member-cta .cta-sub   { font-size: 12px; color: #4b5563; margin-top: 2px; }
+.member-cta .cta-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+.cta-btn {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 7px 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+  border: none;
+}
+.cta-btn.primary { background: #f59e0b; color: #fff; }
+.cta-btn.ghost   { background: #fff; color: #b45309; border: 1px solid #fdba74; }
+
+.member-banner {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 12px;
+  background: #ecfdf5; border: 1px solid #86efac;
+  border-radius: 10px; margin-bottom: 12px;
+}
+.member-banner i { color: #16a34a; font-size: 18px; }
+.member-banner-title { font-size: 13px; }
+.member-banner-sub   { font-size: 12px; color: #4b5563; margin-top: 2px; }
+
+button.menu-img {
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  background: #f3f4f6;
+}
+
+.md-backdrop {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.55);
+  z-index: 25;
+  display: flex; align-items: center; justify-content: center;
+  padding: 12px;
+}
+.md-sheet {
+  position: relative;
+  background: #fff;
+  border-radius: 18px;
+  width: 100%; max-width: 420px;
+  max-height: 92vh; overflow-y: auto;
+}
+.md-close {
+  position: absolute; top: 10px; right: 10px;
+  width: 32px; height: 32px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.92);
+  border: none; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 14px; color: #374151;
+  z-index: 2;
+}
+.md-img-wrap { width: 100%; height: 240px; background: #f3f4f6; }
+.md-img-wrap img { width: 100%; height: 100%; object-fit: cover; }
+.md-img-fallback {
+  width: 100%; height: 100%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 64px; color: #9ca3af; font-weight: 700;
+}
+.md-body { padding: 16px 18px 20px; }
+.md-name { font-size: 18px; margin: 0 0 4px; font-weight: 700; }
+.md-price { color: #f59e0b; font-weight: 700; font-size: 16px; margin-bottom: 6px; }
+.md-desc { color: #4b5563; font-size: 13px; margin: 0 0 12px; line-height: 1.4; }
+.md-field { margin-top: 12px; }
+.md-field label { display: block; font-size: 12px; font-weight: 600; color: #374151; margin-bottom: 6px; }
+.md-field textarea {
+  width: 100%;
+  padding: 10px 12px;
+  font-size: 13px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #f9fafb;
+  resize: vertical;
+}
+.md-qty { width: max-content; }
+.md-actions { margin-top: 16px; display: flex; flex-direction: column; gap: 8px; }
+.danger-outline {
+  background: #fff;
+  color: #dc2626;
+  border: 1px solid #fecaca;
+}
+
+button.link {
+  background: transparent;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  color: #f59e0b;
+  font-size: 12px;
+  margin-top: 4px;
+  display: inline-block;
+}
 </style>

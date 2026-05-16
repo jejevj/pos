@@ -1150,12 +1150,27 @@ class OrderController extends Controller
                 )
                 ->get();
 
-            // Augment with proof public URL (frontend can render/download)
+            // Augment with proof public URL + member info so the kasir's
+            // pending-public list shows who placed the order (member_id is set
+            // when a logged-in member uses the public self-order flow).
             $orders = $orders->map(function ($o) {
                 $arr = $o->toArray();
                 $arr['payment_proof_url'] = !empty($o->payment_proof_path)
                     ? url(Storage::url($o->payment_proof_path))
                     : null;
+                if (!empty($o->member_id)) {
+                    $m = \App\Models\Member::find($o->member_id);
+                    if ($m) {
+                        $arr['member'] = [
+                            'id'          => $m->id,
+                            'nama'        => $m->nama,
+                            'card_number' => $m->card_number,
+                            'tier'        => $m->tier,
+                            'phone'       => $m->phone,
+                            'points'      => $m->points,
+                        ];
+                    }
+                }
                 return $arr;
             });
 
