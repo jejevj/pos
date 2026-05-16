@@ -1474,7 +1474,20 @@
     "fillRequired": "Please fill name and code",
     "saved": "Payment method saved",
     "deleted": "Payment method deleted",
-    "deleteConfirm": "Delete payment method"
+    "deleteConfirm": "Delete payment method",
+    "qrImage": "QR",
+    "qrNone": "None",
+    "qrNoneHint": "No QR image uploaded yet.",
+    "manageQr": "Manage QR",
+    "qrManageTitle": "Manage QR Image",
+    "qrUploadHint": "Upload a static QR image (JPG/PNG/WEBP, max 3MB). Customers will see and download it during online checkout.",
+    "qrUpload": "Upload QR",
+    "qrReplace": "Replace QR",
+    "qrRemove": "Remove QR",
+    "qrRemoveConfirm": "Remove QR image for this payment method?",
+    "qrSaved": "QR image saved",
+    "qrRemoved": "QR image removed",
+    "qrTooLarge": "Max file size is 3MB"
   },
   "whatsapp": {
     "title": "WhatsApp",
@@ -1635,7 +1648,12 @@
     "unavailableOccupied": "This table is currently in use. Please contact the cashier or try again after the table is cleared.",
     "unavailableReserved": "This table is reserved. Please contact the cashier for more information.",
     "unavailableInactive": "This table is inactive. Please choose another table or contact the cashier.",
-    "unavailableGeneric": "This table cannot accept orders right now. Please contact the cashier."
+    "unavailableGeneric": "This table cannot accept orders right now. Please contact the cashier.",
+    "viewQr": "View QR",
+    "downloadQr": "Download QR",
+    "qrAvailable": "QR available",
+    "qrInstructionPay": "Tap \"View QR\" or download it to pay via e-wallet, then upload your payment proof below.",
+    "qrNotConfigured": "QRIS is not yet configured by the outlet. Please contact the cashier for payment details."
   },
   "tableQr": {
     "qrCode": "QR Code",

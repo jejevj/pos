@@ -47,6 +47,9 @@ trait PublicOrderingHelpers
                 DB::statement("ALTER TABLE payment_methods ADD COLUMN is_online_orderable BOOLEAN DEFAULT FALSE");
                 DB::statement("UPDATE payment_methods SET is_online_orderable = TRUE WHERE code = 'qris'");
             }
+            if (!$builder->hasColumn('payment_methods', 'qr_image_path')) {
+                DB::statement("ALTER TABLE payment_methods ADD COLUMN qr_image_path VARCHAR(500) NULL");
+            }
             if (!$builder->hasColumn('orders', 'payment_proof_path')) {
                 DB::statement("ALTER TABLE orders ADD COLUMN payment_proof_path VARCHAR(500) NULL");
             }
@@ -64,14 +67,20 @@ trait PublicOrderingHelpers
      */
     protected function onlineOrderablePaymentMethods()
     {
-        return DB::table('payment_methods')
+        $rows = DB::table('payment_methods')
             ->where('is_active', true)
             ->where('is_online_orderable', true)
             ->whereNull('deleted_at')
             ->orderBy('display_order')
             ->get([
-                'id', 'name', 'code', 'icon', 'display_order',
+                'id', 'name', 'code', 'icon', 'display_order', 'qr_image_path',
             ]);
+        return $rows->map(function ($r) {
+            $r->qr_image_url = $this->publicProofUrl($r->qr_image_path ?? null);
+            // do not leak raw filesystem path to public clients
+            unset($r->qr_image_path);
+            return $r;
+        });
     }
 
     /**

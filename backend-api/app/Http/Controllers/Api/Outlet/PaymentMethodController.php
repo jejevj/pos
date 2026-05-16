@@ -9,6 +9,9 @@ use App\Models\PaymentMethod;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Str;
 
 class PaymentMethodController extends Controller
 {
@@ -27,6 +30,9 @@ class PaymentMethodController extends Controller
             }
             $methods = $query->ordered()->get();
             DB::statement("SET search_path TO public");
+            $methods->each(function ($m) {
+                $m->qr_image_url = $this->buildQrImageUrl($m->qr_image_path ?? null);
+            });
             return response()->json($methods);
         } catch (\Exception $e) {
             DB::statement("SET search_path TO public");
@@ -112,6 +118,79 @@ class PaymentMethodController extends Controller
         }
     }
 
+    // ── QR Image (e.g. QRIS) upload / removal ────────────────────────────────
+
+    public function uploadQr(Request $request, $outletId, $id)
+    {
+        $outlet = $this->authorizeOutlet($outletId);
+        $validator = Validator::make($request->all(), [
+            'qr_image' => 'required|file|mimes:jpg,jpeg,png,webp|max:3072',
+        ]);
+        if ($validator->fails()) {
+            return response()->json(['message' => 'Data tidak valid', 'errors' => $validator->errors()], 422);
+        }
+        try {
+            DB::statement("SET search_path TO {$outlet->schema_name}, public");
+            $this->ensureColumns();
+            $method = PaymentMethod::findOrFail($id);
+
+            $oldPath = $method->qr_image_path;
+            $file = $request->file('qr_image');
+            $ext = strtolower($file->getClientOriginalExtension() ?: $file->extension() ?: 'png');
+            $safeExt = in_array($ext, ['jpg', 'jpeg', 'png', 'webp'], true) ? $ext : 'png';
+            $filename = 'qr_' . $method->code . '_' . Str::random(8) . '.' . $safeExt;
+            $dir = 'uploads/payment_qr/' . $outlet->slug;
+            $path = $file->storeAs($dir, $filename, 'public');
+
+            $method->update(['qr_image_path' => $path]);
+
+            if ($oldPath && $oldPath !== $path) {
+                try { Storage::disk('public')->delete($oldPath); } catch (\Throwable $e) { /* ignore */ }
+            }
+
+            DB::statement("SET search_path TO public");
+            return response()->json([
+                'message' => 'QR image uploaded',
+                'data' => [
+                    'id'            => $method->id,
+                    'qr_image_path' => $method->qr_image_path,
+                    'qr_image_url'  => $this->buildQrImageUrl($method->qr_image_path),
+                ],
+            ]);
+        } catch (\Exception $e) {
+            DB::statement("SET search_path TO public");
+            return response()->json(['message' => $e->getMessage()], 500);
+        }
+    }
+
+    public function deleteQr($outletId, $id)
+    {
+        $outlet = $this->authorizeOutlet($outletId);
+        try {
+            DB::statement("SET search_path TO {$outlet->schema_name}, public");
+            $this->ensureColumns();
+            $method = PaymentMethod::findOrFail($id);
+            $oldPath = $method->qr_image_path;
+            $method->update(['qr_image_path' => null]);
+            if ($oldPath) {
+                try { Storage::disk('public')->delete($oldPath); } catch (\Throwable $e) { /* ignore */ }
+            }
+            DB::statement("SET search_path TO public");
+            return response()->json(['message' => 'QR image removed']);
+        } catch (\Exception $e) {
+            DB::statement("SET search_path TO public");
+            return response()->json(['message' => $e->getMessage()], 500);
+        }
+    }
+
+    private function buildQrImageUrl(?string $path): ?string
+    {
+        if (!$path) {
+            return null;
+        }
+        return url(Storage::url($path));
+    }
+
     // ── Bon (deferred payment) list ──────────────────────────────────────────
 
     public function getBonList(Request $request, $outletId)
@@ -157,6 +236,9 @@ class PaymentMethodController extends Controller
             // Default-enable QRIS for online ordering — safe assumption for typical
             // outlets that already use QRIS as their cashless instrument.
             DB::statement("UPDATE payment_methods SET is_online_orderable = TRUE WHERE code = 'qris'");
+        }
+        if (!$schema->hasColumn('payment_methods', 'qr_image_path')) {
+            DB::statement("ALTER TABLE payment_methods ADD COLUMN qr_image_path VARCHAR(500) NULL");
         }
         if (!$schema->hasColumn('orders', 'payment_proof_path')) {
             DB::statement("ALTER TABLE orders ADD COLUMN payment_proof_path VARCHAR(500) NULL");

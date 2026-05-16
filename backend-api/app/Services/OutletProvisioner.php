@@ -380,6 +380,7 @@ class OutletProvisioner
                 is_active BOOLEAN DEFAULT true,
                 display_order INTEGER DEFAULT 0,
                 is_online_orderable BOOLEAN DEFAULT FALSE,
+                qr_image_path VARCHAR(500) NULL,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 deleted_at TIMESTAMP NULL
@@ -387,6 +388,7 @@ class OutletProvisioner
         ");
         // Heal existing schemas
         DB::statement("ALTER TABLE {$schema}.payment_methods ADD COLUMN IF NOT EXISTS is_online_orderable BOOLEAN DEFAULT FALSE");
+        DB::statement("ALTER TABLE {$schema}.payment_methods ADD COLUMN IF NOT EXISTS qr_image_path VARCHAR(500) NULL");
         DB::statement("
             CREATE TABLE IF NOT EXISTS {$schema}.orders (
                 id BIGSERIAL PRIMARY KEY,

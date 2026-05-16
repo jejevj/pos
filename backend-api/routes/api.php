@@ -185,6 +185,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('outlets/{outlet}/payment-methods', [\App\Http\Controllers\Api\Outlet\PaymentMethodController::class, 'store']);
     Route::put('outlets/{outlet}/payment-methods/{id}', [\App\Http\Controllers\Api\Outlet\PaymentMethodController::class, 'update']);
     Route::delete('outlets/{outlet}/payment-methods/{id}', [\App\Http\Controllers\Api\Outlet\PaymentMethodController::class, 'destroy']);
+    Route::post('outlets/{outlet}/payment-methods/{id}/qr',   [\App\Http\Controllers\Api\Outlet\PaymentMethodController::class, 'uploadQr']);
+    Route::delete('outlets/{outlet}/payment-methods/{id}/qr', [\App\Http\Controllers\Api\Outlet\PaymentMethodController::class, 'deleteQr']);
     Route::get('outlets/{outlet}/bon', [\App\Http\Controllers\Api\Outlet\PaymentMethodController::class, 'getBonList']);
     Route::post('outlets/{outlet}/orders/{id}/settle-bon', [\App\Http\Controllers\Api\Outlet\OrderController::class, 'settleBon']);
 

@@ -20,6 +20,7 @@ class PaymentMethod extends Model
         'defers_stock',   // if true, stock is NOT reduced until bon is settled
         'requires_settlement', // alias for defers_stock — same concept
         'is_online_orderable', // available for public table/takeaway online orders
+        'qr_image_path',  // stored QR image path (e.g. for QRIS) shown on public checkout
     ];
 
     protected $casts = [

@@ -45,14 +45,25 @@
             <Tag v-else :value="$t('paymentMethod.posOnly')" severity="secondary" />
           </template>
         </Column>
+        <Column :header="$t('paymentMethod.qrImage')" style="width:120px">
+          <template #body="{ data }">
+            <div v-if="data.qr_image_url" class="qr-thumb-wrap">
+              <img :src="data.qr_image_url" class="qr-thumb" :alt="data.name + ' QR'" />
+            </div>
+            <Tag v-else :value="$t('paymentMethod.qrNone')" severity="secondary" />
+          </template>
+        </Column>
         <Column field="is_active" :header="$t('common.status')">
           <template #body="{ data }">
             <Tag :value="data.is_active ? $t('common.active') : $t('common.inactive')"
                  :severity="data.is_active ? 'success' : 'secondary'" />
           </template>
         </Column>
-        <Column :header="$t('common.actions')" style="width:120px">
+        <Column :header="$t('common.actions')" style="width:170px">
           <template #body="{ data }">
+            <Button icon="pi pi-qrcode" text rounded size="small"
+                    :title="$t('paymentMethod.manageQr')"
+                    @click="openQrDialog(data)" />
             <Button icon="pi pi-pencil" text rounded size="small" @click="openDialog(data)" />
             <Button icon="pi pi-trash" text rounded size="small" severity="danger"
                     @click="confirmDelete(data)" />
@@ -148,6 +159,57 @@
       </template>
     </Dialog>
 
+    <!-- QR Image Dialog -->
+    <Dialog
+      v-model:visible="qrDialogVisible"
+      :header="$t('paymentMethod.qrManageTitle')"
+      modal
+      style="width:420px"
+    >
+      <div v-if="qrItem" class="qr-dialog-body">
+        <p class="qr-method-name">
+          <i class="pi pi-credit-card"></i>
+          <strong>{{ qrItem.name }}</strong>
+          <small>({{ qrItem.code }})</small>
+        </p>
+        <p class="text-muted small">{{ $t('paymentMethod.qrUploadHint') }}</p>
+        <div v-if="qrPreview" class="qr-preview-box">
+          <img :src="qrPreview" :alt="qrItem.name + ' QR'" />
+        </div>
+        <div v-else class="qr-empty">
+          <i class="pi pi-image"></i>
+          <span>{{ $t('paymentMethod.qrNoneHint') }}</span>
+        </div>
+        <input
+          ref="qrFileInput"
+          type="file"
+          accept="image/jpeg,image/png,image/webp"
+          style="display:none"
+          @change="onQrFilePicked"
+        />
+        <div class="qr-actions">
+          <Button
+            :label="qrPreview ? $t('paymentMethod.qrReplace') : $t('paymentMethod.qrUpload')"
+            icon="pi pi-upload"
+            @click="triggerQrFile"
+            :loading="qrUploading"
+          />
+          <Button
+            v-if="qrPreview"
+            :label="$t('paymentMethod.qrRemove')"
+            icon="pi pi-trash"
+            severity="danger"
+            outlined
+            @click="confirmRemoveQr"
+            :loading="qrRemoving"
+          />
+        </div>
+      </div>
+      <template #footer>
+        <Button :label="$t('common.close')" text @click="qrDialogVisible = false" />
+      </template>
+    </Dialog>
+
     <ConfirmDialog />
   </div>
 </template>
@@ -191,6 +253,82 @@ const form = ref({
   name: '', code: '', icon: '', display_order: 99,
   defers_stock: false, is_active: true, is_online_orderable: false
 })
+
+const qrDialogVisible = ref(false)
+const qrItem          = ref(null)
+const qrPreview       = ref('')
+const qrFileInput     = ref(null)
+const qrUploading     = ref(false)
+const qrRemoving      = ref(false)
+
+const openQrDialog = (item) => {
+  qrItem.value    = item
+  qrPreview.value = item.qr_image_url || ''
+  qrDialogVisible.value = true
+}
+
+const triggerQrFile = () => {
+  qrFileInput.value && qrFileInput.value.click()
+}
+
+const onQrFilePicked = async (e) => {
+  const f = e.target.files && e.target.files[0]
+  if (!f) return
+  // 3 MB cap matches backend validator
+  if (f.size > 3 * 1024 * 1024) {
+    toast.add({ severity: 'warn', summary: t('messages.warning'), detail: t('paymentMethod.qrTooLarge'), life: 3000 })
+    e.target.value = ''
+    return
+  }
+  qrUploading.value = true
+  try {
+    const fd = new FormData()
+    fd.append('qr_image', f)
+    const res = await api.post(
+      `/outlets/${outletId}/payment-methods/${qrItem.value.id}/qr`,
+      fd,
+      { headers: { 'Content-Type': 'multipart/form-data' } }
+    )
+    const url = res.data?.data?.qr_image_url
+    qrPreview.value = url || ''
+    // sync into list
+    const row = methods.value.find(m => m.id === qrItem.value.id)
+    if (row) row.qr_image_url = url
+    toast.add({ severity: 'success', summary: t('messages.success'), detail: t('paymentMethod.qrSaved'), life: 3000 })
+  } catch (err) {
+    toast.add({ severity: 'error', summary: t('messages.error'), detail: err.response?.data?.message, life: 3000 })
+  } finally {
+    qrUploading.value = false
+    if (qrFileInput.value) qrFileInput.value.value = ''
+  }
+}
+
+const confirmRemoveQr = () => {
+  confirm.require({
+    message: t('paymentMethod.qrRemoveConfirm'),
+    header: t('paymentMethod.qrRemove'),
+    icon: 'pi pi-exclamation-triangle',
+    acceptLabel: t('common.yes'),
+    rejectLabel: t('common.no'),
+    accept: () => removeQr()
+  })
+}
+
+const removeQr = async () => {
+  if (!qrItem.value) return
+  qrRemoving.value = true
+  try {
+    await api.delete(`/outlets/${outletId}/payment-methods/${qrItem.value.id}/qr`)
+    qrPreview.value = ''
+    const row = methods.value.find(m => m.id === qrItem.value.id)
+    if (row) row.qr_image_url = null
+    toast.add({ severity: 'success', summary: t('messages.success'), detail: t('paymentMethod.qrRemoved'), life: 3000 })
+  } catch (err) {
+    toast.add({ severity: 'error', summary: t('messages.error'), detail: err.response?.data?.message, life: 3000 })
+  } finally {
+    qrRemoving.value = false
+  }
+}
 
 const fetchMethods = async () => {
   loading.value = true
@@ -335,4 +473,28 @@ onMounted(() => {
   background: #fef3c7; border-radius: 8px;
   border: 1px solid #f59e0b; font-size: 0.95rem;
 }
+
+.qr-thumb-wrap { display: flex; align-items: center; }
+.qr-thumb {
+  width: 44px; height: 44px; object-fit: cover;
+  border: 1px solid #e5e7eb; border-radius: 6px; background: #fff;
+}
+
+.qr-dialog-body { display: flex; flex-direction: column; gap: 0.75rem; }
+.qr-method-name { display: flex; align-items: center; gap: 0.4rem; margin: 0; font-size: 0.95rem; }
+.qr-method-name small { color: #6b7280; }
+.text-muted.small { color: #6b7280; font-size: 0.8rem; margin: 0; }
+.qr-preview-box {
+  display: flex; justify-content: center; align-items: center;
+  padding: 1rem; background: #f9fafb; border: 1px dashed #d1d5db;
+  border-radius: 10px;
+}
+.qr-preview-box img { max-width: 100%; max-height: 280px; border-radius: 6px; }
+.qr-empty {
+  display: flex; flex-direction: column; align-items: center; gap: 0.4rem;
+  padding: 1.25rem; background: #f9fafb; border: 1px dashed #d1d5db;
+  border-radius: 10px; color: #9ca3af; font-size: 0.85rem;
+}
+.qr-empty i { font-size: 24px; }
+.qr-actions { display: flex; gap: 0.5rem; justify-content: flex-end; flex-wrap: wrap; }
 </style>

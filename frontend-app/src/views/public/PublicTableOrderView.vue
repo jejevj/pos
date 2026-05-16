@@ -233,7 +233,31 @@
                 />
                 <i class="pi" :class="pm.icon || 'pi-credit-card'"></i>
                 <span>{{ pm.name }}</span>
+                <i v-if="pm.qr_image_url" class="pi pi-qrcode pm-qr-badge" :title="t('publicOrder.qrAvailable')"></i>
               </label>
+            </div>
+
+            <div v-if="selectedPaymentMethod" class="qr-block">
+              <div v-if="selectedPaymentMethod.qr_image_url" class="qr-info">
+                <p class="qr-info-text">
+                  <i class="pi pi-info-circle"></i>
+                  {{ t('publicOrder.qrInstructionPay') }}
+                </p>
+                <div class="qr-action-row">
+                  <button type="button" class="qr-btn" @click="openQrModal">
+                    <i class="pi pi-eye"></i>
+                    {{ t('publicOrder.viewQr') }}
+                  </button>
+                  <button type="button" class="qr-btn outlined" @click="downloadQr">
+                    <i class="pi pi-download"></i>
+                    {{ t('publicOrder.downloadQr') }}
+                  </button>
+                </div>
+              </div>
+              <div v-else-if="selectedPaymentMethod.code === 'qris'" class="qr-info missing">
+                <i class="pi pi-exclamation-triangle"></i>
+                {{ t('publicOrder.qrNotConfigured') }}
+              </div>
             </div>
 
             <div class="field">
@@ -280,6 +304,30 @@
         </div>
       </div>
     </template>
+
+    <!-- QR Image Modal -->
+    <div v-if="qrModalOpen" class="qr-modal-backdrop" @click.self="qrModalOpen = false">
+      <div class="qr-modal">
+        <div class="qr-modal-header">
+          <strong>{{ selectedPaymentMethod ? selectedPaymentMethod.name : '' }} QR</strong>
+          <button class="icon-btn" @click="qrModalOpen = false" :aria-label="t('common.close')">
+            <i class="pi pi-times"></i>
+          </button>
+        </div>
+        <div class="qr-modal-body">
+          <img
+            v-if="selectedPaymentMethod && selectedPaymentMethod.qr_image_url"
+            :src="selectedPaymentMethod.qr_image_url"
+            :alt="selectedPaymentMethod.name + ' QR'"
+          />
+        </div>
+        <p class="qr-modal-hint">{{ t('publicOrder.qrInstructionPay') }}</p>
+        <button class="primary big" type="button" @click="downloadQr">
+          <i class="pi pi-download"></i>
+          {{ t('publicOrder.downloadQr') }}
+        </button>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -324,6 +372,38 @@ const proofFile = ref(null)
 const proofPreview = ref('')
 const proofPreviewType = ref('image')
 const proofFileName = ref('')
+const qrModalOpen = ref(false)
+
+const selectedPaymentMethod = computed(() =>
+  paymentMethods.value.find((p) => p.id === form.value.payment_method_id) || null
+)
+
+function openQrModal() {
+  if (selectedPaymentMethod.value && selectedPaymentMethod.value.qr_image_url) {
+    qrModalOpen.value = true
+  }
+}
+
+async function downloadQr() {
+  const pm = selectedPaymentMethod.value
+  if (!pm || !pm.qr_image_url) return
+  try {
+    const resp = await fetch(pm.qr_image_url, { mode: 'cors' })
+    const blob = await resp.blob()
+    const url  = URL.createObjectURL(blob)
+    const a    = document.createElement('a')
+    const ext  = (pm.qr_image_url.split('.').pop() || 'png').split('?')[0].slice(0, 5)
+    a.href     = url
+    a.download = `qr-${(pm.code || 'payment')}.${ext}`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    setTimeout(() => URL.revokeObjectURL(url), 500)
+  } catch (err) {
+    // Fallback: open in new tab — browser will allow user to save
+    window.open(pm.qr_image_url, '_blank')
+  }
+}
 
 const form = ref({
   customer_name: '',
@@ -744,4 +824,49 @@ async function submitOrder() {
 }
 .proof-preview img { max-width: 100%; max-height: 200px; border-radius: 6px; }
 .proof-preview i { font-size: 18px; color: #ef4444; margin-right: 4px; }
+
+.pm-qr-badge { margin-left: auto; color: #16a34a; font-size: 14px; }
+
+.qr-block { margin: 4px 0 12px; }
+.qr-info {
+  background: #eef2ff; border: 1px solid #c7d2fe; color: #3730a3;
+  border-radius: 10px; padding: 10px 12px; font-size: 13px;
+  display: flex; flex-direction: column; gap: 8px;
+}
+.qr-info.missing {
+  background: #fff7ed; border-color: #fdba74; color: #c2410c;
+  flex-direction: row; align-items: center; gap: 8px;
+}
+.qr-info-text { margin: 0; display: flex; align-items: flex-start; gap: 6px; line-height: 1.4; }
+.qr-info-text i { color: #6366f1; }
+.qr-action-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.qr-btn {
+  flex: 1; min-width: 120px;
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  padding: 8px 12px; font-size: 13px; font-weight: 600;
+  background: #6366f1; color: #fff; border: 1px solid #6366f1;
+  border-radius: 8px; cursor: pointer;
+}
+.qr-btn.outlined { background: #fff; color: #6366f1; }
+.qr-btn:hover { opacity: 0.92; }
+
+.qr-modal-backdrop {
+  position: fixed; inset: 0; background: rgba(0, 0, 0, 0.6);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 30; padding: 16px;
+}
+.qr-modal {
+  background: #fff; border-radius: 14px;
+  width: 100%; max-width: 380px;
+  padding: 14px;
+  display: flex; flex-direction: column; gap: 10px;
+}
+.qr-modal-header { display: flex; align-items: center; justify-content: space-between; }
+.qr-modal-body {
+  display: flex; justify-content: center; align-items: center;
+  background: #f9fafb; border: 1px dashed #e5e7eb; border-radius: 10px;
+  padding: 12px; min-height: 220px;
+}
+.qr-modal-body img { max-width: 100%; max-height: 360px; border-radius: 6px; }
+.qr-modal-hint { font-size: 12px; color: #6b7280; margin: 0; text-align: center; }
 </style>
