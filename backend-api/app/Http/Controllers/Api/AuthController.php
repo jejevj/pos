@@ -98,14 +98,24 @@ class AuthController extends Controller
     public function login(Request $request)
     {
         $request->validate([
-            'email' => 'required|email',
+            'login'    => 'required|string', // bisa email atau username
             'password' => 'required',
         ]);
 
-        $email = strtolower(trim($request->email));
+        $login    = strtolower(trim($request->login));
+        $isEmail  = filter_var($login, FILTER_VALIDATE_EMAIL) !== false;
 
         // ── 1. Coba login sebagai global user (superadmin / owner) ──────────
-        $user = User::with(['roles.permissions'])->whereRaw('LOWER(email) = ?', [$email])->first();
+        $user = User::with(['roles.permissions'])
+            ->where(function ($q) use ($login, $isEmail) {
+                if ($isEmail) {
+                    $q->whereRaw('LOWER(email) = ?', [$login]);
+                } else {
+                    $q->whereRaw('LOWER(username) = ?', [$login])
+                      ->orWhereRaw('LOWER(email) = ?', [$login]);
+                }
+            })
+            ->first();
 
         if ($user && Hash::check($request->password, $user->password)) {
             $token = $user->createToken('auth_token')->plainTextToken;
@@ -117,23 +127,27 @@ class AuthController extends Controller
         }
 
         // ── 2. Fallback: cari di outlet_users semua schema ──────────────────
-        // Outlet user tidak punya akun di tabel users public.
-        // Kita temukan schema-nya, verifikasi password, lalu buat/sync
-        // akun proxy di tabel users public agar Sanctum bisa issue token.
-        $outletUserData = $this->findOutletUser($email, $request->password);
+        $outletUserData = $this->findOutletUser($login, $request->password, $isEmail);
 
         if ($outletUserData) {
+            $outletUser = $outletUserData['outlet_user'];
+            $email      = $outletUser->email;
+
             // Sync ke users public (upsert berdasarkan email)
             $user = User::firstOrCreate(
                 ['email' => $email],
                 [
-                    'name'     => $outletUserData['outlet_user']->name,
-                    'password' => $outletUserData['outlet_user']->password, // sudah di-hash
+                    'name'     => $outletUser->name,
+                    'username' => $outletUser->username ?? null,
+                    'password' => $outletUser->password,
                 ]
             );
 
-            // Selalu update password agar sinkron jika diubah di outlet
-            $user->update(['password' => $outletUserData['outlet_user']->password]);
+            // Selalu update password & username agar sinkron
+            $user->update([
+                'password' => $outletUser->password,
+                'username' => $outletUser->username ?? $user->username,
+            ]);
 
             $token = $user->createToken('auth_token')->plainTextToken;
 
@@ -146,15 +160,17 @@ class AuthController extends Controller
 
         // ── 3. Credentials salah ──────────────────────────────────────────────
         throw ValidationException::withMessages([
-            'email' => ['The provided credentials are incorrect.'],
+            'login' => ['Username atau password salah.'],
         ]);
     }
 
     /**
-     * Cari outlet_user di semua schema outlet yang aktif berdasarkan email.
+     * Cari outlet_user di semua schema outlet yang aktif.
+     * Jika $isEmail=true  → cari by email saja.
+     * Jika $isEmail=false → cari by username ATAU email (fallback).
      * Kembalikan ['outlet' => Outlet, 'outlet_user' => object] atau null.
      */
-    private function findOutletUser(string $email, string $password): ?array
+    private function findOutletUser(string $login, string $password, bool $isEmail = true): ?array
     {
         try {
             $outlets = Outlet::where('is_active', true)->get();
@@ -163,11 +179,21 @@ class AuthController extends Controller
                 try {
                     DB::statement("SET search_path TO {$outlet->schema_name}, public");
 
-                    $outletUser = DB::table('outlet_users')
-                        ->whereRaw('LOWER(email) = ?', [$email])
+                    $query = DB::table('outlet_users')
                         ->where('is_active', true)
-                        ->whereNull('deleted_at')
-                        ->first();
+                        ->whereNull('deleted_at');
+
+                    if ($isEmail) {
+                        $query->whereRaw('LOWER(email) = ?', [$login]);
+                    } else {
+                        // username atau email
+                        $query->where(function ($q) use ($login) {
+                            $q->whereRaw('LOWER(username) = ?', [$login])
+                              ->orWhereRaw('LOWER(email) = ?', [$login]);
+                        });
+                    }
+
+                    $outletUser = $query->first();
 
                     if ($outletUser && Hash::check($password, $outletUser->password)) {
                         return ['outlet' => $outlet, 'outlet_user' => $outletUser];
