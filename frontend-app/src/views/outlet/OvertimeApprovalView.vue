@@ -154,7 +154,7 @@
 import { ref, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { useToast } from 'primevue/usetoast'
-import axios from '@/utils/axios'
+import api from '@/services/api'
 
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
@@ -218,7 +218,7 @@ const loadOvertimeRequests = async () => {
   try {
     const params = {}
     if (filterStatus.value) params.status = filterStatus.value
-    const res = await axios.get(`/outlets/${outletId}/overtime-requests`, { params })
+    const res = await api.get(`/outlets/${outletId}/overtime-requests`, { params })
     overtimeList.value = res.data || []
   } catch (e) {
     toast.add({ severity: 'error', summary: 'Gagal', detail: e.response?.data?.message || 'Gagal memuat data lembur', life: 3000 })
@@ -236,7 +236,7 @@ const confirmApprove = (record) => {
 const doApprove = async () => {
   actionLoading.value = true
   try {
-    await axios.post(`/outlets/${outletId}/attendances/${selectedRecord.value.id}/approve-overtime`)
+    await api.post(`/outlets/${outletId}/attendances/${selectedRecord.value.id}/approve-overtime`)
     toast.add({ severity: 'success', summary: 'Berhasil', detail: 'Lembur disetujui', life: 3000 })
     approveDialog.value = false
     loadOvertimeRequests()
@@ -262,7 +262,7 @@ const doReject = async () => {
   }
   actionLoading.value = true
   try {
-    await axios.post(`/outlets/${outletId}/attendances/${selectedRecord.value.id}/reject-overtime`, {
+    await api.post(`/outlets/${outletId}/attendances/${selectedRecord.value.id}/reject-overtime`, {
       rejection_reason: rejectionReason.value,
     })
     toast.add({ severity: 'info', summary: 'Ditolak', detail: 'Pengajuan lembur ditolak', life: 3000 })
