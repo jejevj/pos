@@ -446,6 +446,14 @@ class ShiftController extends Controller
         
         try {
             DB::statement("SET search_path TO {$outlet->schema_name}, public");
+
+            // Resolve outlet_user dari user global yang sedang login
+            $authUser = Auth::user();
+            $outletUser = DB::table('outlet_users')
+                ->where('email', $authUser->email)
+                ->whereNull('deleted_at')
+                ->first();
+            $createdBy = $outletUser ? $outletUser->id : null;
             
             // Check if assignment already exists
             $exists = DB::table('shift_assignments')
@@ -464,7 +472,7 @@ class ShiftController extends Controller
                 'date' => $request->date,
                 'status' => 'scheduled',
                 'notes' => $request->notes,
-                'created_by' => Auth::id(),
+                'created_by' => $createdBy,
                 'created_at' => now(),
                 'updated_at' => now(),
             ]);
@@ -499,6 +507,14 @@ class ShiftController extends Controller
         
         try {
             DB::statement("SET search_path TO {$outlet->schema_name}, public");
+
+            // Resolve outlet_user dari user global yang sedang login
+            $authUser = Auth::user();
+            $outletUser = DB::table('outlet_users')
+                ->where('email', $authUser->email)
+                ->whereNull('deleted_at')
+                ->first();
+            $createdBy = $outletUser ? $outletUser->id : null;
             
             $created = 0;
             foreach ($request->assignments as $assignment) {
@@ -513,7 +529,7 @@ class ShiftController extends Controller
                         'shift_id' => $assignment['shift_id'],
                         'date' => $assignment['date'],
                         'status' => 'scheduled',
-                        'created_by' => Auth::id(),
+                        'created_by' => $createdBy,
                         'created_at' => now(),
                         'updated_at' => now(),
                     ]);
