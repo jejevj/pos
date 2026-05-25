@@ -310,11 +310,12 @@ class AuthController extends Controller
                         ->all();
 
                     $memberships[] = [
-                        'outlet_id'   => $outlet->id,
-                        'outlet_name' => $outlet->name,
-                        'schema'      => $outlet->schema_name,
-                        'roles'       => $roles->map(fn($r) => ['name' => $r->name, 'display_name' => $r->display_name])->values(),
-                        'permissions' => $permissions,
+                        'outlet_id'      => $outlet->id,
+                        'outlet_name'    => $outlet->name,
+                        'schema'         => $outlet->schema_name,
+                        'outlet_user_id' => $outletUser->id,  // ID user di schema outlet (untuk PIC check)
+                        'roles'          => $roles->map(fn($r) => ['name' => $r->name, 'display_name' => $r->display_name])->values(),
+                        'permissions'    => $permissions,
                     ];
                 } catch (\Throwable $e) {
                     // Schema may not exist yet — skip silently
