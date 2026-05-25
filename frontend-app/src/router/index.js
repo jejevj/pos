@@ -298,6 +298,15 @@ const router = createRouter({
           }
         },
         {
+          path: 'outlets/:outletId/overtime-approval',
+          name: 'outlet-overtime-approval',
+          component: () => import('@/views/outlet/OvertimeApprovalView.vue'),
+          meta: {
+            requiresAuth: true,
+            title: 'Approval Lembur'
+          }
+        },
+        {
           path: 'outlets/:outletId/utilities',
           name: 'outlet-utilities',
           component: () => import('@/views/outlet/UtilitiesView.vue'),
