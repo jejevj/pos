@@ -43,7 +43,7 @@
     </div>
 
     <!-- ===================== QR BANNER (muncul di semua tab saat belum konek) ===================== -->
-    <Card v-if="wahaEnabled && (sessionStatus === 'SCAN_QR' || sessionStatus === 'STOPPED' || sessionStatus === 'STARTING')" class="qr-banner mb-3">
+    <Card v-if="wahaEnabled && (sessionStatus === 'SCAN_QR_CODE' || sessionStatus === 'STOPPED' || sessionStatus === 'STARTING')" class="qr-banner mb-3">
       <template #content>
         <div class="qr-banner-inner">
           <div class="qr-banner-info">
@@ -80,7 +80,7 @@
             <div class="sc-val">{{ serverOnline ? 'Online' : 'Offline' }}</div>
           </div>
         </div>
-        <div class="status-card" :class="sessionStatus === 'WORKING' ? 'ok' : sessionStatus === 'SCAN_QR' ? 'warn' : 'err'">
+        <div class="status-card" :class="sessionStatus === 'WORKING' ? 'ok' : sessionStatus === 'SCAN_QR_CODE' ? 'warn' : 'err'">
           <i class="pi pi-whatsapp"></i>
           <div>
             <div class="sc-label">Session</div>
@@ -104,7 +104,7 @@
       </div>
 
       <!-- QR Code -->
-      <Card v-if="sessionStatus === 'SCAN_QR'" class="mb-3">
+      <Card v-if="sessionStatus === 'SCAN_QR_CODE'" class="mb-3">
         <template #title>Scan QR Code</template>
         <template #content>
           <div class="qr-wrap">
@@ -146,7 +146,7 @@
             <Column field="name" header="Name" />
             <Column field="status" header="Status">
               <template #body="{ data }">
-                <Tag :value="data.status" :severity="data.status === 'WORKING' ? 'success' : data.status === 'SCAN_QR' ? 'warn' : 'secondary'" />
+                <Tag :value="data.status" :severity="data.status === 'WORKING' ? 'success' : data.status === 'SCAN_QR_CODE' ? 'warn' : 'secondary'" />
               </template>
             </Column>
             <Column field="engine.engine" header="Engine" />
@@ -532,7 +532,7 @@ const startQrCountdown = (seconds = 60) => {
     if (qrExpireCountdown.value <= 0) {
       clearInterval(qrCountdownInterval)
       // Auto refresh QR saat kedaluwarsa
-      if (sessionStatus.value === 'SCAN_QR') fetchQr()
+      if (sessionStatus.value === 'SCAN_QR_CODE') fetchQr()
     }
   }, 1000)
 }
@@ -567,7 +567,7 @@ const checkForm         = ref({ session: 'default', phone: '' })
 // ── computed ───────────────────────────────────────────────────────────────
 const statusSeverity = computed(() => {
   if (sessionStatus.value === 'WORKING') return 'success'
-  if (sessionStatus.value === 'SCAN_QR') return 'warn'
+  if (sessionStatus.value === 'SCAN_QR_CODE') return 'warn'
   return 'secondary'
 })
 
@@ -613,7 +613,7 @@ const init = async () => {
         const me = await waha.get(`/api/sessions/${sessionName.value}`)
         sessionInfo.value = me.data
       }
-      if (def.status === 'SCAN_QR') fetchQr()
+      if (def.status === 'SCAN_QR_CODE') fetchQr()
     }
   } catch (e) {
     err(e, 'Failed to load sessions')
@@ -957,11 +957,14 @@ const quickSendTo = (chatId) => {
   tab.value = 'send'
 }
 
-onMounted(() => {
+onMounted(async () => {
   clearWahaUnread()
   if (!wahaEnabled) return
-  init()
-  fetchChats()
+  await init()
+  // Hanya load chat jika session sudah aktif
+  if (sessionStatus.value === 'WORKING') {
+    fetchChats()
+  }
 })
 
 // Auto-update when incoming message arrives via WebSocket
@@ -994,8 +997,8 @@ onMounted(() => {
       }
     }
 
-    // Always refresh chat list sidebar
-    fetchChats()
+    // Refresh chat list hanya jika session aktif
+    if (sessionStatus.value === 'WORKING') fetchChats()
   })
 })
 
