@@ -67,12 +67,7 @@
       <div class="attendance-section">
         <div class="section-header">
           <h3>{{ $t('hr.attendance') }}</h3>
-          <div class="header-actions">
-            <Button :label="$t('hr.clockIn')" icon="pi pi-sign-in" @click="handleClockIn" :disabled="todayStatus.has_clocked_in" />
-            <Button :label="$t('hr.clockOut')" icon="pi pi-sign-out" severity="secondary" @click="openClockOutDialog" 
-                    :disabled="!todayStatus.has_clocked_in || todayStatus.has_clocked_out" />
 
-          </div>
         </div>
 
         <!-- Today Status -->
