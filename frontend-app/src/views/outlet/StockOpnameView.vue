@@ -20,7 +20,8 @@
             <h3 class="m-0">{{ $t('stockOpname.list') }}</h3>
             <p class="text-muted m-0 mt-1">{{ $t('stockOpname.description') }}</p>
           </div>
-          <Button :label="$t('stockOpname.createSchedule')" icon="pi pi-plus" @click="showCreateDialog" />
+          <!-- Hanya manager yang bisa buat jadwal -->
+          <Button v-if="canManage" :label="$t('stockOpname.createSchedule')" icon="pi pi-plus" @click="showCreateDialog" />
         </div>
       </template>
       <template #content>
@@ -72,13 +73,16 @@
           </div>
           <div style="display: flex; gap: 0.5rem;">
             <Button :label="$t('stockOpname.backToList')" icon="pi pi-arrow-left" text @click="backToList" />
-            <Button v-if="selectedOpname.is_editable" :label="$t('stockOpname.saveProgress')" 
+            <!-- Simpan progress: hanya PIC atau manager, saat status bisa edit -->
+            <Button v-if="selectedOpname.is_editable && canEdit" :label="$t('stockOpname.saveProgress')" 
                     icon="pi pi-save" @click="saveProgress" :loading="saving" />
-            <Button v-if="selectedOpname.can_submit" :label="$t('stockOpname.submitForReview')" 
+            <!-- Submit: hanya PIC atau manager -->
+            <Button v-if="selectedOpname.can_submit && canEdit" :label="$t('stockOpname.submitForReview')" 
                     icon="pi pi-send" @click="confirmSubmitOpname" severity="success" />
-            <Button v-if="selectedOpname.can_approve" :label="$t('stockOpname.approve')" 
+            <!-- Approve & Reject: hanya manager -->
+            <Button v-if="selectedOpname.can_approve && canManage" :label="$t('stockOpname.approve')" 
                     icon="pi pi-check" @click="confirmApproveOpname" severity="success" />
-            <Button v-if="selectedOpname.can_approve" :label="$t('stockOpname.reject')" 
+            <Button v-if="selectedOpname.can_approve && canManage" :label="$t('stockOpname.reject')" 
                     icon="pi pi-times" @click="confirmRejectOpname" severity="danger" />
           </div>
         </div>
@@ -104,8 +108,8 @@
           </div>
         </div>
 
-        <!-- Approval Section (for submitted status) -->
-        <div v-if="selectedOpname.status === 'submitted'" class="approval-section mb-4">
+        <!-- Approval Section: hanya untuk manager -->
+        <div v-if="selectedOpname.status === 'submitted' && canManage" class="approval-section mb-4">
           <h4>{{ $t('stockOpname.reviewApproval') }}</h4>
           <p class="text-muted">{{ $t('stockOpname.reviewDesc') }}</p>
           <Textarea v-model="approvalNotes" :placeholder="$t('stockOpname.approvalNotesPlaceholder')" 
@@ -136,8 +140,8 @@
           </Column>
           <Column :header="$t('stockOpname.physicalStock')" style="width: 180px">
             <template #body="{ data }">
-              <InputNumber v-if="selectedOpname.is_editable" v-model="data.physical_stock" 
-                           :minFractionDigits="0" :maxFractionDigits="2" style="width: 100%" 
+              <InputNumber v-if="selectedOpname.is_editable && canEdit" v-model="data.physical_stock" 
+                           :maxFractionDigits="4" style="width: 100%" 
                            @input="calculateDifference(data)" />
               <span v-else>{{ formatNumber(data.physical_stock) }} {{ data.bahan_baku?.satuan?.singkatan }}</span>
             </template>
@@ -161,7 +165,7 @@
           </Column>
           <Column :header="$t('stockOpname.itemNotes')" style="width: 200px">
             <template #body="{ data }">
-              <InputText v-if="selectedOpname.is_editable" v-model="data.notes" 
+              <InputText v-if="selectedOpname.is_editable && canEdit" v-model="data.notes" 
                          :placeholder="$t('stockOpname.notesPlaceholder')" style="width: 100%" />
               <span v-else>{{ data.notes || '-' }}</span>
             </template>
@@ -304,6 +308,7 @@ import { useToast } from 'primevue/usetoast'
 import { useConfirm } from 'primevue/useconfirm'
 import { useI18n } from 'vue-i18n'
 import api from '@/services/api'
+import { useAuthStore } from '@/stores/auth'
 import Card from 'primevue/card'
 import Breadcrumb from 'primevue/breadcrumb'
 import Button from 'primevue/button'
@@ -323,8 +328,29 @@ const router = useRouter()
 const toast = useToast()
 const confirm = useConfirm()
 const { t } = useI18n()
+const authStore = useAuthStore()
 
 const outletId = route.params.outletId
+
+// Akses: manager = bisa buat jadwal, approve, reject
+const canManage = computed(() =>
+  authStore.isSuperAdmin ||
+  authStore.hasOutletPermission(outletId, 'manage_stock_opname')
+)
+
+// Cek apakah current user adalah PIC dari opname yang sedang dilihat
+// (backend juga kirim flag is_assigned_pic, tapi kita bisa cek dari membership)
+const currentOutletUserId = computed(() => {
+  const membership = authStore.getOutletMembership?.(outletId)
+  return membership?.outlet_user_id || null
+})
+
+const isAssignedPic = computed(() =>
+  selectedOpname.value ? selectedOpname.value.is_assigned_pic : false
+)
+
+// Boleh edit (input qty) = manager ATAU PIC yang ditunjuk
+const canEdit = computed(() => canManage.value || isAssignedPic.value)
 
 const breadcrumbHome = ref({ icon: 'pi pi-home', to: '/dashboard' })
 const breadcrumbItems = computed(() => [
