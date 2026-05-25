@@ -227,6 +227,8 @@ const navLinks = computed(() => {
     }
     if (can('view_attendance'))
       hrChildren.push({ label: 'Absensi', to: `/outlets/${id}/attendance`, icon: 'pi pi-clock' })
+    if (can('manage_payroll'))
+      hrChildren.push({ label: 'Approval Lembur', to: `/outlets/${id}/overtime-approval`, icon: 'pi pi-check-circle' })
     items.push({ type: 'collapse', label: 'HR / Karyawan', icon: 'pi pi-users', children: hrChildren })
   }
 
