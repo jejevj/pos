@@ -218,7 +218,7 @@ const loadOvertimeRequests = async () => {
   try {
     const params = {}
     if (filterStatus.value) params.status = filterStatus.value
-    const res = await api.get(`/outlets/${outletId}/overtime-requests`, { params })
+    const res = await api.get(`/outlets/${outletId}/attendances/overtime-requests`, { params })
     overtimeList.value = res.data || []
   } catch (e) {
     toast.add({ severity: 'error', summary: 'Gagal', detail: e.response?.data?.message || 'Gagal memuat data lembur', life: 3000 })
