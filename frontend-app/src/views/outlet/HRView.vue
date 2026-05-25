@@ -27,6 +27,7 @@
           {{ $t('hr.leave') }}
         </button>
         <button 
+          v-if="canManagePayroll"
           class="tab" 
           :class="{ active: activeTab === 'payroll' }"
           @click="activeTab = 'payroll'"
@@ -68,8 +69,10 @@
           <h3>{{ $t('hr.attendance') }}</h3>
           <div class="header-actions">
             <Button :label="$t('hr.clockIn')" icon="pi pi-sign-in" @click="handleClockIn" :disabled="todayStatus.has_clocked_in" />
-            <Button :label="$t('hr.clockOut')" icon="pi pi-sign-out" severity="secondary" @click="handleClockOut" 
+            <Button :label="$t('hr.clockOut')" icon="pi pi-sign-out" severity="secondary" @click="openClockOutDialog" 
                     :disabled="!todayStatus.has_clocked_in || todayStatus.has_clocked_out" />
+            <Button v-if="canManagePayroll" label="Approval Lembur" icon="pi pi-clock" severity="warning" outlined
+                    @click="openOvertimeApprovalDialog" />
           </div>
         </div>
 
@@ -1141,6 +1144,73 @@
         <Button :label="$t('hr.allowLocation')" @click="confirmUseCurrentLocation" :loading="gettingLocation" />
       </template>
     </Dialog>
+
+    <!-- ── Dialog Clock Out (dengan alasan lembur jika overtime) ────────────── -->
+    <Dialog v-model:visible="clockOutDialogVisible" header="Clock Out" modal :style="{ width: '480px' }">
+      <div class="form-content">
+        <Message v-if="clockOutOvertimeHours > 0" severity="warn" :closable="false" class="mb-3">
+          <strong>Anda akan lembur {{ clockOutOvertimeHours }} jam hari ini.</strong>
+          Alasan lembur wajib diisi dan akan dikirim untuk approval manajer.
+        </Message>
+        <div class="field">
+          <label>Catatan Clock Out</label>
+          <Textarea v-model="clockOutForm.notes" rows="2" fluid :placeholder="$t('hr.clockOutNotes', 'Catatan opsional...')" />
+        </div>
+        <div v-if="clockOutOvertimeHours > 0" class="field">
+          <label>Alasan Lembur <span class="p-error">*</span></label>
+          <Textarea v-model="clockOutForm.overtime_reason" rows="3" fluid placeholder="Jelaskan alasan bekerja melebihi jam kerja standar..." />
+        </div>
+      </div>
+      <template #footer>
+        <Button label="Batal" text @click="clockOutDialogVisible = false" />
+        <Button label="Clock Out" severity="warning" @click="submitClockOut" :loading="clockingOut" />
+      </template>
+    </Dialog>
+
+    <!-- ── Section Approval Lembur (hanya tampil di tab attendance, untuk manager) ── -->
+    <Dialog v-model:visible="overtimeApprovalDialogVisible" header="Approval Lembur" modal :style="{ width: '700px' }">
+      <DataTable :value="overtimeRequests" :loading="loadingOvertime" striped-rows paginator :rows="10">
+        <Column field="date" header="Tanggal" sortable>
+          <template #body="{ data }">{{ formatDate(data.date) }}</template>
+        </Column>
+        <Column field="user_name" header="Karyawan" sortable />
+        <Column field="overtime_hours" header="Jam Lembur">
+          <template #body="{ data }">{{ data.overtime_hours }} jam</template>
+        </Column>
+        <Column field="overtime_reason" header="Alasan Lembur" />
+        <Column field="overtime_status" header="Status">
+          <template #body="{ data }">
+            <Tag :value="data.overtime_status || 'pending'" :severity="getOvertimeSeverity(data.overtime_status)" />
+          </template>
+        </Column>
+        <Column header="Aksi" style="width: 140px">
+          <template #body="{ data }">
+            <div class="action-buttons" v-if="data.overtime_status === 'pending_approval'">
+              <Button icon="pi pi-check" size="small" severity="success" text rounded
+                      @click="approveOvertime(data)" v-tooltip.top="'Setujui Lembur'" />
+              <Button icon="pi pi-times" size="small" severity="danger" text rounded
+                      @click="openRejectOvertimeDialog(data)" v-tooltip.top="'Tolak Lembur'" />
+            </div>
+            <Tag v-else :value="data.overtime_status" :severity="getOvertimeSeverity(data.overtime_status)" />
+          </template>
+        </Column>
+      </DataTable>
+      <template #footer>
+        <Button label="Tutup" text @click="overtimeApprovalDialogVisible = false" />
+      </template>
+    </Dialog>
+
+    <!-- Dialog Tolak Lembur -->
+    <Dialog v-model:visible="rejectOvertimeDialogVisible" header="Tolak Lembur" modal :style="{ width: '400px' }">
+      <div class="field">
+        <label>Alasan Penolakan <span class="p-error">*</span></label>
+        <Textarea v-model="rejectOvertimeReason" rows="3" fluid />
+      </div>
+      <template #footer>
+        <Button label="Batal" text @click="rejectOvertimeDialogVisible = false" />
+        <Button label="Tolak" severity="danger" @click="submitRejectOvertime" :loading="savingOvertime" />
+      </template>
+    </Dialog>
   </div>
 </template>
 
@@ -1187,6 +1257,13 @@ const currentOutletMembership = computed(() =>
 
 // outlet_user id (bukan global user id) — digunakan untuk endpoint absensi & kasbon
 const userId = computed(() => currentOutletMembership.value?.outlet_user_id || null)
+
+// Apakah user bisa manage payroll (generate, approve, mark-paid) dan lihat tab payroll
+const canManagePayroll = computed(() =>
+  authStore.isSuperAdmin ||
+  currentOutletMembership.value?.roles?.some(r => r.is_owner || r.name === 'admin') ||
+  authStore.hasOutletPermission(outletId, 'manage_payroll')
+)
 
 // Apakah user punya permission approve_kasbon di outlet ini
 const canApproveKasbon = computed(() =>
@@ -1411,15 +1488,140 @@ const handleClockIn = async () => {
   }
 }
 
-const handleClockOut = async () => {
+// ── Clock Out dengan dialog alasan lembur ───────────────────────────────
+const clockOutDialogVisible = ref(false)
+const clockingOut = ref(false)
+const clockOutOvertimeHours = ref(0)
+const clockOutForm = ref({ notes: '', overtime_reason: '' })
+
+const openClockOutDialog = async () => {
+  // Hitung estimasi overtime berdasarkan jam clock-in vs sekarang
+  clockOutOvertimeHours.value = 0
+  if (todayStatus.value.attendance?.clock_in) {
+    const clockIn   = new Date(todayStatus.value.attendance.clock_in)
+    const now       = new Date()
+    const totalMin  = Math.floor((now - clockIn) / 60000)
+    const stdMin    = (payrollSettings.value.work_hours_per_day || 8) * 60
+    const otMin     = Math.max(0, totalMin - stdMin)
+    clockOutOvertimeHours.value = Math.floor(otMin / 60)
+  }
+  clockOutForm.value = { notes: '', overtime_reason: '' }
+  clockOutDialogVisible.value = true
+}
+
+const submitClockOut = async () => {
+  if (clockOutOvertimeHours.value > 0 && !clockOutForm.value.overtime_reason?.trim()) {
+    toast.add({ severity: 'warn', summary: 'Perhatian', detail: 'Alasan lembur wajib diisi', life: 3000 })
+    return
+  }
+  clockingOut.value = true
   try {
-    await api.post(`/outlets/${outletId}/attendances/clock-out`, { user_id: userId.value })
-    toast.add({ severity: 'success', summary: t('messages.success'), detail: t('hr.clockOutSuccess'), life: 3000 })
+    const payload = {
+      photo: todayStatus.value.attendance?.clock_in_photo || '',
+      latitude: 0,
+      longitude: 0,
+      accuracy: 0,
+      notes: clockOutForm.value.notes,
+      overtime_reason: clockOutForm.value.overtime_reason || undefined,
+    }
+    // Gunakan geolocation jika tersedia
+    if (navigator.geolocation) {
+      await new Promise((resolve) => {
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            payload.latitude  = pos.coords.latitude
+            payload.longitude = pos.coords.longitude
+            payload.accuracy  = pos.coords.accuracy
+            resolve()
+          },
+          () => resolve() // fallback jika ditolak
+        )
+      })
+    }
+    const res = await api.post(`/outlets/${outletId}/attendances/clock-out`, payload)
+    clockOutDialogVisible.value = false
+    if (res.data.needs_approval) {
+      toast.add({ severity: 'info', summary: 'Clock Out Berhasil', detail: `Lembur ${res.data.overtime_hours} jam menunggu approval manajer`, life: 5000 })
+    } else {
+      toast.add({ severity: 'success', summary: t('messages.success'), detail: t('hr.clockOutSuccess'), life: 3000 })
+    }
     fetchTodayStatus()
     fetchAttendances()
   } catch (error) {
+    toast.add({ severity: 'error', summary: t('messages.error'), detail: error.response?.data?.message, life: 4000 })
+  } finally {
+    clockingOut.value = false
+  }
+}
+
+// Alias lama untuk kompatibilitas (tidak dipakai setelah refactor)
+const handleClockOut = openClockOutDialog
+
+// ── Overtime Approval (untuk manager) ────────────────────────────────
+const overtimeApprovalDialogVisible = ref(false)
+const rejectOvertimeDialogVisible   = ref(false)
+const overtimeRequests              = ref([])
+const loadingOvertime               = ref(false)
+const savingOvertime                = ref(false)
+const selectedOvertime              = ref(null)
+const rejectOvertimeReason          = ref('')
+
+const openOvertimeApprovalDialog = async () => {
+  overtimeApprovalDialogVisible.value = true
+  await fetchOvertimeRequests()
+}
+
+const fetchOvertimeRequests = async () => {
+  loadingOvertime.value = true
+  try {
+    const res = await api.get(`/outlets/${outletId}/attendances/overtime-requests`)
+    overtimeRequests.value = res.data || []
+  } catch (error) {
+    toast.add({ severity: 'error', summary: t('messages.error'), detail: error.response?.data?.message, life: 3000 })
+  } finally {
+    loadingOvertime.value = false
+  }
+}
+
+const approveOvertime = async (attendance) => {
+  try {
+    await api.post(`/outlets/${outletId}/attendances/${attendance.id}/approve-overtime`, { notes: '' })
+    toast.add({ severity: 'success', summary: t('messages.success'), detail: 'Lembur berhasil disetujui', life: 3000 })
+    fetchOvertimeRequests()
+  } catch (error) {
     toast.add({ severity: 'error', summary: t('messages.error'), detail: error.response?.data?.message, life: 3000 })
   }
+}
+
+const openRejectOvertimeDialog = (attendance) => {
+  selectedOvertime.value = attendance
+  rejectOvertimeReason.value = ''
+  rejectOvertimeDialogVisible.value = true
+}
+
+const submitRejectOvertime = async () => {
+  if (!rejectOvertimeReason.value.trim()) {
+    toast.add({ severity: 'warn', summary: 'Perhatian', detail: 'Alasan penolakan wajib diisi', life: 3000 })
+    return
+  }
+  savingOvertime.value = true
+  try {
+    await api.post(`/outlets/${outletId}/attendances/${selectedOvertime.value.id}/reject-overtime`, {
+      rejection_reason: rejectOvertimeReason.value
+    })
+    toast.add({ severity: 'success', summary: t('messages.success'), detail: 'Lembur berhasil ditolak', life: 3000 })
+    rejectOvertimeDialogVisible.value = false
+    fetchOvertimeRequests()
+  } catch (error) {
+    toast.add({ severity: 'error', summary: t('messages.error'), detail: error.response?.data?.message, life: 3000 })
+  } finally {
+    savingOvertime.value = false
+  }
+}
+
+const getOvertimeSeverity = (status) => {
+  const map = { pending_approval: 'warn', approved: 'success', rejected: 'danger' }
+  return map[status] || 'secondary'
 }
 
 const openLeaveDialog = () => {
