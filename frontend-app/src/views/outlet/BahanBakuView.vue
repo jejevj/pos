@@ -129,7 +129,7 @@
         </div>
         <div v-if="form.satuan_pembelian_id" class="field">
           <label>{{ $t('bahanBaku.quantityPerPurchaseUnit') }} *</label>
-          <InputNumber v-model="form.jumlah_per_unit_pembelian" style="width: 100%" :minFractionDigits="2" :maxFractionDigits="4" />
+          <InputNumber v-model="form.jumlah_per_unit_pembelian" style="width: 100%" :maxFractionDigits="4" />
           <small class="text-gray-500">
             {{ $t('bahanBaku.quantityPerPurchaseUnitHelp') }}
             <span v-if="form.satuan_id" class="font-semibold">
@@ -139,7 +139,7 @@
         </div>
         <div class="field">
           <label>{{ $t('bahanBaku.purchasePrice') }} *</label>
-          <InputNumber v-model="form.harga_beli" style="width: 100%" mode="currency" currency="IDR" locale="id-ID" />
+          <InputNumber v-model="form.harga_beli" style="width: 100%" :maxFractionDigits="0" />
           <small v-if="form.satuan_pembelian_id && form.jumlah_per_unit_pembelian && form.harga_beli" class="text-green-600 font-semibold block mt-2">
             💡 {{ $t('bahanBaku.pricePerBaseUnit') }}: 
             Rp {{ form.harga_beli.toLocaleString('id-ID') }} ÷ {{ form.jumlah_per_unit_pembelian.toLocaleString('id-ID') }} {{ getBaseUnitName() }} 
@@ -152,11 +152,11 @@
         </div>
         <div class="field">
           <label>{{ $t('bahanBaku.minimumStock') }} *</label>
-          <InputNumber v-model="form.minimum_stock" style="width: 100%" :minFractionDigits="2" />
+          <InputNumber v-model="form.minimum_stock" style="width: 100%" :maxFractionDigits="4" />
         </div>
         <div class="field">
           <label>{{ $t('bahanBaku.currentStock') }}</label>
-          <InputNumber v-model="form.current_stock" style="width: 100%" :minFractionDigits="2" />
+          <InputNumber v-model="form.current_stock" style="width: 100%" :maxFractionDigits="4" />
         </div>
         <div class="field">
           <label>{{ $t('bahanBaku.storageLocation') }}</label>
@@ -228,7 +228,7 @@
         </div>
         <div class="field">
           <label>{{ $t('bahanBaku.quantity') }} *</label>
-          <InputNumber v-model="stockForm.quantity" style="width: 100%" :minFractionDigits="2" />
+          <InputNumber v-model="stockForm.quantity" style="width: 100%" :maxFractionDigits="4" />
         </div>
         <div class="field">
           <label>{{ $t('bahanBaku.notes') }}</label>
