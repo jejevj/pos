@@ -670,7 +670,10 @@ const printerSettingsVisible = ref(false)
 // ── Mobile detection ──────────────────────────────────────────────────────────
 const windowWidth = ref(window.innerWidth)
 const onResize = () => { windowWidth.value = window.innerWidth }
-onMounted(() => window.addEventListener('resize', onResize))
+onMounted(() => {
+  window.addEventListener('resize', onResize)
+  fetchOrders()
+})
 onUnmounted(() => window.removeEventListener('resize', onResize))
 const isMobile = computed(() => windowWidth.value < 768)
 
@@ -679,7 +682,11 @@ const loading = ref(false)
 const searchQuery = ref('')
 const filterStatus = ref(null)
 const filterType = ref(null)
-const dateRange = ref(null)
+
+// Default: filter hari ini
+const today = new Date()
+today.setHours(0, 0, 0, 0)
+const dateRange = ref([today, today])
 const detailVisible = ref(false)
 const selectedOrder = ref(null)
 const printingId = ref(null)
