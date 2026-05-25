@@ -401,7 +401,19 @@
 
         <!-- Employees List -->
         <DataTable :value="employees" :loading="loading" paginator :rows="15" stripedRows>
+          <Column header="Foto" style="width: 70px">
+            <template #body="{ data }">
+              <img v-if="data.photo" :src="data.photo" alt="foto" style="width:40px;height:40px;border-radius:50%;object-fit:cover;" />
+              <span v-else><i class="pi pi-user" style="font-size:1.8rem;color:#9ca3af"></i></span>
+            </template>
+          </Column>
           <Column field="name" :header="$t('users.name')" sortable />
+          <Column field="username" header="Username" sortable>
+            <template #body="{ data }">
+              <span v-if="data.username" class="font-mono text-sm">{{ data.username }}</span>
+              <span v-else class="text-gray-400 text-sm">-</span>
+            </template>
+          </Column>
           <Column field="role_display" :header="$t('users.role')" sortable />
           <Column field="employee_code" :header="$t('hr.employeeCode')" sortable />
           <Column field="basic_salary" :header="$t('hr.basicSalary')" sortable>
@@ -626,6 +638,30 @@
     <!-- Employee Edit Dialog -->
     <Dialog v-model:visible="employeeDialogVisible" :header="$t('hr.editEmployee')" modal :style="{ width: '700px' }">
       <div class="form-grid">
+        <!-- Foto Karyawan -->
+        <div class="form-field full-width">
+          <label>Foto Karyawan <span class="text-gray-400 text-sm">(opsional)</span></label>
+          <div class="flex items-center gap-4">
+            <img v-if="employeeForm.photoPreview || employeeForm.photo" 
+                 :src="employeeForm.photoPreview || employeeForm.photo" 
+                 alt="foto" 
+                 style="width:72px;height:72px;border-radius:50%;object-fit:cover;border:2px solid #e5e7eb" />
+            <div v-else style="width:72px;height:72px;border-radius:50%;background:#f3f4f6;display:flex;align-items:center;justify-content:center">
+              <i class="pi pi-user" style="font-size:2rem;color:#9ca3af"></i>
+            </div>
+            <div class="flex flex-col gap-2">
+              <input ref="photoInputRef" type="file" accept="image/*" style="display:none" @change="onPhotoSelected" />
+              <Button label="Pilih Foto" icon="pi pi-upload" size="small" outlined @click="photoInputRef.click()" />
+              <Button v-if="employeeForm.photoPreview" label="Hapus" icon="pi pi-times" size="small" severity="danger" outlined @click="clearPhoto" />
+            </div>
+          </div>
+        </div>
+        <!-- Username -->
+        <div class="form-field">
+          <label>Username <span class="text-gray-400 text-sm">(untuk login)</span></label>
+          <InputText v-model="employeeForm.username" placeholder="contoh: budi123" fluid />
+          <small class="text-gray-400">Kosongkan jika tidak ingin mengubah</small>
+        </div>
         <div class="form-field">
           <label>{{ $t('hr.employeeCode') }}</label>
           <InputText v-model="employeeForm.employee_code" fluid />
@@ -1251,8 +1287,14 @@ const leaveForm = ref({
   reason: ''
 })
 
+const photoInputRef = ref(null)
+
 const employeeForm = ref({
   id: null,
+  username: '',
+  photo: null,
+  photoPreview: null,
+  photoFile: null,
   employee_code: '',
   join_date: null,
   employment_type: 'full_time',
@@ -1263,6 +1305,23 @@ const employeeForm = ref({
   bank_account_name: '',
   address: ''
 })
+
+const onPhotoSelected = (event) => {
+  const file = event.target.files[0]
+  if (!file) return
+  employeeForm.value.photoFile = file
+  const reader = new FileReader()
+  reader.onload = (e) => {
+    employeeForm.value.photoPreview = e.target.result
+  }
+  reader.readAsDataURL(file)
+}
+
+const clearPhoto = () => {
+  employeeForm.value.photoFile = null
+  employeeForm.value.photoPreview = null
+  if (photoInputRef.value) photoInputRef.value.value = ''
+}
 
 const payrollSettings = ref({
   work_days_per_month: 22,
@@ -1970,6 +2029,10 @@ const updateMapLocation = (lat, lon, accuracy) => {
 const openEmployeeDialog = (employee) => {
   employeeForm.value = {
     id: employee.id,
+    username: employee.username || '',
+    photo: employee.photo || null,
+    photoPreview: null,
+    photoFile: null,
     employee_code: employee.employee_code || '',
     join_date: employee.join_date ? new Date(employee.join_date) : null,
     employment_type: employee.employment_type || 'full_time',
@@ -1980,13 +2043,17 @@ const openEmployeeDialog = (employee) => {
     bank_account_name: employee.bank_account_name || '',
     address: employee.address || ''
   }
+  if (photoInputRef.value) photoInputRef.value.value = ''
   employeeDialogVisible.value = true
 }
 
 const saveEmployee = async () => {
   saving.value = true
   try {
-    await api.put(`/outlets/${outletId}/employees/${employeeForm.value.id}/info`, {
+    const userId = employeeForm.value.id
+
+    // 1. Simpan info karyawan
+    await api.put(`/outlets/${outletId}/employees/${userId}/info`, {
       employee_code: employeeForm.value.employee_code,
       join_date: employeeForm.value.join_date ? formatDateForAPI(employeeForm.value.join_date) : null,
       employment_type: employeeForm.value.employment_type,
@@ -1997,6 +2064,21 @@ const saveEmployee = async () => {
       bank_account_name: employeeForm.value.bank_account_name,
       address: employeeForm.value.address
     })
+
+    // 2. Update username jika diisi
+    if (employeeForm.value.username && employeeForm.value.username.trim()) {
+      await api.put(`/outlets/${outletId}/employees/${userId}/username`, {
+        username: employeeForm.value.username.trim()
+      })
+    }
+
+    // 3. Upload foto jika ada file baru dipilih
+    if (employeeForm.value.photoPreview) {
+      await api.post(`/outlets/${outletId}/employees/${userId}/photo`, {
+        photo: employeeForm.value.photoPreview // data URL base64
+      })
+    }
+
     toast.add({ severity: 'success', summary: t('messages.success'), detail: t('hr.employeeUpdated'), life: 3000 })
     employeeDialogVisible.value = false
     fetchEmployees()
