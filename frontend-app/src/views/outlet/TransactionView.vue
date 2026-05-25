@@ -152,10 +152,9 @@
           <div class="order-card-right">
             <span class="amount">Rp {{ formatNumber(order.total_amount) }}</span>
             <div class="order-card-actions" @click.stop>
-              <Button v-if="['paid','bon'].includes(order.status)" icon="pi pi-receipt" text rounded size="small"
-                      severity="success" @click.stop="printReceipt(order)"
-                      :loading="printingId === order.id"
-                      v-tooltip.top="$t('transaction.printReceipt')" />
+              <Button v-if="order.status === 'paid'" icon="pi pi-print" text rounded size="small" 
+                      severity="success" @click.stop="printReceipt(order)" 
+                      :loading="printingId === order.id" />
               <Button icon="pi pi-qrcode" text rounded size="small" severity="info"
                       @click.stop="openQr(order)" />
             </div>
@@ -211,7 +210,7 @@
           <div class="action-buttons">
             <Button icon="pi pi-eye" text rounded size="small" @click.stop="openDetail(data)"
                     v-tooltip.top="$t('transaction.viewDetail')" />
-            <Button v-if="['paid','bon'].includes(data.status)" icon="pi pi-receipt" text rounded size="small" severity="success"
+            <Button v-if="data.status === 'paid'" icon="pi pi-print" text rounded size="small" severity="success"
                     @click.stop="printReceipt(data)" :loading="printingId === data.id"
                     v-tooltip.top="$t('transaction.printReceipt')" />
             <Button icon="pi pi-qrcode" text rounded size="small" severity="info"
@@ -535,8 +534,8 @@
         <Button :label="$t('common.close')" text @click="detailVisible = false" />
         <Button icon="pi pi-qrcode" label="QR Tracking" outlined severity="info"
                 @click="openQr(selectedOrder)" />
-        <Button v-if="['paid','bon'].includes(selectedOrder?.status)" :label="$t('transaction.printReceipt')"
-                icon="pi pi-receipt" @click="printReceipt(selectedOrder)"
+        <Button v-if="selectedOrder?.status === 'paid'" :label="$t('transaction.printReceipt')"
+                icon="pi pi-print" @click="printReceipt(selectedOrder)"
                 :loading="printingId === selectedOrder?.id" severity="success" />
       </template>
     </Dialog>
@@ -671,7 +670,10 @@ const printerSettingsVisible = ref(false)
 // ── Mobile detection ──────────────────────────────────────────────────────────
 const windowWidth = ref(window.innerWidth)
 const onResize = () => { windowWidth.value = window.innerWidth }
-onMounted(() => window.addEventListener('resize', onResize))
+onMounted(() => {
+  window.addEventListener('resize', onResize)
+  fetchOrders()
+})
 onUnmounted(() => window.removeEventListener('resize', onResize))
 const isMobile = computed(() => windowWidth.value < 768)
 
@@ -680,7 +682,11 @@ const loading = ref(false)
 const searchQuery = ref('')
 const filterStatus = ref(null)
 const filterType = ref(null)
-const dateRange = ref(null)
+
+// Default: filter hari ini
+const today = new Date()
+today.setHours(0, 0, 0, 0)
+const dateRange = ref([today, today])
 const detailVisible = ref(false)
 const selectedOrder = ref(null)
 const printingId = ref(null)
@@ -869,22 +875,21 @@ const formatNumber = (num) => Number(num || 0).toLocaleString('id-ID', { minimum
 // Format seconds into human-readable duration with auto unit selection and 1 decimal
 const formatDuration = (seconds) => {
   if (seconds === null || seconds === undefined) return '-'
-  if (seconds < 0) return '-'
-
+  
   // Convert to hours if >= 60 minutes
   if (seconds >= 3600) {
     const hours = seconds / 3600
-    return `${hours.toFixed(1)} jam`
+    return `${hours.toFixed(1)}h`
   }
-
+  
   // Convert to minutes if >= 60 seconds
   if (seconds >= 60) {
     const minutes = seconds / 60
-    return `${minutes.toFixed(1)} mnt`
+    return `${minutes.toFixed(1)}m`
   }
-
+  
   // Show seconds
-  return `${seconds.toFixed(1)} dtk`
+  return `${seconds.toFixed(1)}d`
 }
 
 // Color-code prep time: green < 5m, yellow < 10m, red >= 10m
@@ -917,15 +922,15 @@ const getStepIcon = (step) => {
 
 const formatDateTime = (dt) => {
   if (!dt) return '-'
-  const dateObj = new Date(dt)
-  if (isNaN(dateObj.getTime())) return '-'
-  return dateObj.toLocaleString('id-ID', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    timeZone: 'Asia/Jakarta',
+  // Prioritize _local timestamp if available (already converted by backend)
+  const timestamp = dt.replace('_local', '')
+  const dateObj = new Date(timestamp)
+  return dateObj.toLocaleString('id-ID', { 
+    day: '2-digit', 
+    month: 'short', 
+    year: 'numeric', 
+    hour: '2-digit', 
+    minute: '2-digit' 
   })
 }
 
@@ -935,12 +940,12 @@ const getTierSeverity = (tier) => {
 }
 
 const getStatusLabel = (status) => {
-  const map = { draft: t('transaction.statusDraft'), paid: t('transaction.statusPaid'), cancelled: t('transaction.statusCancelled'), bon: 'Bon' }
+  const map = { draft: t('transaction.statusDraft'), paid: t('transaction.statusPaid'), cancelled: t('transaction.statusCancelled') }
   return map[status] || status
 }
 
 const getStatusSeverity = (status) => {
-  const map = { draft: 'warn', paid: 'success', cancelled: 'danger', bon: 'info' }
+  const map = { draft: 'warn', paid: 'success', cancelled: 'danger' }
   return map[status] || 'secondary'
 }
 
