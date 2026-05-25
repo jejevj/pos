@@ -109,8 +109,8 @@
                 v-tooltip.top="$t('bahanBaku.addBahanBaku')"
               />
             </div>
-            <InputNumber v-model="item.quantity" :placeholder="$t('purchase.quantity')" :minFractionDigits="2" :maxFractionDigits="2" fluid class="item-quantity" />
-            <InputNumber v-model="item.unit_price" :placeholder="$t('purchase.unitPrice')" mode="currency" currency="IDR" locale="id-ID" fluid class="item-price" />
+            <InputNumber v-model="item.quantity" :placeholder="$t('purchase.quantity')" :maxFractionDigits="4" fluid class="item-quantity" />
+            <InputNumber v-model="item.unit_price" :placeholder="$t('purchase.unitPrice')" :maxFractionDigits="0" fluid class="item-price" />
             <div class="item-subtotal">{{ formatCurrency(item.quantity * item.unit_price) }}</div>
             <Button icon="pi pi-trash" text rounded severity="danger" @click="removeItem(index)" />
           </div>
@@ -217,7 +217,7 @@
 
         <div v-if="newBahanBaku.satuan_pembelian_id" class="field">
           <label>{{ $t('bahanBaku.quantityPerPurchaseUnit') }} *</label>
-          <InputNumber v-model="newBahanBaku.jumlah_per_unit_pembelian" :minFractionDigits="2" :maxFractionDigits="4" fluid />
+          <InputNumber v-model="newBahanBaku.jumlah_per_unit_pembelian" :maxFractionDigits="4" fluid />
           <small class="text-muted">
             {{ $t('bahanBaku.quantityPerPurchaseUnitHelp') }}
             <span v-if="newBahanBaku.satuan_id" class="font-semibold">
@@ -228,7 +228,7 @@
 
         <div class="field">
           <label>{{ $t('bahanBaku.purchasePrice') }} *</label>
-          <InputNumber v-model="newBahanBaku.harga_beli" mode="currency" currency="IDR" locale="id-ID" fluid />
+          <InputNumber v-model="newBahanBaku.harga_beli" :maxFractionDigits="0" fluid />
           <small v-if="newBahanBaku.satuan_pembelian_id && newBahanBaku.jumlah_per_unit_pembelian && newBahanBaku.harga_beli" class="price-hint">
             💡 {{ $t('bahanBaku.pricePerBaseUnit') }}: 
             Rp {{ newBahanBaku.harga_beli.toLocaleString('id-ID') }} ÷ {{ newBahanBaku.jumlah_per_unit_pembelian.toLocaleString('id-ID') }} {{ getBaseUnitName() }} 
@@ -243,12 +243,12 @@
 
         <div class="field">
           <label>{{ $t('bahanBaku.minimumStock') }} *</label>
-          <InputNumber v-model="newBahanBaku.minimum_stock" :minFractionDigits="2" :maxFractionDigits="2" fluid />
+          <InputNumber v-model="newBahanBaku.minimum_stock" :maxFractionDigits="4" fluid />
         </div>
 
         <div class="field">
           <label>{{ $t('bahanBaku.currentStock') }}</label>
-          <InputNumber v-model="newBahanBaku.current_stock" :minFractionDigits="2" :maxFractionDigits="2" fluid />
+          <InputNumber v-model="newBahanBaku.current_stock" :maxFractionDigits="4" fluid />
         </div>
 
         <div class="field">
