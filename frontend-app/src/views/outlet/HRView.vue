@@ -352,14 +352,34 @@
               <Tag :value="$t(`kasbon.${data.repayment_status}`)" :severity="data.repayment_status === 'paid' ? 'success' : 'warn'" />
             </template>
           </Column>
+          <!-- Bukti Persetujuan -->
+          <Column :header="$t('kasbon.approvalProof')" style="width: 130px">
+            <template #body="{ data }">
+              <a v-if="data.approval_proof" :href="data.approval_proof" target="_blank"
+                 class="proof-link" style="display:flex;align-items:center;gap:4px;color:var(--p-primary-color);font-size:0.85rem;">
+                <i class="pi pi-image" /> Lihat
+              </a>
+              <span v-else class="text-muted" style="font-size:0.8rem;">-</span>
+            </template>
+          </Column>
+          <!-- Bukti Pelunasan -->
+          <Column :header="$t('kasbon.repaymentProof')" style="width: 130px">
+            <template #body="{ data }">
+              <a v-if="data.repayment_proof" :href="data.repayment_proof" target="_blank"
+                 class="proof-link" style="display:flex;align-items:center;gap:4px;color:var(--p-primary-color);font-size:0.85rem;">
+                <i class="pi pi-image" /> Lihat
+              </a>
+              <span v-else class="text-muted" style="font-size:0.8rem;">-</span>
+            </template>
+          </Column>
           <Column :header="$t('common.actions')" style="width: 200px">
             <template #body="{ data }">
               <div class="action-buttons">
-                <Button v-if="data.status === 'pending'" icon="pi pi-check" text rounded severity="success" 
+                <Button v-if="canApproveKasbon && data.status === 'pending'" icon="pi pi-check" text rounded severity="success" 
                         @click="approveKasbon(data)" v-tooltip.top="$t('kasbon.approve')" />
-                <Button v-if="data.status === 'pending'" icon="pi pi-times" text rounded severity="danger" 
+                <Button v-if="canApproveKasbon && data.status === 'pending'" icon="pi pi-times" text rounded severity="danger" 
                         @click="openRejectDialog(data)" v-tooltip.top="$t('kasbon.reject')" />
-                <Button v-if="data.status === 'approved' && data.repayment_status === 'unpaid'" 
+                <Button v-if="canApproveKasbon && data.status === 'approved' && data.repayment_status === 'unpaid'" 
                         icon="pi pi-dollar" text rounded severity="info" 
                         @click="openMarkKasbonPaidDialog(data)" v-tooltip.top="$t('kasbon.markAsPaid')" />
               </div>
@@ -809,10 +829,13 @@
     <!-- Add Kasbon Dialog -->
     <Dialog v-model:visible="addKasbonDialogVisible" :header="$t('kasbon.addKasbon')" modal :style="{ width: '600px' }">
       <div class="form-content">
-        <div class="field">
-          <label>{{ $t('kasbon.employee') }} *</label>
-          <Select v-model="kasbonForm.user_id" :options="employees" optionLabel="name" optionValue="id" 
-                  :placeholder="$t('kasbon.selectEmployee')" fluid @change="onEmployeeChange" />
+        <!-- Informasi pemohon: otomatis sesuai user yang login -->
+        <div class="field" v-if="currentOutletMembership">
+          <label>{{ $t('kasbon.employee') }}</label>
+          <div class="p-inputtext p-component" style="background:var(--p-surface-100);color:var(--p-text-muted-color);cursor:default;">
+            {{ currentOutletMembership.outlet_user_name || authStore.user?.name || '-' }}
+          </div>
+          <small class="text-muted">{{ $t('kasbon.selfSubmitNote', 'Pengajuan kasbon atas nama Anda sendiri') }}</small>
         </div>
 
         <!-- Employee Summary -->
@@ -1128,6 +1151,7 @@ import { useToast } from 'primevue/usetoast'
 import { useConfirm } from 'primevue/useconfirm'
 import { useI18n } from 'vue-i18n'
 import api from '@/services/api'
+import { useAuthStore } from '@/stores/auth'
 import Button from 'primevue/button'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
@@ -1151,7 +1175,25 @@ const confirm = useConfirm()
 const { t } = useI18n()
 
 const outletId = route.params.outletId
-const userId = 1 // TODO: Get from auth
+const authStore = useAuthStore()
+
+// Ambil outlet_user_id dari membership yang cocok dengan outlet ini
+const currentOutletMembership = computed(() =>
+  authStore.outletMemberships?.find(
+    m => String(m.encoded_outlet_id) === String(outletId) ||
+         String(m.outlet_id) === String(outletId)
+  )
+)
+
+// outlet_user id (bukan global user id) — digunakan untuk endpoint absensi & kasbon
+const userId = computed(() => currentOutletMembership.value?.outlet_user_id || null)
+
+// Apakah user punya permission approve_kasbon di outlet ini
+const canApproveKasbon = computed(() =>
+  authStore.isSuperAdmin ||
+  currentOutletMembership.value?.roles?.some(r => r.is_owner || r.name === 'admin') ||
+  authStore.hasOutletPermission(outletId, 'approve_kasbon')
+)
 
 const activeTab = ref('attendance')
 const loading = ref(false)
@@ -1306,7 +1348,7 @@ const paymentMethodOptions = computed(() => [
 const fetchAttendances = async () => {
   loading.value = true
   try {
-    const response = await api.get(`/outlets/${outletId}/attendances`, { params: { user_id: userId } })
+    const response = await api.get(`/outlets/${outletId}/attendances`, { params: { user_id: userId.value } })
     attendances.value = response.data || []
   } catch (error) {
     toast.add({ severity: 'error', summary: t('messages.error'), detail: error.response?.data?.message, life: 3000 })
@@ -1317,7 +1359,7 @@ const fetchAttendances = async () => {
 
 const fetchTodayStatus = async () => {
   try {
-    const response = await api.get(`/outlets/${outletId}/attendances/today/${userId}`)
+    const response = await api.get(`/outlets/${outletId}/attendances/today/${userId.value}`)
     todayStatus.value = response.data
   } catch (error) {
     console.error('Failed to fetch today status:', error)
@@ -1339,7 +1381,7 @@ const fetchLeaveRequests = async () => {
 
 const fetchLeaveBalance = async () => {
   try {
-    const response = await api.get(`/outlets/${outletId}/leave-requests/balance/${userId}`)
+    const response = await api.get(`/outlets/${outletId}/leave-requests/balance/${userId.value}`)
     leaveBalance.value = response.data[0] || null
   } catch (error) {
     console.error('Failed to fetch leave balance:', error)
@@ -1349,7 +1391,7 @@ const fetchLeaveBalance = async () => {
 const fetchPayrolls = async () => {
   loading.value = true
   try {
-    const response = await api.get(`/outlets/${outletId}/payrolls`, { params: { user_id: userId } })
+    const response = await api.get(`/outlets/${outletId}/payrolls`, { params: { user_id: userId.value } })
     payrolls.value = response.data || []
   } catch (error) {
     toast.add({ severity: 'error', summary: t('messages.error'), detail: error.response?.data?.message, life: 3000 })
@@ -1360,7 +1402,7 @@ const fetchPayrolls = async () => {
 
 const handleClockIn = async () => {
   try {
-    await api.post(`/outlets/${outletId}/attendances/clock-in`, { user_id: userId })
+    await api.post(`/outlets/${outletId}/attendances/clock-in`, { user_id: userId.value })
     toast.add({ severity: 'success', summary: t('messages.success'), detail: t('hr.clockInSuccess'), life: 3000 })
     fetchTodayStatus()
     fetchAttendances()
@@ -1371,7 +1413,7 @@ const handleClockIn = async () => {
 
 const handleClockOut = async () => {
   try {
-    await api.post(`/outlets/${outletId}/attendances/clock-out`, { user_id: userId })
+    await api.post(`/outlets/${outletId}/attendances/clock-out`, { user_id: userId.value })
     toast.add({ severity: 'success', summary: t('messages.success'), detail: t('hr.clockOutSuccess'), life: 3000 })
     fetchTodayStatus()
     fetchAttendances()
@@ -1394,7 +1436,7 @@ const submitLeaveRequest = async () => {
   saving.value = true
   try {
     await api.post(`/outlets/${outletId}/leave-requests`, {
-      user_id: userId,
+      user_id: userId.value,
       ...leaveForm.value,
       start_date: formatDateForAPI(leaveForm.value.start_date),
       end_date: formatDateForAPI(leaveForm.value.end_date)
@@ -2042,28 +2084,39 @@ const onEmployeeChange = async () => {
   }
 }
 
-const openAddKasbonDialog = () => {
+const openAddKasbonDialog = async () => {
   kasbonForm.value = {
-    user_id: null,
     request_date: new Date(),
     amount: 0,
     reason: ''
   }
   employeeSummary.value = null
+  // Langsung fetch summary untuk user yang login
+  try {
+    const response = await api.get(`/outlets/${outletId}/kasbon/user/${userId.value}/summary`)
+    employeeSummary.value = response.data
+  } catch (error) {
+    console.error('Failed to fetch kasbon summary:', error)
+  }
   addKasbonDialogVisible.value = true
 }
 
 const createKasbon = async () => {
-  if (!kasbonForm.value.user_id || !kasbonForm.value.amount) {
+  if (!kasbonForm.value.amount) {
     toast.add({ severity: 'warn', summary: t('messages.warning'), detail: t('users.fillRequired'), life: 3000 })
     return
   }
 
   savingKasbon.value = true
   try {
+    const toLocalDate = (d) => {
+      const y = d.getFullYear()
+      const m = String(d.getMonth() + 1).padStart(2, '0')
+      const day = String(d.getDate()).padStart(2, '0')
+      return `${y}-${m}-${day}`
+    }
     await api.post(`/outlets/${outletId}/kasbon`, {
-      user_id: kasbonForm.value.user_id,
-      request_date: kasbonForm.value.request_date.toISOString().split('T')[0],
+      request_date: toLocalDate(kasbonForm.value.request_date),
       amount: kasbonForm.value.amount,
       reason: kasbonForm.value.reason
     })
