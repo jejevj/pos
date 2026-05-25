@@ -71,8 +71,7 @@
             <Button :label="$t('hr.clockIn')" icon="pi pi-sign-in" @click="handleClockIn" :disabled="todayStatus.has_clocked_in" />
             <Button :label="$t('hr.clockOut')" icon="pi pi-sign-out" severity="secondary" @click="openClockOutDialog" 
                     :disabled="!todayStatus.has_clocked_in || todayStatus.has_clocked_out" />
-            <Button v-if="canManagePayroll" label="Approval Lembur" icon="pi pi-clock" severity="warning" outlined
-                    @click="openOvertimeApprovalDialog" />
+
           </div>
         </div>
 
@@ -1167,50 +1166,7 @@
       </template>
     </Dialog>
 
-    <!-- ── Section Approval Lembur (hanya tampil di tab attendance, untuk manager) ── -->
-    <Dialog v-model:visible="overtimeApprovalDialogVisible" header="Approval Lembur" modal :style="{ width: '700px' }">
-      <DataTable :value="overtimeRequests" :loading="loadingOvertime" striped-rows paginator :rows="10">
-        <Column field="date" header="Tanggal" sortable>
-          <template #body="{ data }">{{ formatDate(data.date) }}</template>
-        </Column>
-        <Column field="user_name" header="Karyawan" sortable />
-        <Column field="overtime_hours" header="Jam Lembur">
-          <template #body="{ data }">{{ data.overtime_hours }} jam</template>
-        </Column>
-        <Column field="overtime_reason" header="Alasan Lembur" />
-        <Column field="overtime_status" header="Status">
-          <template #body="{ data }">
-            <Tag :value="data.overtime_status || 'pending'" :severity="getOvertimeSeverity(data.overtime_status)" />
-          </template>
-        </Column>
-        <Column header="Aksi" style="width: 140px">
-          <template #body="{ data }">
-            <div class="action-buttons" v-if="data.overtime_status === 'pending_approval'">
-              <Button icon="pi pi-check" size="small" severity="success" text rounded
-                      @click="approveOvertime(data)" v-tooltip.top="'Setujui Lembur'" />
-              <Button icon="pi pi-times" size="small" severity="danger" text rounded
-                      @click="openRejectOvertimeDialog(data)" v-tooltip.top="'Tolak Lembur'" />
-            </div>
-            <Tag v-else :value="data.overtime_status" :severity="getOvertimeSeverity(data.overtime_status)" />
-          </template>
-        </Column>
-      </DataTable>
-      <template #footer>
-        <Button label="Tutup" text @click="overtimeApprovalDialogVisible = false" />
-      </template>
-    </Dialog>
 
-    <!-- Dialog Tolak Lembur -->
-    <Dialog v-model:visible="rejectOvertimeDialogVisible" header="Tolak Lembur" modal :style="{ width: '400px' }">
-      <div class="field">
-        <label>Alasan Penolakan <span class="p-error">*</span></label>
-        <Textarea v-model="rejectOvertimeReason" rows="3" fluid />
-      </div>
-      <template #footer>
-        <Button label="Batal" text @click="rejectOvertimeDialogVisible = false" />
-        <Button label="Tolak" severity="danger" @click="submitRejectOvertime" :loading="savingOvertime" />
-      </template>
-    </Dialog>
   </div>
 </template>
 
@@ -1557,72 +1513,7 @@ const submitClockOut = async () => {
 // Alias lama untuk kompatibilitas (tidak dipakai setelah refactor)
 const handleClockOut = openClockOutDialog
 
-// ── Overtime Approval (untuk manager) ────────────────────────────────
-const overtimeApprovalDialogVisible = ref(false)
-const rejectOvertimeDialogVisible   = ref(false)
-const overtimeRequests              = ref([])
-const loadingOvertime               = ref(false)
-const savingOvertime                = ref(false)
-const selectedOvertime              = ref(null)
-const rejectOvertimeReason          = ref('')
 
-const openOvertimeApprovalDialog = async () => {
-  overtimeApprovalDialogVisible.value = true
-  await fetchOvertimeRequests()
-}
-
-const fetchOvertimeRequests = async () => {
-  loadingOvertime.value = true
-  try {
-    const res = await api.get(`/outlets/${outletId}/attendances/overtime-requests`)
-    overtimeRequests.value = res.data || []
-  } catch (error) {
-    toast.add({ severity: 'error', summary: t('messages.error'), detail: error.response?.data?.message, life: 3000 })
-  } finally {
-    loadingOvertime.value = false
-  }
-}
-
-const approveOvertime = async (attendance) => {
-  try {
-    await api.post(`/outlets/${outletId}/attendances/${attendance.id}/approve-overtime`, { notes: '' })
-    toast.add({ severity: 'success', summary: t('messages.success'), detail: 'Lembur berhasil disetujui', life: 3000 })
-    fetchOvertimeRequests()
-  } catch (error) {
-    toast.add({ severity: 'error', summary: t('messages.error'), detail: error.response?.data?.message, life: 3000 })
-  }
-}
-
-const openRejectOvertimeDialog = (attendance) => {
-  selectedOvertime.value = attendance
-  rejectOvertimeReason.value = ''
-  rejectOvertimeDialogVisible.value = true
-}
-
-const submitRejectOvertime = async () => {
-  if (!rejectOvertimeReason.value.trim()) {
-    toast.add({ severity: 'warn', summary: 'Perhatian', detail: 'Alasan penolakan wajib diisi', life: 3000 })
-    return
-  }
-  savingOvertime.value = true
-  try {
-    await api.post(`/outlets/${outletId}/attendances/${selectedOvertime.value.id}/reject-overtime`, {
-      rejection_reason: rejectOvertimeReason.value
-    })
-    toast.add({ severity: 'success', summary: t('messages.success'), detail: 'Lembur berhasil ditolak', life: 3000 })
-    rejectOvertimeDialogVisible.value = false
-    fetchOvertimeRequests()
-  } catch (error) {
-    toast.add({ severity: 'error', summary: t('messages.error'), detail: error.response?.data?.message, life: 3000 })
-  } finally {
-    savingOvertime.value = false
-  }
-}
-
-const getOvertimeSeverity = (status) => {
-  const map = { pending_approval: 'warn', approved: 'success', rejected: 'danger' }
-  return map[status] || 'secondary'
-}
 
 const openLeaveDialog = () => {
   leaveForm.value = { leave_type: 'annual', start_date: null, end_date: null, reason: '' }
