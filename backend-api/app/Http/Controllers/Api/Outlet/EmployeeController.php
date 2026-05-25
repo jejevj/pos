@@ -8,6 +8,8 @@ use App\Models\Outlet;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 class EmployeeController extends Controller
 {
@@ -35,6 +37,8 @@ class EmployeeController extends Controller
                     'outlet_users.name',
                     'outlet_users.email',
                     'outlet_users.phone',
+                    'outlet_users.username',
+                    'outlet_users.photo',
                     'roles.name as role_name',
                     'roles.display_name as role_display',
                     'employee_info.employee_code',
@@ -94,6 +98,106 @@ class EmployeeController extends Controller
             return response()->json($employee);
         } catch (\Exception $e) {
             DB::statement("SET search_path TO public");
+            return response()->json(['message' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Upload / update foto karyawan
+     */
+    public function updatePhoto(Request $request, $outletId, $userId)
+    {
+        $outlet = $this->authorizeOutlet($outletId);
+
+        $request->validate([
+            'photo' => 'required|string', // base64 data URL
+        ]);
+
+        try {
+            DB::statement("SET search_path TO {$outlet->schema_name}, public");
+
+            // Pastikan karyawan ada
+            $employee = DB::table('outlet_users')->where('id', $userId)->whereNull('deleted_at')->first();
+            if (!$employee) {
+                DB::statement('SET search_path TO public');
+                return response()->json(['message' => 'Karyawan tidak ditemukan'], 404);
+            }
+
+            $photoData = $request->photo;
+
+            // Jika dikirim sebagai data URL (data:image/jpeg;base64,...)
+            if (str_contains($photoData, ',')) {
+                [, $photoData] = explode(',', $photoData, 2);
+            }
+
+            $decoded = base64_decode($photoData, true);
+            if ($decoded === false) {
+                DB::statement('SET search_path TO public');
+                return response()->json(['message' => 'Format foto tidak valid'], 422);
+            }
+
+            // Simpan ke storage/app/public/employee_photos/
+            $filename  = 'employee_photos/' . $outlet->schema_name . '_' . $userId . '_' . time() . '.jpg';
+            Storage::disk('public')->put($filename, $decoded);
+            $photoUrl  = Storage::disk('public')->url($filename);
+
+            // Hapus foto lama jika ada
+            if ($employee->photo) {
+                $oldPath = str_replace('/storage/', '', parse_url($employee->photo, PHP_URL_PATH));
+                Storage::disk('public')->delete($oldPath);
+            }
+
+            DB::table('outlet_users')
+                ->where('id', $userId)
+                ->update(['photo' => $photoUrl, 'updated_at' => now()]);
+
+            DB::statement('SET search_path TO public');
+
+            return response()->json([
+                'message' => 'Foto berhasil diperbarui',
+                'photo'   => $photoUrl,
+            ]);
+        } catch (\Exception $e) {
+            DB::statement('SET search_path TO public');
+            return response()->json(['message' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Update username karyawan
+     */
+    public function updateUsername(Request $request, $outletId, $userId)
+    {
+        $outlet = $this->authorizeOutlet($outletId);
+
+        $request->validate([
+            'username' => 'required|string|max:64|alpha_dash',
+        ]);
+
+        try {
+            DB::statement("SET search_path TO {$outlet->schema_name}, public");
+
+            // Cek unik dalam schema ini
+            $exists = DB::table('outlet_users')
+                ->whereRaw('LOWER(username) = ?', [strtolower($request->username)])
+                ->where('id', '!=', $userId)
+                ->whereNull('deleted_at')
+                ->exists();
+
+            if ($exists) {
+                DB::statement('SET search_path TO public');
+                return response()->json(['message' => 'Username sudah digunakan'], 422);
+            }
+
+            DB::table('outlet_users')
+                ->where('id', $userId)
+                ->update(['username' => strtolower($request->username), 'updated_at' => now()]);
+
+            DB::statement('SET search_path TO public');
+
+            return response()->json(['message' => 'Username berhasil diperbarui']);
+        } catch (\Exception $e) {
+            DB::statement('SET search_path TO public');
             return response()->json(['message' => $e->getMessage()], 500);
         }
     }
