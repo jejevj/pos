@@ -1,64 +1,67 @@
 <template>
-  <div class="overtime-approval-page p-4">
-    <div class="flex align-items-center justify-content-between mb-4">
+  <div class="hr-view">
+    <div class="page-header">
       <div>
-        <h2 class="text-2xl font-bold m-0">Approval Lembur</h2>
-        <p class="text-color-secondary mt-1 mb-0">Kelola pengajuan lembur karyawan</p>
+        <h2>Approval Lembur</h2>
+        <p class="text-muted">Kelola dan setujui pengajuan lembur karyawan</p>
       </div>
     </div>
 
-    <!-- Filter Tab Status -->
-    <div class="mb-3">
-      <SelectButton
-        v-model="filterStatus"
-        :options="statusOptions"
-        option-label="label"
-        option-value="value"
-        @change="loadOvertimeRequests"
-      />
+    <!-- Filter Status -->
+    <div class="section-header">
+      <div class="filter-tabs">
+        <button
+          v-for="opt in statusOptions"
+          :key="opt.value"
+          class="tab"
+          :class="{ active: filterStatus === opt.value }"
+          @click="filterStatus = opt.value; loadData()"
+        >
+          {{ opt.label }}
+        </button>
+      </div>
     </div>
 
-    <!-- Tabel -->
+    <!-- DataTable -->
     <DataTable
       :value="overtimeList"
       :loading="loading"
+      paginator
+      :rows="15"
       striped-rows
-      responsive-layout="scroll"
-      class="p-datatable-sm"
+      class="mt-4"
     >
       <template #empty>
-        <div class="text-center py-4 text-color-secondary">
-          Tidak ada data pengajuan lembur.
-        </div>
+        <div class="text-center py-4 text-muted">Tidak ada data pengajuan lembur.</div>
       </template>
 
-      <Column field="date" header="Tanggal" style="min-width:110px">
+      <Column field="date" header="Tanggal" sortable>
         <template #body="{ data }">
           {{ formatDate(data.date) }}
         </template>
       </Column>
 
-      <Column field="user_name" header="Karyawan" style="min-width:140px" />
+      <Column field="user_name" header="Karyawan" sortable />
 
-      <Column header="Jam Kerja" style="min-width:110px">
+      <Column field="work_hours" header="Jam Kerja" sortable>
         <template #body="{ data }">
-          {{ data.work_hours ? Number(data.work_hours).toFixed(1) + ' jam' : '-' }}
+          {{ data.work_hours ? Number(data.work_hours).toFixed(1) + 'h' : '-' }}
         </template>
       </Column>
 
-      <Column field="overtime_hours" header="Lembur" style="min-width:90px">
+      <Column field="overtime_hours" header="Lembur" sortable>
         <template #body="{ data }">
-          <span class="font-semibold text-orange-500">{{ data.overtime_hours }} jam</span>
+          <span class="font-semibold" style="color: #f59e0b">{{ data.overtime_hours }}h</span>
         </template>
       </Column>
 
-      <Column field="overtime_reason" header="Alasan Lembur" style="min-width:180px">
+      <Column field="overtime_reason" header="Alasan Lembur">
         <template #body="{ data }">
           {{ data.overtime_reason || '-' }}
         </template>
       </Column>
 
-      <Column field="overtime_status" header="Status" style="min-width:130px">
+      <Column field="overtime_status" header="Status">
         <template #body="{ data }">
           <Tag
             :value="statusLabel(data.overtime_status)"
@@ -67,38 +70,41 @@
         </template>
       </Column>
 
-      <Column field="approver_name" header="Diproses Oleh" style="min-width:130px">
+      <Column field="approver_name" header="Diproses Oleh">
         <template #body="{ data }">
           {{ data.approver_name || '-' }}
         </template>
       </Column>
 
-      <Column field="overtime_notes" header="Catatan" style="min-width:150px">
+      <Column field="overtime_notes" header="Catatan">
         <template #body="{ data }">
           {{ data.overtime_notes || '-' }}
         </template>
       </Column>
 
-      <Column header="Aksi" style="min-width:160px">
+      <Column header="Aksi" style="width: 160px">
         <template #body="{ data }">
-          <div v-if="data.overtime_status === 'pending_approval'" class="flex gap-2">
+          <div v-if="data.overtime_status === 'pending_approval'" class="action-buttons">
             <Button
-              label="Setujui"
               icon="pi pi-check"
               size="small"
               severity="success"
+              text
+              rounded
               @click="confirmApprove(data)"
+              v-tooltip.top="'Setujui'"
             />
             <Button
-              label="Tolak"
               icon="pi pi-times"
               size="small"
               severity="danger"
-              outlined
+              text
+              rounded
               @click="openRejectDialog(data)"
+              v-tooltip.top="'Tolak'"
             />
           </div>
-          <span v-else class="text-color-secondary text-sm">—</span>
+          <span v-else class="text-muted">—</span>
         </template>
       </Column>
     </DataTable>
@@ -106,13 +112,13 @@
     <!-- Dialog Konfirmasi Approve -->
     <Dialog
       v-model:visible="approveDialog"
-      header="Konfirmasi Persetujuan Lembur"
+      header="Konfirmasi Persetujuan"
       :modal="true"
       :style="{ width: '400px' }"
     >
       <p>
         Setujui lembur <strong>{{ selectedRecord?.user_name }}</strong> sebesar
-        <strong>{{ selectedRecord?.overtime_hours }} jam</strong> pada tanggal
+        <strong>{{ selectedRecord?.overtime_hours }} jam</strong> pada
         <strong>{{ formatDate(selectedRecord?.date) }}</strong>?
       </p>
       <template #footer>
@@ -128,19 +134,21 @@
       :modal="true"
       :style="{ width: '450px' }"
     >
-      <div class="mb-3">
-        <p class="mb-2">
-          Tolak lembur <strong>{{ selectedRecord?.user_name }}</strong> ({{ selectedRecord?.overtime_hours }} jam)?
+      <div class="field">
+        <p class="mb-3">
+          Tolak lembur <strong>{{ selectedRecord?.user_name }}</strong>
+          ({{ selectedRecord?.overtime_hours }} jam)?
         </p>
-        <label class="block font-medium mb-1">Alasan Penolakan <span class="text-red-500">*</span></label>
+        <label class="font-medium">Alasan Penolakan <span class="p-error">*</span></label>
         <Textarea
           v-model="rejectionReason"
           rows="3"
-          class="w-full"
+          fluid
           placeholder="Masukkan alasan penolakan..."
           auto-resize
+          class="mt-2"
         />
-        <small v-if="rejectError" class="text-red-500">{{ rejectError }}</small>
+        <small v-if="rejectError" class="p-error">{{ rejectError }}</small>
       </div>
       <template #footer>
         <Button label="Batal" text @click="rejectDialog = false" />
@@ -162,17 +170,16 @@ import Button from 'primevue/button'
 import Tag from 'primevue/tag'
 import Dialog from 'primevue/dialog'
 import Textarea from 'primevue/textarea'
-import SelectButton from 'primevue/selectbutton'
 
-const route = useRoute()
-const toast = useToast()
+const route    = useRoute()
+const toast    = useToast()
 const outletId = route.params.outletId
 
-// ── State ──────────────────────────────────────────────────────────────────
-const overtimeList  = ref([])
-const loading       = ref(false)
-const actionLoading = ref(false)
-const filterStatus  = ref('pending_approval')
+// ── State ──────────────────────────────────────────────────────────────
+const overtimeList    = ref([])
+const loading         = ref(false)
+const actionLoading   = ref(false)
+const filterStatus    = ref('pending_approval')
 
 const approveDialog   = ref(false)
 const rejectDialog    = ref(false)
@@ -187,33 +194,24 @@ const statusOptions = [
   { label: 'Semua',     value: '' },
 ]
 
-// ── Helpers ────────────────────────────────────────────────────────────────
+// ── Helpers ────────────────────────────────────────────────────────────
 const formatDate = (d) => {
   if (!d) return '-'
-  const date = new Date(d)
-  return date.toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' })
+  return new Date(d).toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' })
 }
 
 const statusLabel = (s) => {
-  const map = {
-    pending_approval: 'Menunggu',
-    approved:         'Disetujui',
-    rejected:         'Ditolak',
-  }
+  const map = { pending_approval: 'Menunggu', approved: 'Disetujui', rejected: 'Ditolak' }
   return map[s] || s
 }
 
 const statusSeverity = (s) => {
-  const map = {
-    pending_approval: 'warning',
-    approved:         'success',
-    rejected:         'danger',
-  }
-  return map[s] || 'info'
+  const map = { pending_approval: 'warn', approved: 'success', rejected: 'danger' }
+  return map[s] || 'secondary'
 }
 
-// ── Data ───────────────────────────────────────────────────────────────────
-const loadOvertimeRequests = async () => {
+// ── Data ───────────────────────────────────────────────────────────────
+const loadData = async () => {
   loading.value = true
   try {
     const params = {}
@@ -221,16 +219,16 @@ const loadOvertimeRequests = async () => {
     const res = await api.get(`/outlets/${outletId}/attendances/overtime-requests`, { params })
     overtimeList.value = res.data || []
   } catch (e) {
-    toast.add({ severity: 'error', summary: 'Gagal', detail: e.response?.data?.message || 'Gagal memuat data lembur', life: 3000 })
+    toast.add({ severity: 'error', summary: 'Gagal', detail: e.response?.data?.message || 'Gagal memuat data', life: 3000 })
   } finally {
     loading.value = false
   }
 }
 
-// ── Approve ────────────────────────────────────────────────────────────────
+// ── Approve ────────────────────────────────────────────────────────────
 const confirmApprove = (record) => {
   selectedRecord.value = record
-  approveDialog.value = true
+  approveDialog.value  = true
 }
 
 const doApprove = async () => {
@@ -239,15 +237,15 @@ const doApprove = async () => {
     await api.post(`/outlets/${outletId}/attendances/${selectedRecord.value.id}/approve-overtime`)
     toast.add({ severity: 'success', summary: 'Berhasil', detail: 'Lembur disetujui', life: 3000 })
     approveDialog.value = false
-    loadOvertimeRequests()
+    loadData()
   } catch (e) {
-    toast.add({ severity: 'error', summary: 'Gagal', detail: e.response?.data?.message || 'Gagal menyetujui lembur', life: 3000 })
+    toast.add({ severity: 'error', summary: 'Gagal', detail: e.response?.data?.message || 'Gagal menyetujui', life: 3000 })
   } finally {
     actionLoading.value = false
   }
 }
 
-// ── Reject ─────────────────────────────────────────────────────────────────
+// ── Reject ─────────────────────────────────────────────────────────────
 const openRejectDialog = (record) => {
   selectedRecord.value  = record
   rejectionReason.value = ''
@@ -267,20 +265,73 @@ const doReject = async () => {
     })
     toast.add({ severity: 'info', summary: 'Ditolak', detail: 'Pengajuan lembur ditolak', life: 3000 })
     rejectDialog.value = false
-    loadOvertimeRequests()
+    loadData()
   } catch (e) {
-    toast.add({ severity: 'error', summary: 'Gagal', detail: e.response?.data?.message || 'Gagal menolak lembur', life: 3000 })
+    toast.add({ severity: 'error', summary: 'Gagal', detail: e.response?.data?.message || 'Gagal menolak', life: 3000 })
   } finally {
     actionLoading.value = false
   }
 }
 
-// ── Init ───────────────────────────────────────────────────────────────────
-onMounted(() => loadOvertimeRequests())
+onMounted(() => loadData())
 </script>
 
 <style scoped>
-.overtime-approval-page {
-  max-width: 1200px;
+.hr-view {
+  padding: 1.5rem;
 }
+
+.page-header {
+  margin-bottom: 1.5rem;
+}
+
+.page-header h2 { margin: 0; }
+.text-muted { color: #6b7280; font-size: 0.875rem; margin: 0; }
+
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.filter-tabs {
+  display: flex;
+  gap: 0.5rem;
+  border-bottom: 2px solid #e5e7eb;
+  width: 100%;
+}
+
+.tab {
+  padding: 0.75rem 1.5rem;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: #6b7280;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: -2px;
+}
+
+.tab:hover { color: #3b82f6; }
+.tab.active { color: #3b82f6; border-bottom-color: #3b82f6; }
+
+.action-buttons {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.mt-2 { margin-top: 0.5rem; }
+.mt-4 { margin-top: 1rem; }
+.mb-3 { margin-bottom: 0.75rem; }
 </style>
