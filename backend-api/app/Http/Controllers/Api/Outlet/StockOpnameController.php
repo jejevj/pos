@@ -17,6 +17,62 @@ class StockOpnameController extends Controller
 {
     use AuthorizesOutletAccess;
 
+    /**
+     * Resolve outlet_user_id dari user yang sedang login (cari di outlet_users by email).
+     * Harus dipanggil SETELAH search_path di-set ke schema outlet.
+     */
+    private function resolveOutletUserId(): ?int
+    {
+        $authUser = Auth::user();
+        if (!$authUser) return null;
+        $row = DB::table('outlet_users')
+            ->whereRaw('LOWER(email) = ?', [strtolower($authUser->email)])
+            ->whereNull('deleted_at')
+            ->first();
+        return $row ? (int) $row->id : null;
+    }
+
+    /**
+     * Cek apakah user yang login punya permission manage_stock_opname di outlet ini.
+     * Owner outlet (outlet_user.role owner) juga dianggap punya akses.
+     */
+    private function canManageOpname(string $schemaName, int $outletId): bool
+    {
+        $authUser = Auth::user();
+        if (!$authUser) return false;
+
+        // Superadmin selalu bisa
+        if ($authUser->hasRole('superadmin')) return true;
+
+        // Cek permission manage_stock_opname di schema outlet
+        $outletUser = DB::table('outlet_users')
+            ->whereRaw('LOWER(email) = ?', [strtolower($authUser->email)])
+            ->whereNull('deleted_at')
+            ->first();
+
+        if (!$outletUser) return false;
+
+        // Cek apakah owner
+        $isOwner = DB::table('user_roles')
+            ->join('roles', 'user_roles.role_id', '=', 'roles.id')
+            ->where('user_roles.user_id', $outletUser->id)
+            ->where('roles.name', 'owner')
+            ->exists();
+
+        if ($isOwner) return true;
+
+        // Cek permission
+        $hasPermission = DB::table('user_roles')
+            ->join('roles', 'user_roles.role_id', '=', 'roles.id')
+            ->join('role_permissions', 'roles.id', '=', 'role_permissions.role_id')
+            ->join('permissions', 'role_permissions.permission_id', '=', 'permissions.id')
+            ->where('user_roles.user_id', $outletUser->id)
+            ->where('permissions.name', 'manage_stock_opname')
+            ->exists();
+
+        return $hasPermission;
+    }
+
 
     /**
      * PIC options: users available in this outlet (active outlet_users plus
@@ -84,14 +140,27 @@ class StockOpnameController extends Controller
         try {
             DB::statement("SET search_path TO {$outlet->schema_name}, public");
 
+            $isManager = $this->canManageOpname($outlet->schema_name, $outlet->id);
+            $currentUserId = $this->resolveOutletUserId();
+
             $query = StockOpname::query();
+
+            // Petugas biasa hanya lihat jadwal yang ditugaskan ke mereka
+            if (!$isManager && $currentUserId) {
+                $query->where('pic_user_id', $currentUserId);
+            }
 
             if ($request->has('status')) {
                 $query->where('status', $request->status);
             }
 
-            // Don't load details for list view to improve performance
             $stockOpnames = $query->orderBy('created_at', 'desc')->get();
+
+            // Tambah flag untuk frontend
+            $stockOpnames->each(function ($so) use ($isManager, $currentUserId) {
+                $so->can_manage = $isManager;
+                $so->is_assigned_pic = $currentUserId && (int)$so->pic_user_id === $currentUserId;
+            });
 
             DB::statement("SET search_path TO public");
 
@@ -295,6 +364,12 @@ class StockOpnameController extends Controller
 
             $stockOpname->can_submit = $stockOpname->canSubmit();
 
+            // Flag akses untuk frontend
+            $isManager     = $this->canManageOpname($outlet->schema_name, $outlet->id);
+            $currentUserId = $this->resolveOutletUserId();
+            $stockOpname->can_manage      = $isManager;
+            $stockOpname->is_assigned_pic = $currentUserId && (int)$stockOpname->pic_user_id === $currentUserId;
+
             DB::statement("SET search_path TO public");
 
             return response()->json($stockOpname);
@@ -305,7 +380,7 @@ class StockOpnameController extends Controller
     }
 
     /**
-     * Update stock opname (fill physical stock)
+     * Update stock opname (fill physical stock) — hanya PIC yang ditunjuk atau manager
      */
     public function update(Request $request, $outletId, $id)
     {
@@ -327,6 +402,16 @@ class StockOpnameController extends Controller
             DB::beginTransaction();
 
             $stockOpname = StockOpname::with(['details.bahanBaku'])->findOrFail($id);
+
+            // Guard: hanya PIC atau manager yang boleh update
+            $isManager     = $this->canManageOpname($outlet->schema_name, $outlet->id);
+            $currentUserId = $this->resolveOutletUserId();
+            $isPic         = $currentUserId && (int)$stockOpname->pic_user_id === $currentUserId;
+            if (!$isManager && !$isPic) {
+                DB::rollBack();
+                DB::statement('SET search_path TO public');
+                return response()->json(['message' => 'Anda bukan PIC yang ditugaskan untuk opname ini'], 403);
+            }
 
             if (!$stockOpname->is_editable) {
                 DB::rollBack();
@@ -399,6 +484,15 @@ class StockOpnameController extends Controller
 
             $stockOpname = StockOpname::with('details')->findOrFail($id);
 
+            // Guard: hanya PIC atau manager yang boleh submit
+            $isManager     = $this->canManageOpname($outlet->schema_name, $outlet->id);
+            $currentUserId = $this->resolveOutletUserId();
+            $isPic         = $currentUserId && (int)$stockOpname->pic_user_id === $currentUserId;
+            if (!$isManager && !$isPic) {
+                DB::statement('SET search_path TO public');
+                return response()->json(['message' => 'Anda bukan PIC yang ditugaskan untuk opname ini'], 403);
+            }
+
             if (!$stockOpname->canSubmit()) {
                 return response()->json(['message' => 'Stock opname cannot be submitted'], 400);
             }
@@ -443,6 +537,13 @@ class StockOpnameController extends Controller
         try {
             DB::statement("SET search_path TO {$outlet->schema_name}, public");
             DB::beginTransaction();
+
+            // Guard: hanya manager yang boleh approve
+            if (!$this->canManageOpname($outlet->schema_name, $outlet->id)) {
+                DB::rollBack();
+                DB::statement('SET search_path TO public');
+                return response()->json(['message' => 'Anda tidak memiliki akses untuk approve stock opname'], 403);
+            }
 
             $stockOpname = StockOpname::with('details.bahanBaku')->findOrFail($id);
 
@@ -519,6 +620,12 @@ class StockOpnameController extends Controller
 
         try {
             DB::statement("SET search_path TO {$outlet->schema_name}, public");
+
+            // Guard: hanya manager yang boleh reject
+            if (!$this->canManageOpname($outlet->schema_name, $outlet->id)) {
+                DB::statement('SET search_path TO public');
+                return response()->json(['message' => 'Anda tidak memiliki akses untuk menolak stock opname'], 403);
+            }
 
             $stockOpname = StockOpname::findOrFail($id);
 
