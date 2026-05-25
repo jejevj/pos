@@ -520,6 +520,35 @@ const loadingQr         = ref(false)
 const qrExpireCountdown = ref(0)
 let qrCountdownInterval = null
 let qrAutoRefreshTimer  = null
+let sessionPollInterval = null
+
+const startSessionPolling = () => {
+  if (sessionPollInterval) clearInterval(sessionPollInterval)
+  sessionPollInterval = setInterval(async () => {
+    try {
+      const res = await waha.get('/api/sessions')
+      const def = (res.data || []).find(s => s.name === sessionName.value)
+      if (def && def.status === 'WORKING') {
+        // Session aktif — stop polling, bersihkan QR, load chat
+        stopSessionPolling()
+        sessionStatus.value = 'WORKING'
+        qrImage.value = null
+        qrExpireCountdown.value = 0
+        if (qrCountdownInterval) clearInterval(qrCountdownInterval)
+        const me = await waha.get(`/api/sessions/${sessionName.value}`)
+        sessionInfo.value = me.data
+        fetchChats()
+      }
+    } catch { /* abaikan error polling */ }
+  }, 3000) // cek setiap 3 detik
+}
+
+const stopSessionPolling = () => {
+  if (sessionPollInterval) {
+    clearInterval(sessionPollInterval)
+    sessionPollInterval = null
+  }
+}
 
 const startQrCountdown = (seconds = 60) => {
   // Bersihkan timer lama
@@ -628,6 +657,7 @@ const fetchQr = async () => {
     const res = await waha.get(`/api/${sessionName.value}/auth/qr`, { params: { format: 'image' }, responseType: 'blob' })
     qrImage.value = URL.createObjectURL(res.data)
     startQrCountdown(60)
+    startSessionPolling()
   } catch {
     // try base64 format
     try {
@@ -636,6 +666,7 @@ const fetchQr = async () => {
       if (val) {
         qrImage.value = val.startsWith('data:') ? val : `data:image/png;base64,${val}`
         startQrCountdown(60)
+        startSessionPolling()
       }
     } catch (e2) {
       err(e2, 'Failed to load QR')
@@ -1006,6 +1037,7 @@ onUnmounted(() => {
   if (unsubWaha) unsubWaha()
   if (qrCountdownInterval) clearInterval(qrCountdownInterval)
   if (qrAutoRefreshTimer)  clearTimeout(qrAutoRefreshTimer)
+  stopSessionPolling()
 })
 </script>
 
