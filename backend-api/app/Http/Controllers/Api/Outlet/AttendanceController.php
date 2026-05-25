@@ -246,11 +246,12 @@ class AttendanceController extends Controller
         $outlet = $this->authorizeAttendanceOutlet($outletId);
 
         $request->validate([
-            'photo' => 'required|string',
-            'latitude' => 'required|numeric',
-            'longitude' => 'required|numeric',
-            'accuracy' => 'required|numeric',
-            'notes' => 'nullable|string',
+            'photo'           => 'required|string',
+            'latitude'        => 'required|numeric',
+            'longitude'       => 'required|numeric',
+            'accuracy'        => 'required|numeric',
+            'notes'           => 'nullable|string',
+            'overtime_reason' => 'nullable|string',
         ]);
 
         try {
@@ -272,16 +273,18 @@ class AttendanceController extends Controller
 
             if (!$attendance || !$attendance->clock_in) {
                 DB::statement("SET search_path TO public");
-                return response()->json(['message' => 'No clock in record found'], 422);
+                return response()->json(['message' => 'Belum ada catatan clock-in hari ini'], 422);
             }
 
             if ($attendance->clock_out) {
                 DB::statement("SET search_path TO public");
-                return response()->json(['message' => 'Already clocked out'], 422);
+                return response()->json(['message' => 'Sudah melakukan clock-out hari ini'], 422);
             }
 
-            // Get attendance settings to check radius
+            // Ambil pengaturan jam kerja dan radius
             $settings = DB::table('payroll_settings')->first();
+            $standardHours = (float) ($settings->work_hours_per_day ?? 8);
+
             if ($settings && $settings->attendance_location_lat && $settings->attendance_location_lng) {
                 $distance = $this->calculateDistance(
                     $request->latitude,
@@ -295,38 +298,62 @@ class AttendanceController extends Controller
                 if ($distance > $allowedRadius) {
                     DB::statement("SET search_path TO public");
                     return response()->json([
-                        'message' => 'You are outside the allowed attendance radius. Distance: ' . round($distance) . 'm, Allowed: ' . $allowedRadius . 'm',
-                        'distance' => round($distance),
-                        'allowed_radius' => $allowedRadius
+                        'message'        => 'Anda di luar radius absensi yang diizinkan. Jarak: ' . round($distance) . 'm, Maksimal: ' . $allowedRadius . 'm',
+                        'distance'       => round($distance),
+                        'allowed_radius' => $allowedRadius,
                     ], 422);
                 }
             }
 
             $clockOutTime = Carbon::now();
-            $clockInTime = Carbon::parse($attendance->clock_in);
+            $clockInTime  = Carbon::parse($attendance->clock_in);
 
-            $workMinutes = $clockOutTime->diffInMinutes($clockInTime);
-            $workHours = round($workMinutes / 60, 2);
+            // Hitung total menit kerja
+            $workMinutes  = $clockOutTime->diffInMinutes($clockInTime);
+            $workHours    = round($workMinutes / 60, 2);
 
-            $overtimeHours = max(0, $workHours - 8);
+            // ── Aturan pembulatan overtime ─────────────────────────────────
+            // Overtime dihitung jika melebihi jam kerja standar.
+            // Pembulatan ke bawah per jam penuh:
+            //   over 0–59 menit  → 0 jam lembur
+            //   over 60–119 menit → 1 jam lembur
+            //   over 120–179 menit → 2 jam lembur
+            //   dst.
+            $overtimeMinutesRaw = max(0, $workMinutes - ($standardHours * 60));
+            $overtimeHours      = floor($overtimeMinutesRaw / 60); // jam penuh saja
+
+            // Jika ada overtime, wajib ada alasan lembur
+            if ($overtimeHours > 0 && empty($request->overtime_reason)) {
+                DB::statement("SET search_path TO public");
+                return response()->json([
+                    'message'        => 'Alasan lembur wajib diisi karena Anda melebihi jam kerja standar',
+                    'overtime_hours' => $overtimeHours,
+                    'requires_overtime_reason' => true,
+                ], 422);
+            }
 
             $location = json_encode([
-                'latitude' => $request->latitude,
+                'latitude'  => $request->latitude,
                 'longitude' => $request->longitude,
-                'accuracy' => $request->accuracy,
-                'timestamp' => $clockOutTime->toIso8601String()
+                'accuracy'  => $request->accuracy,
+                'timestamp' => $clockOutTime->toIso8601String(),
             ]);
+
+            // Status overtime: jika ada lembur maka pending approval, belum dihitung ke payroll
+            $overtimeStatus = $overtimeHours > 0 ? 'pending_approval' : null;
 
             DB::table('attendances')
                 ->where('id', $attendance->id)
                 ->update([
-                    'clock_out' => $clockOutTime,
-                    'clock_out_photo' => $request->photo,
+                    'clock_out'          => $clockOutTime,
+                    'clock_out_photo'    => $request->photo,
                     'clock_out_location' => $location,
-                    'clock_out_notes' => $request->notes,
-                    'work_hours' => $workHours,
-                    'overtime_hours' => $overtimeHours,
-                    'updated_at' => now(),
+                    'clock_out_notes'    => $request->notes,
+                    'work_hours'         => $workHours,
+                    'overtime_hours'     => $overtimeHours,
+                    'overtime_reason'    => $overtimeHours > 0 ? $request->overtime_reason : null,
+                    'overtime_status'    => $overtimeStatus,
+                    'updated_at'         => now(),
                 ]);
 
             $updatedAttendance = DB::table('attendances')->where('id', $attendance->id)->first();
@@ -334,9 +361,151 @@ class AttendanceController extends Controller
             DB::statement("SET search_path TO public");
 
             return response()->json([
-                'message' => 'Clock out successful',
-                'data' => $updatedAttendance
+                'message'        => 'Clock out berhasil',
+                'data'           => $updatedAttendance,
+                'overtime_hours' => $overtimeHours,
+                'needs_approval' => $overtimeHours > 0,
             ]);
+        } catch (\Exception $e) {
+            DB::statement("SET search_path TO public");
+            return response()->json(['message' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Approve overtime request
+     * Hanya user dengan permission manage_payroll atau owner/superadmin yang bisa approve.
+     */
+    public function approveOvertime(Request $request, $outletId, $attendanceId)
+    {
+        $outlet = $this->authorizeOutlet($outletId, ['permission' => 'manage_payroll']);
+
+        $request->validate([
+            'notes' => 'nullable|string',
+        ]);
+
+        try {
+            DB::statement("SET search_path TO {$outlet->schema_name}, public");
+
+            $attendance = DB::table('attendances')->where('id', $attendanceId)->first();
+
+            if (!$attendance) {
+                DB::statement("SET search_path TO public");
+                return response()->json(['message' => 'Data absensi tidak ditemukan'], 404);
+            }
+
+            if ($attendance->overtime_hours <= 0) {
+                DB::statement("SET search_path TO public");
+                return response()->json(['message' => 'Tidak ada lembur pada absensi ini'], 422);
+            }
+
+            if ($attendance->overtime_status !== 'pending_approval') {
+                DB::statement("SET search_path TO public");
+                return response()->json(['message' => 'Status lembur bukan pending_approval'], 422);
+            }
+
+            // Pastikan approver bukan karyawan yang bersangkutan
+            $outletUser = $this->currentOutletUser();
+            if ($outletUser && $outletUser->id === $attendance->user_id) {
+                DB::statement("SET search_path TO public");
+                return response()->json(['message' => 'Tidak dapat menyetujui lembur milik sendiri'], 403);
+            }
+
+            DB::table('attendances')->where('id', $attendanceId)->update([
+                'overtime_status'      => 'approved',
+                'overtime_approved_by' => $outletUser ? $outletUser->id : null,
+                'overtime_approved_at' => now(),
+                'overtime_notes'       => $request->notes,
+                'updated_at'           => now(),
+            ]);
+
+            DB::statement("SET search_path TO public");
+            return response()->json(['message' => 'Lembur berhasil disetujui']);
+        } catch (\Exception $e) {
+            DB::statement("SET search_path TO public");
+            return response()->json(['message' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Reject overtime request
+     */
+    public function rejectOvertime(Request $request, $outletId, $attendanceId)
+    {
+        $outlet = $this->authorizeOutlet($outletId, ['permission' => 'manage_payroll']);
+
+        $request->validate([
+            'rejection_reason' => 'required|string',
+        ]);
+
+        try {
+            DB::statement("SET search_path TO {$outlet->schema_name}, public");
+
+            $attendance = DB::table('attendances')->where('id', $attendanceId)->first();
+
+            if (!$attendance) {
+                DB::statement("SET search_path TO public");
+                return response()->json(['message' => 'Data absensi tidak ditemukan'], 404);
+            }
+
+            if ($attendance->overtime_status !== 'pending_approval') {
+                DB::statement("SET search_path TO public");
+                return response()->json(['message' => 'Status lembur bukan pending_approval'], 422);
+            }
+
+            $outletUser = $this->currentOutletUser();
+            if ($outletUser && $outletUser->id === $attendance->user_id) {
+                DB::statement("SET search_path TO public");
+                return response()->json(['message' => 'Tidak dapat menolak lembur milik sendiri'], 403);
+            }
+
+            DB::table('attendances')->where('id', $attendanceId)->update([
+                'overtime_status'      => 'rejected',
+                'overtime_hours'       => 0,   // lembur ditolak = tidak dihitung
+                'overtime_approved_by' => $outletUser ? $outletUser->id : null,
+                'overtime_approved_at' => now(),
+                'overtime_notes'       => $request->rejection_reason,
+                'updated_at'           => now(),
+            ]);
+
+            DB::statement("SET search_path TO public");
+            return response()->json(['message' => 'Lembur berhasil ditolak']);
+        } catch (\Exception $e) {
+            DB::statement("SET search_path TO public");
+            return response()->json(['message' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * List overtime requests pending approval (untuk manager)
+     */
+    public function overtimeRequests(Request $request, $outletId)
+    {
+        $outlet = $this->authorizeOutlet($outletId, ['permission' => 'manage_payroll']);
+
+        try {
+            DB::statement("SET search_path TO {$outlet->schema_name}, public");
+
+            $query = DB::table('attendances')
+                ->join('outlet_users', 'attendances.user_id', '=', 'outlet_users.id')
+                ->leftJoin('outlet_users as approver', 'attendances.overtime_approved_by', '=', 'approver.id')
+                ->where('attendances.overtime_hours', '>', 0)
+                ->select(
+                    'attendances.*',
+                    'outlet_users.name as user_name',
+                    'outlet_users.email as user_email',
+                    'approver.name as approver_name'
+                )
+                ->orderBy('attendances.date', 'desc');
+
+            if ($request->has('status')) {
+                $query->where('attendances.overtime_status', $request->status);
+            }
+
+            $results = $query->get();
+
+            DB::statement("SET search_path TO public");
+            return response()->json($results);
         } catch (\Exception $e) {
             DB::statement("SET search_path TO public");
             return response()->json(['message' => $e->getMessage()], 500);
