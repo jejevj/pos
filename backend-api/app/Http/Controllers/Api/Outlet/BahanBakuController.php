@@ -118,7 +118,7 @@ class BahanBakuController extends Controller
                     'Initial stock',
                     'initial',
                     null,
-                    $user->id
+                    Auth::id()
                 );
             }
             
@@ -296,7 +296,7 @@ class BahanBakuController extends Controller
                 $request->notes,
                 $request->reference_type ?? 'manual',
                 $request->reference_id,
-                $user->id
+                Auth::id()
             );
 
             $bahanBaku->load(['kategori', 'satuan', 'satuanPembelian', 'supplier']);
@@ -352,7 +352,7 @@ class BahanBakuController extends Controller
                 $request->notes,
                 $request->reference_type ?? 'manual',
                 $request->reference_id,
-                $user->id
+                Auth::id()
             );
 
             $bahanBaku->load(['kategori', 'satuan', 'satuanPembelian', 'supplier']);
@@ -404,7 +404,7 @@ class BahanBakuController extends Controller
             $bahanBaku->adjustStock(
                 $request->new_stock,
                 $request->notes,
-                $user->id
+                Auth::id()
             );
 
             $bahanBaku->load(['kategori', 'satuan', 'satuanPembelian', 'supplier']);
