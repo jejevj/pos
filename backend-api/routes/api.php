@@ -258,6 +258,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('outlets/{outlet}/attendances/clock-out', [\App\Http\Controllers\Api\Outlet\AttendanceController::class, 'clockOut']);
     Route::get('outlets/{outlet}/attendances/today/{userId}', [\App\Http\Controllers\Api\Outlet\AttendanceController::class, 'getTodayStatus']);
     Route::get('outlets/{outlet}/attendances/summary', [\App\Http\Controllers\Api\Outlet\AttendanceController::class, 'getSummary']);
+    Route::get('outlets/{outlet}/attendances/overtime-requests', [\App\Http\Controllers\Api\Outlet\AttendanceController::class, 'overtimeRequests']);
+    Route::post('outlets/{outlet}/attendances/{attendanceId}/approve-overtime', [\App\Http\Controllers\Api\Outlet\AttendanceController::class, 'approveOvertime']);
+    Route::post('outlets/{outlet}/attendances/{attendanceId}/reject-overtime', [\App\Http\Controllers\Api\Outlet\AttendanceController::class, 'rejectOvertime']);
 
     // HR Management - Leave Requests
     Route::get('outlets/{outlet}/leave-requests', [\App\Http\Controllers\Api\Outlet\LeaveRequestController::class, 'index']);
