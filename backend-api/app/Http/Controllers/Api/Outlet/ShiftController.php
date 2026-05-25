@@ -14,6 +14,23 @@ class ShiftController extends Controller
 {
     use AuthorizesOutletAccess;
 
+    /**
+     * Resolve ID outlet_user dari user global yang sedang login.
+     * Dipanggil setelah SET search_path ke schema outlet.
+     * Return null jika tidak ditemukan (misal superadmin tanpa outlet_user).
+     */
+    private function resolveOutletUserId(): ?int
+    {
+        $authUser = Auth::user();
+        if (!$authUser) return null;
+
+        $outletUser = DB::table('outlet_users')
+            ->where('email', $authUser->email)
+            ->whereNull('deleted_at')
+            ->first();
+
+        return $outletUser ? (int) $outletUser->id : null;
+    }
 
     /**
      * Get all shifts
@@ -447,14 +464,6 @@ class ShiftController extends Controller
         try {
             DB::statement("SET search_path TO {$outlet->schema_name}, public");
 
-            // Resolve outlet_user dari user global yang sedang login
-            $authUser = Auth::user();
-            $outletUser = DB::table('outlet_users')
-                ->where('email', $authUser->email)
-                ->whereNull('deleted_at')
-                ->first();
-            $createdBy = $outletUser ? $outletUser->id : null;
-            
             // Check if assignment already exists
             $exists = DB::table('shift_assignments')
                 ->where('user_id', $request->user_id)
@@ -472,7 +481,7 @@ class ShiftController extends Controller
                 'date' => $request->date,
                 'status' => 'scheduled',
                 'notes' => $request->notes,
-                'created_by' => $createdBy,
+                'created_by' => $this->resolveOutletUserId(),
                 'created_at' => now(),
                 'updated_at' => now(),
             ]);
@@ -508,14 +517,6 @@ class ShiftController extends Controller
         try {
             DB::statement("SET search_path TO {$outlet->schema_name}, public");
 
-            // Resolve outlet_user dari user global yang sedang login
-            $authUser = Auth::user();
-            $outletUser = DB::table('outlet_users')
-                ->where('email', $authUser->email)
-                ->whereNull('deleted_at')
-                ->first();
-            $createdBy = $outletUser ? $outletUser->id : null;
-            
             $created = 0;
             foreach ($request->assignments as $assignment) {
                 $exists = DB::table('shift_assignments')
@@ -529,7 +530,7 @@ class ShiftController extends Controller
                         'shift_id' => $assignment['shift_id'],
                         'date' => $assignment['date'],
                         'status' => 'scheduled',
-                        'created_by' => $createdBy,
+                        'created_by' => $this->resolveOutletUserId(),
                         'created_at' => now(),
                         'updated_at' => now(),
                     ]);
@@ -915,7 +916,7 @@ class ShiftController extends Controller
                                 'shift_id' => $shift->id,
                                 'date' => $dateStr,
                                 'status' => 'scheduled',
-                                'created_by' => Auth::id(),
+                                'created_by' => $this->resolveOutletUserId(),
                                 'created_at' => now(),
                                 'updated_at' => now(),
                             ]);
@@ -1022,7 +1023,7 @@ class ShiftController extends Controller
                 'user_id' => $request->user_id,
                 'date' => $request->date,
                 'notes' => $request->notes,
-                'created_by' => Auth::id(),
+                'created_by' => $this->resolveOutletUserId(),
                 'created_at' => now(),
                 'updated_at' => now(),
             ]);
@@ -1108,7 +1109,7 @@ class ShiftController extends Controller
                         'date' => $targetDate,
                         'status' => 'scheduled',
                         'notes' => $assignment->notes,
-                        'created_by' => Auth::id(),
+                        'created_by' => $this->resolveOutletUserId(),
                         'created_at' => now(),
                         'updated_at' => now(),
                     ]);
@@ -1121,7 +1122,7 @@ class ShiftController extends Controller
                         'user_id' => $dayOff->user_id,
                         'date' => $targetDate,
                         'notes' => $dayOff->notes,
-                        'created_by' => Auth::id(),
+                        'created_by' => $this->resolveOutletUserId(),
                         'created_at' => now(),
                         'updated_at' => now(),
                     ]);
