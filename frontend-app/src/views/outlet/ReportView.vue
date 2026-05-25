@@ -152,41 +152,111 @@
         <!-- Weather Report -->
         <TabPanel value="2">
           <div class="report-section">
-            <Card>
-              <template #title>{{ $t('report.salesByWeatherCondition') }}</template>
+            <!-- Loading -->
+            <div v-if="weatherLoading" class="text-center py-5">
+              <i class="pi pi-spin pi-spinner" style="font-size:2rem"></i>
+              <p class="text-muted mt-2">Memuat data cuaca...</p>
+            </div>
+
+            <!-- Tidak ada data -->
+            <Card v-else-if="!weatherStats.length">
               <template #content>
-                <Chart type="bar" :data="weatherConditionChartData" :options="chartOptions" />
+                <div class="text-center py-5">
+                  <i class="pi pi-cloud" style="font-size:3rem;color:#94a3b8"></i>
+                  <p class="text-muted mt-2">Tidak ada data cuaca untuk periode ini.<br>Pastikan WAHA weather recorder sudah berjalan.</p>
+                </div>
               </template>
             </Card>
 
-            <div class="chart-grid">
-              <Card>
-                <template #title>{{ $t('report.todayWeather') }}</template>
+            <template v-else>
+              <!-- Summary Cards -->
+              <div v-if="weatherSummary" class="summary-cards mb-4">
+                <Card class="summary-card">
+                  <template #content>
+                    <div class="summary-item">
+                      <i class="pi pi-cloud" style="color:#3b82f6;font-size:1.5rem"></i>
+                      <div>
+                        <div class="summary-label">Total Hari Ada Data</div>
+                        <div class="summary-value">{{ weatherSummary.total_hours }} jam data</div>
+                      </div>
+                    </div>
+                  </template>
+                </Card>
+                <Card class="summary-card">
+                  <template #content>
+                    <div class="summary-item">
+                      <i class="pi pi-sun" style="color:#f59e0b;font-size:1.5rem"></i>
+                      <div>
+                        <div class="summary-label">Suhu Rata-rata</div>
+                        <div class="summary-value">{{ weatherSummary.avg_temperature }}°C</div>
+                      </div>
+                    </div>
+                  </template>
+                </Card>
+                <Card class="summary-card">
+                  <template #content>
+                    <div class="summary-item">
+                      <i class="pi pi-shopping-cart" style="color:#10b981;font-size:1.5rem"></i>
+                      <div>
+                        <div class="summary-label">Total Transaksi</div>
+                        <div class="summary-value">{{ weatherSummary.total_orders }} order</div>
+                      </div>
+                    </div>
+                  </template>
+                </Card>
+                <Card class="summary-card">
+                  <template #content>
+                    <div class="summary-item">
+                      <i class="pi pi-wallet" style="color:#8b5cf6;font-size:1.5rem"></i>
+                      <div>
+                        <div class="summary-label">Total Pendapatan</div>
+                        <div class="summary-value">{{ formatCurrency(weatherSummary.total_sales) }}</div>
+                      </div>
+                    </div>
+                  </template>
+                </Card>
+              </div>
+
+              <!-- Chart: Suhu & Penjualan per Hari -->
+              <Card class="mb-4">
+                <template #title>Suhu & Penjualan per Hari</template>
                 <template #content>
-                  <Chart type="line" :data="weatherSalesChartData" :options="multiAxisOptions" />
+                  <Chart type="bar" :data="weatherSalesChartData" :options="multiAxisOptions" />
                 </template>
               </Card>
 
-              <Card>
-                <template #title>{{ $t('report.weatherConditionStats') }}</template>
-                <template #content>
-                  <DataTable :value="weatherStats" stripedRows>
-                    <Column field="condition" :header="$t('report.condition')" />
-                    <Column field="avgTemp" :header="$t('report.avgTemp')">
-                      <template #body="slotProps">
-                        {{ slotProps.data.avgTemp }}°C
-                      </template>
-                    </Column>
-                    <Column field="orders" :header="$t('report.orders')" />
-                    <Column field="revenue" :header="$t('report.revenue')">
-                      <template #body="slotProps">
-                        {{ formatCurrency(slotProps.data.revenue) }}
-                      </template>
-                    </Column>
-                  </DataTable>
-                </template>
-              </Card>
-            </div>
+              <div class="chart-grid">
+                <!-- Chart: Per Kondisi Cuaca -->
+                <Card>
+                  <template #title>Penjualan per Kondisi Cuaca</template>
+                  <template #content>
+                    <Chart type="bar" :data="weatherConditionChartData" :options="chartOptions" />
+                  </template>
+                </Card>
+
+                <!-- Tabel Ringkasan per Hari -->
+                <Card>
+                  <template #title>Ringkasan per Hari</template>
+                  <template #content>
+                    <DataTable :value="weatherStats" stripedRows paginator :rows="10" size="small">
+                      <Column field="date" header="Tanggal" sortable>
+                        <template #body="{ data }">
+                          {{ new Date(data.date).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' }) }}
+                        </template>
+                      </Column>
+                      <Column field="condition" header="Cuaca" />
+                      <Column field="avgTemp" header="Suhu" sortable>
+                        <template #body="{ data }">{{ data.avgTemp }}°C</template>
+                      </Column>
+                      <Column field="orders" header="Order" sortable />
+                      <Column field="revenue" header="Pendapatan" sortable>
+                        <template #body="{ data }">{{ formatCurrency(data.revenue) }}</template>
+                      </Column>
+                    </DataTable>
+                  </template>
+                </Card>
+              </div>
+            </template>
           </div>
         </TabPanel>
 
@@ -325,9 +395,11 @@ const topMenus = ref([])
 const menuChartData = ref({})
 
 // Weather data
-const weatherSalesChartData = ref({})
-const weatherConditionChartData = ref({})
-const weatherStats = ref([])
+const weatherSalesChartData = ref({})       // chart suhu vs penjualan per hari
+const weatherConditionChartData = ref({})   // chart bar penjualan per kondisi cuaca
+const weatherStats = ref([])                // tabel ringkasan per hari
+const weatherSummary = ref(null)            // summary keseluruhan
+const weatherLoading = ref(false)
 
 // Inventory data
 const inventoryStats = ref({
@@ -543,155 +615,127 @@ const loadMenuReport = async () => {
 }
 
 const loadWeatherReport = async () => {
+  weatherLoading.value = true
   try {
     const [startDate, endDate] = dateRange.value
-    
-    // Get outlet location (assuming Jakarta for now, should be from outlet data)
-    const latitude = -6.2088
-    const longitude = 106.8456
-    
-    // Fetch real-time weather data from Open-Meteo API
-    const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&hourly=temperature_2m,relative_humidity_2m,weather_code&timezone=Asia/Jakarta&forecast_days=1`
-    
-    const weatherResponse = await fetch(weatherUrl)
-    const weatherData = await weatherResponse.json()
-    
-    // Fetch orders for correlation
-    const ordersResponse = await api.get(`/outlets/${outletId}/orders`, {
-      params: {
-        start_date: startDate.toISOString().split('T')[0],
-        end_date: endDate.toISOString().split('T')[0]
-      }
-    })
-    const orders = ordersResponse.data.filter(o => o.status === 'paid')
+    const toLocalDate = (d) => {
+      const y = d.getFullYear()
+      const m = String(d.getMonth() + 1).padStart(2, '0')
+      const day = String(d.getDate()).padStart(2, '0')
+      return `${y}-${m}-${day}`
+    }
+    const start = toLocalDate(startDate)
+    const end   = toLocalDate(endDate)
 
-    // WMO Weather interpretation codes
-    const getWeatherCondition = (code) => {
-      if (code === 0) return 'Cerah'
-      if (code <= 3) return 'Berawan'
-      if (code <= 48) return 'Berkabut'
-      if (code <= 67) return 'Hujan Ringan'
-      if (code <= 77) return 'Hujan'
-      if (code <= 82) return 'Hujan Lebat'
-      if (code <= 86) return 'Hujan Salju'
-      if (code <= 99) return 'Badai'
-      return 'Lainnya'
+    // Pakai endpoint salesCorrelation dari backend (group by day)
+    const corrRes = await api.get(`/outlets/${outletId}/weather/sales-correlation`, {
+      params: { start_date: start, end_date: end }
+    })
+    const corrData = corrRes.data?.data || []
+    weatherSummary.value = corrRes.data?.summary || null
+
+    if (!corrData.length) {
+      weatherStats.value = []
+      weatherSalesChartData.value = {}
+      weatherConditionChartData.value = {}
+      return
     }
 
-    // Process hourly weather data
-    const hourlyData = weatherData.hourly
-    const hours = hourlyData.time.map(t => t.substring(11, 16)) // Extract HH:MM
-    const temperatures = hourlyData.temperature_2m
-    const humidity = hourlyData.relative_humidity_2m
-    const weatherCodes = hourlyData.weather_code
-    
-    // Calculate sales by hour
-    const salesByHour = {}
-    const today = new Date().toISOString().split('T')[0]
-    
-    orders.forEach(order => {
-      const orderDate = new Date(order.created_at)
-      const orderDateStr = orderDate.toISOString().split('T')[0]
-      
-      // Only count today's orders for hourly correlation
-      if (orderDateStr === today) {
-        const hourKey = `${String(orderDate.getHours()).padStart(2, '0')}:00`
-        salesByHour[hourKey] = (salesByHour[hourKey] || 0) + parseFloat(order.total_amount)
-      }
-    })
-
-    // Group by weather condition
-    const weatherConditions = {}
-    const conditionSales = {}
-    
-    weatherCodes.forEach((code, index) => {
-      const condition = getWeatherCondition(code)
-      const hour = hours[index]
-      const temp = temperatures[index]
-      
-      if (!weatherConditions[condition]) {
-        weatherConditions[condition] = {
-          condition,
-          avgTemp: 0,
-          tempSum: 0,
-          count: 0,
+    // ── Group by hari ─────────────────────────────────────────
+    const byDay = {}
+    corrData.forEach(row => {
+      const day = row.hour?.substring(0, 10) || 'unknown'
+      if (!byDay[day]) {
+        byDay[day] = {
+          date: day,
+          tempSum: 0, tempCount: 0,
+          humidity: 0, humCount: 0,
           orders: 0,
-          revenue: 0
+          revenue: 0,
+          condition: row.weather_condition || '-'
         }
       }
-      
-      weatherConditions[condition].tempSum += temp
-      weatherConditions[condition].count++
-      
-      // Add sales data if available for this hour
-      if (salesByHour[hour]) {
-        weatherConditions[condition].orders++
-        weatherConditions[condition].revenue += salesByHour[hour]
+      byDay[day].tempSum   += parseFloat(row.temperature || 0)
+      byDay[day].tempCount += 1
+      byDay[day].orders    += parseInt(row.order_count || 0)
+      byDay[day].revenue   += parseFloat(row.total_sales || 0)
+      // Ambil kondisi cuaca terbanyak (kondisi jam pertama sebagai representasi)
+      if (row.weather_condition && byDay[day].tempCount === 1) {
+        byDay[day].condition = row.weather_condition
       }
     })
 
-    // Calculate averages
-    Object.values(weatherConditions).forEach(wc => {
-      wc.avgTemp = (wc.tempSum / wc.count).toFixed(1)
+    const days = Object.values(byDay).sort((a, b) => a.date.localeCompare(b.date))
+    days.forEach(d => { d.avgTemp = (d.tempSum / d.tempCount).toFixed(1) })
+    weatherStats.value = days
+
+    // ── Chart 1: Suhu & Penjualan per Hari ───────────────────
+    const dayLabels = days.map(d => {
+      const dt = new Date(d.date)
+      return dt.toLocaleDateString('id-ID', { day: '2-digit', month: 'short' })
     })
-
-    weatherStats.value = Object.values(weatherConditions).filter(wc => wc.count > 0)
-
-    // Chart 1: Temperature & Humidity over time
     weatherSalesChartData.value = {
-      labels: hours,
+      labels: dayLabels,
       datasets: [
         {
-          label: t('report.temperature') + ' (°C)',
-          data: temperatures,
+          label: 'Suhu Rata-rata (°C)',
+          data: days.map(d => d.avgTemp),
           borderColor: '#f59e0b',
-          backgroundColor: 'rgba(245, 158, 11, 0.1)',
+          backgroundColor: 'rgba(245, 158, 11, 0.15)',
           yAxisID: 'y',
           tension: 0.4,
-          fill: true
+          fill: true,
+          type: 'line'
         },
         {
-          label: t('report.humidity') + ' (%)',
-          data: humidity,
+          label: 'Pendapatan (Rp)',
+          data: days.map(d => d.revenue),
+          backgroundColor: 'rgba(59, 130, 246, 0.6)',
           borderColor: '#3b82f6',
-          backgroundColor: 'rgba(59, 130, 246, 0.1)',
           yAxisID: 'y1',
-          tension: 0.4,
-          fill: true
+          type: 'bar'
         }
       ]
     }
 
-    // Chart 2: Sales by Weather Condition
-    const conditions = Object.keys(weatherConditions)
+    // ── Chart 2: Penjualan per Kondisi Cuaca ─────────────────
+    const conditionMap = {}
+    days.forEach(d => {
+      const c = d.condition || 'Lainnya'
+      if (!conditionMap[c]) conditionMap[c] = { orders: 0, revenue: 0 }
+      conditionMap[c].orders  += d.orders
+      conditionMap[c].revenue += d.revenue
+    })
     const conditionColors = {
-      'Cerah': '#fbbf24',
-      'Berawan': '#94a3b8',
-      'Berkabut': '#64748b',
-      'Hujan Ringan': '#60a5fa',
-      'Hujan': '#3b82f6',
-      'Hujan Lebat': '#1e40af',
-      'Hujan Salju': '#0ea5e9',
-      'Badai': '#7c3aed',
-      'Lainnya': '#6b7280'
+      'Clear': '#fbbf24', 'Sunny': '#fbbf24', 'Cerah': '#fbbf24',
+      'Cloudy': '#94a3b8', 'Berawan': '#94a3b8', 'Partly cloudy': '#cbd5e1',
+      'Fog': '#64748b', 'Berkabut': '#64748b',
+      'Drizzle': '#93c5fd', 'Light rain': '#60a5fa', 'Hujan Ringan': '#60a5fa',
+      'Rain': '#3b82f6', 'Hujan': '#3b82f6',
+      'Heavy rain': '#1e40af', 'Hujan Lebat': '#1e40af',
+      'Thunderstorm': '#7c3aed', 'Badai': '#7c3aed',
     }
-    
+    const cLabels = Object.keys(conditionMap)
     weatherConditionChartData.value = {
-      labels: conditions,
+      labels: cLabels,
       datasets: [{
-        label: t('report.revenue'),
-        data: conditions.map(c => weatherConditions[c].revenue),
-        backgroundColor: conditions.map(c => conditionColors[c] || '#6b7280')
+        label: 'Pendapatan (Rp)',
+        data: cLabels.map(c => conditionMap[c].revenue),
+        backgroundColor: cLabels.map(c => conditionColors[c] || '#6b7280')
       }]
     }
+
   } catch (error) {
     console.error('Failed to load weather report:', error)
-    toast.add({
-      severity: 'error',
-      summary: t('messages.error'),
-      detail: t('report.weatherDataNotAvailable'),
-      life: 3000
-    })
+    // Jika tidak ada data cuaca di backend, tampilkan info bukan error
+    if (error.response?.status === 404) {
+      weatherStats.value = []
+      weatherSummary.value = null
+    } else {
+      toast.add({ severity: 'warn', summary: 'Cuaca', detail: 'Data cuaca belum tersedia untuk periode ini', life: 4000 })
+    }
+  } finally {
+    weatherLoading.value = false
   }
 }
 
