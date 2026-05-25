@@ -457,11 +457,11 @@
               </div>
               <div class="form-field">
                 <label>{{ $t('hr.workHoursPerDay') }}</label>
-                <InputNumber v-model="payrollSettings.work_hours_per_day" :min="1" :max="24" :minFractionDigits="1" :maxFractionDigits="1" fluid />
+                <InputNumber v-model="payrollSettings.work_hours_per_day" :min="1" :max="24" :maxFractionDigits="2" fluid />
               </div>
               <div class="form-field">
                 <label>{{ $t('hr.overtimeMultiplier') }}</label>
-                <InputNumber v-model="payrollSettings.overtime_multiplier" :min="1" :max="5" :minFractionDigits="1" :maxFractionDigits="1" fluid />
+                <InputNumber v-model="payrollSettings.overtime_multiplier" :min="1" :max="5" :maxFractionDigits="2" fluid />
               </div>
               <div class="form-field">
                 <label>{{ $t('hr.lateToleranceMinutes') }}</label>
@@ -477,7 +477,7 @@
               </div>
               <div class="form-field">
                 <label>{{ $t('hr.taxPercentage') }} (%)</label>
-                <InputNumber v-model="payrollSettings.tax_percentage" :min="0" :max="100" :minFractionDigits="1" :maxFractionDigits="1" fluid />
+                <InputNumber v-model="payrollSettings.tax_percentage" :min="0" :max="100" :maxFractionDigits="2" fluid />
               </div>
             </div>
           </template>
@@ -676,11 +676,11 @@
         </div>
         <div class="form-field">
           <label>{{ $t('hr.basicSalary') }}</label>
-          <InputNumber v-model="employeeForm.basic_salary" mode="currency" currency="IDR" locale="id-ID" fluid />
+          <InputNumber v-model="employeeForm.basic_salary" :maxFractionDigits="0" fluid />
         </div>
         <div class="form-field">
           <label>{{ $t('hr.overtimePay') }} (per jam)</label>
-          <InputNumber v-model="employeeForm.overtime_rate" mode="currency" currency="IDR" locale="id-ID" fluid />
+          <InputNumber v-model="employeeForm.overtime_rate" :maxFractionDigits="0" fluid />
         </div>
         <div class="form-field">
           <label>{{ $t('hr.bankName') }}</label>
@@ -732,15 +732,15 @@
       <div class="form-grid">
         <div class="form-field">
           <label>{{ $t('hr.allowances') }}</label>
-          <InputNumber v-model="payrollForm.allowances" mode="currency" currency="IDR" locale="id-ID" fluid />
+          <InputNumber v-model="payrollForm.allowances" :maxFractionDigits="0" fluid />
         </div>
         <div class="form-field">
           <label>{{ $t('hr.bonuses') }}</label>
-          <InputNumber v-model="payrollForm.bonuses" mode="currency" currency="IDR" locale="id-ID" fluid />
+          <InputNumber v-model="payrollForm.bonuses" :maxFractionDigits="0" fluid />
         </div>
         <div class="form-field">
           <label>{{ $t('hr.deductions') }}</label>
-          <InputNumber v-model="payrollForm.deductions" mode="currency" currency="IDR" locale="id-ID" fluid />
+          <InputNumber v-model="payrollForm.deductions" :maxFractionDigits="0" fluid />
         </div>
         <div class="form-field full-width">
           <label>{{ $t('common.notes') }}</label>
@@ -902,7 +902,7 @@
 
         <div class="field">
           <label>{{ $t('kasbon.amount') }} *</label>
-          <InputNumber v-model="kasbonForm.amount" mode="currency" currency="IDR" locale="id-ID" fluid />
+          <InputNumber v-model="kasbonForm.amount" :maxFractionDigits="0" fluid />
           <small v-if="employeeSummary && kasbonForm.amount > employeeSummary.available_kasbon" class="p-error">
             {{ $t('kasbon.exceedsMaximum') }}
           </small>
@@ -967,7 +967,7 @@
       <div class="form-content">
         <div class="field">
           <label>{{ $t('kasbon.repaymentAmount') }} *</label>
-          <InputNumber v-model="repaymentForm.repayment_amount" mode="currency" currency="IDR" locale="id-ID" fluid />
+          <InputNumber v-model="repaymentForm.repayment_amount" :maxFractionDigits="0" fluid />
         </div>
 
         <div class="field">
