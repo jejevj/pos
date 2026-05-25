@@ -42,6 +42,33 @@
       </div>
     </div>
 
+    <!-- ===================== QR BANNER (muncul di semua tab saat belum konek) ===================== -->
+    <Card v-if="wahaEnabled && (sessionStatus === 'SCAN_QR' || sessionStatus === 'STOPPED' || sessionStatus === 'STARTING')" class="qr-banner mb-3">
+      <template #content>
+        <div class="qr-banner-inner">
+          <div class="qr-banner-info">
+            <h3 class="mt-0 mb-1"><i class="pi pi-qrcode mr-2"></i>Aktifkan WhatsApp</h3>
+            <p class="text-muted mb-2">Scan QR code ini dengan WhatsApp di HP Anda untuk mengaktifkan layanan notifikasi.</p>
+            <div class="flex gap-2 align-items-center flex-wrap">
+              <Tag :value="sessionStatus || 'STOPPED'" :severity="statusSeverity" />
+              <Button v-if="sessionStatus === 'STOPPED'" label="Start Session" icon="pi pi-play" size="small" severity="success" @click="startSession" :loading="actioning" />
+              <Button label="Refresh QR" icon="pi pi-refresh" size="small" outlined @click="fetchQr" :loading="loadingQr" />
+            </div>
+            <small v-if="qrExpireCountdown > 0" class="text-muted mt-2 block">QR kedaluwarsa dalam {{ qrExpireCountdown }} detik</small>
+          </div>
+          <div class="qr-banner-code">
+            <div v-if="qrImage" class="qr-box">
+              <img :src="qrImage" alt="QR Code" style="width:200px;height:200px;object-fit:contain" />
+            </div>
+            <div v-else class="qr-placeholder" style="width:200px;height:200px">
+              <i class="pi pi-qrcode" style="font-size:3rem;color:#ccc"></i>
+              <p class="text-muted">{{ sessionStatus === 'STOPPED' ? 'Start session dulu' : 'Memuat QR...' }}</p>
+            </div>
+          </div>
+        </div>
+      </template>
+    </Card>
+
     <!-- ===================== SESSION TAB ===================== -->
     <div v-if="tab === 'session'" class="tab-content">
       <!-- Status cards -->
@@ -488,8 +515,27 @@ const sessionName   = ref('default')
 const sessionStatus = ref('STOPPED')
 const sessionInfo   = ref(null)
 const sessions      = ref([])
-const qrImage       = ref(null)
-const loadingQr     = ref(false)
+const qrImage           = ref(null)
+const loadingQr         = ref(false)
+const qrExpireCountdown = ref(0)
+let qrCountdownInterval = null
+let qrAutoRefreshTimer  = null
+
+const startQrCountdown = (seconds = 60) => {
+  // Bersihkan timer lama
+  if (qrCountdownInterval) clearInterval(qrCountdownInterval)
+  if (qrAutoRefreshTimer)  clearTimeout(qrAutoRefreshTimer)
+
+  qrExpireCountdown.value = seconds
+  qrCountdownInterval = setInterval(() => {
+    qrExpireCountdown.value--
+    if (qrExpireCountdown.value <= 0) {
+      clearInterval(qrCountdownInterval)
+      // Auto refresh QR saat kedaluwarsa
+      if (sessionStatus.value === 'SCAN_QR') fetchQr()
+    }
+  }, 1000)
+}
 
 // send forms
 const sendForm     = ref({ session: 'default', chatId: '', text: '' })
@@ -581,12 +627,16 @@ const fetchQr = async () => {
   try {
     const res = await waha.get(`/api/${sessionName.value}/auth/qr`, { params: { format: 'image' }, responseType: 'blob' })
     qrImage.value = URL.createObjectURL(res.data)
+    startQrCountdown(60)
   } catch {
     // try base64 format
     try {
       const res2 = await waha.get(`/api/${sessionName.value}/auth/qr`)
       const val = res2.data?.value || res2.data?.qr
-      if (val) qrImage.value = val.startsWith('data:') ? val : `data:image/png;base64,${val}`
+      if (val) {
+        qrImage.value = val.startsWith('data:') ? val : `data:image/png;base64,${val}`
+        startQrCountdown(60)
+      }
     } catch (e2) {
       err(e2, 'Failed to load QR')
     }
@@ -951,6 +1001,8 @@ onMounted(() => {
 
 onUnmounted(() => {
   if (unsubWaha) unsubWaha()
+  if (qrCountdownInterval) clearInterval(qrCountdownInterval)
+  if (qrAutoRefreshTimer)  clearTimeout(qrAutoRefreshTimer)
 })
 </script>
 
@@ -1025,6 +1077,17 @@ onUnmounted(() => {
 .sc-val   { font-weight: 600; font-size: 0.9rem; }
 
 /* QR */
+/* QR Banner (halaman utama) */
+.qr-banner { margin-bottom: 1rem; border: 2px solid #25d366; }
+.qr-banner-inner {
+  display: flex;
+  gap: 2rem;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+.qr-banner-info { flex: 1; min-width: 220px; }
+.qr-banner-code { flex-shrink: 0; }
+
 .qr-wrap {
   display: flex;
   flex-direction: column;
