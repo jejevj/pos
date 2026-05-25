@@ -804,6 +804,7 @@ const sendLocation = async () => {
 
 // ── chats ──────────────────────────────────────────────────────────────────
 const fetchChats = async () => {
+  if (sessionStatus.value !== 'WORKING') return
   loadingChats.value = true
   try {
     const res = await waha.get(`/api/${chatSession.value}/chats/overview`, {
