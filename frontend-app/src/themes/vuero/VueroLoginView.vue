@@ -40,18 +40,18 @@
 
         <!-- Email -->
         <div class="field-group">
-          <label class="field-label">{{ $t('auth.email') }}</label>
+          <label class="field-label">Username / Email</label>
           <div class="input-wrap">
             <input
-              v-model="form.email"
-              type="email"
+              v-model="form.login"
+              type="text"
               class="mod-input"
-              :class="{ error: errors.email }"
-              :placeholder="$t('auth.email')"
-              autocomplete="email"
+              :class="{ error: errors.login }"
+              placeholder="Username atau email"
+              autocomplete="username"
             />
           </div>
-          <span v-if="errors.email" class="field-error">{{ errors.email }}</span>
+          <span v-if="errors.login" class="field-error">{{ errors.login }}</span>
         </div>
 
         <!-- Password -->
@@ -128,7 +128,7 @@ const { t }     = useI18n()
 const showPassword          = ref(false)
 const rememberMe            = ref(false)
 const sessionExpiredVisible = ref(false)
-const form   = ref({ email: '', password: '' })
+const form   = ref({ login: '', password: '' })
 const errors = ref({})
 
 onMounted(() => {
@@ -140,7 +140,7 @@ onMounted(() => {
 
 const handleLogin = async () => {
   errors.value = {}
-  if (!form.value.email)    { errors.value.email    = 'Email is required';    return }
+  if (!form.value.login)    { errors.value.login    = 'Username atau email wajib diisi'; return }
   if (!form.value.password) { errors.value.password = 'Password is required'; return }
   try {
     await authStore.login(form.value)
