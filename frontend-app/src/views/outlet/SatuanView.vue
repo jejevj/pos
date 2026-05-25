@@ -178,7 +178,7 @@
             <span class="conv-badge">1</span>
             <InputText v-model="form.singkatan" placeholder="simbol" style="width: 72px" />
             <span class="conv-eq-text">=</span>
-            <InputNumber v-model="form.conversion_to_base" :minFractionDigits="0" :maxFractionDigits="6"
+            <InputNumber v-model="form.conversion_to_base" :maxFractionDigits="6"
                          :min="0.000001" placeholder="jumlah" style="width: 120px" />
             <Select v-model="selectedBaseUnitId" :options="baseUnitsOfType"
                     optionLabel="label" optionValue="value" style="width: 130px"
