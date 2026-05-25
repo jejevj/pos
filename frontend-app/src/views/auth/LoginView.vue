@@ -38,17 +38,17 @@
           <div class="form-field">
             <FloatLabel>
               <InputText 
-                id="email" 
-                v-model="form.email" 
-                type="email"
-                :invalid="!!errors.email"
-                autocomplete="email"
+                id="login" 
+                v-model="form.login" 
+                type="text"
+                :invalid="!!errors.login"
+                autocomplete="username"
                 fluid
                 class="text-input"
               />
-              <label for="email">{{ $t('auth.email') }}</label>
+              <label for="login">Username / Email</label>
             </FloatLabel>
-            <small v-if="errors.email" class="error-text">{{ errors.email }}</small>
+            <small v-if="errors.login" class="error-text">{{ errors.login }}</small>
           </div>
 
           <div class="form-field">
@@ -134,7 +134,7 @@ onMounted(() => {
 })
 
 const form = ref({
-  email: '',
+  login: '',
   password: ''
 })
 
@@ -144,13 +144,13 @@ const rememberMe = ref(false)
 const handleLogin = async () => {
   errors.value = {}
   
-  if (!form.value.email) {
-    errors.value.email = 'Email is required'
+  if (!form.value.login) {
+    errors.value.login = 'Username atau email wajib diisi'
     return
   }
   
   if (!form.value.password) {
-    errors.value.password = 'Password is required'
+    errors.value.password = 'Password wajib diisi'
     return
   }
 
