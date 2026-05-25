@@ -63,7 +63,8 @@ class PayrollController extends Controller
      */
     public function generate(Request $request, $outletId)
     {
-        $outlet = $this->authorizeOutlet($outletId);
+        // Hanya owner/superadmin atau user dengan permission manage_payroll yang bisa generate
+        $outlet = $this->authorizeOutlet($outletId, ['permission' => 'manage_payroll']);
         
         $request->validate([
             'month' => 'required|integer|min:1|max:12',
@@ -122,6 +123,7 @@ class PayrollController extends Controller
                 if ($exists) continue;
                 
                 // Get attendance data
+                // Overtime hanya dihitung jika sudah approved — pending/rejected tidak masuk payroll
                 $attendance = DB::table('attendances')
                     ->where('user_id', $user->user_id)
                     ->whereBetween('date', [$startDate, $endDate])
@@ -130,7 +132,7 @@ class PayrollController extends Controller
                         DB::raw("COUNT(CASE WHEN status = 'absent' THEN 1 END) as absent_days"),
                         DB::raw("COUNT(CASE WHEN status = 'leave' THEN 1 END) as leave_days"),
                         DB::raw("COUNT(CASE WHEN status = 'late' THEN 1 END) as late_days"),
-                        DB::raw('SUM(overtime_hours) as overtime_hours')
+                        DB::raw("SUM(CASE WHEN overtime_status = 'approved' THEN overtime_hours ELSE 0 END) as overtime_hours")
                     )
                     ->first();
                 
@@ -256,7 +258,7 @@ class PayrollController extends Controller
      */
     public function approve(Request $request, $outletId, $id)
     {
-        $outlet = $this->authorizeOutlet($outletId);
+        $outlet = $this->authorizeOutlet($outletId, ['permission' => 'manage_payroll']);
         
         try {
             DB::statement("SET search_path TO {$outlet->schema_name}, public");
@@ -301,7 +303,7 @@ class PayrollController extends Controller
      */
     public function markAsPaid(Request $request, $outletId, $id)
     {
-        $outlet = $this->authorizeOutlet($outletId);
+        $outlet = $this->authorizeOutlet($outletId, ['permission' => 'manage_payroll']);
         
         $request->validate([
             'payment_date' => 'required|date',
