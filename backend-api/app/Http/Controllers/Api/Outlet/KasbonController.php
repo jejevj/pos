@@ -52,74 +52,74 @@ class KasbonController extends Controller
 
     public function store(Request $request, $outletId)
     {
-        $outlet = $this->authorizeOutlet($outletId);
-        
+        // Hanya karyawan aktif yang terdaftar di outlet yang bisa mengajukan kasbon untuk dirinya sendiri.
+        // Superadmin / owner tidak bisa bypass — kasbon harus milik outlet_user yang nyata.
+        $outlet = $this->authorizeOutletAsEmployee($outletId);
+
         $request->validate([
-            'user_id' => 'required|integer',
             'request_date' => 'required|date',
-            'amount' => 'required|numeric|min:0',
-            'reason' => 'nullable|string',
+            'amount'       => 'required|numeric|min:0',
+            'reason'       => 'nullable|string',
         ]);
-        
+
+        // Ambil outlet_user yang sedang login — sudah di-resolve oleh authorizeOutletAsEmployee.
+        $outletUser = $this->currentOutletUser();
+
         try {
             DB::statement("SET search_path TO {$outlet->schema_name}, public");
-            
-            // Get employee info
+
+            // Ambil info gaji berdasarkan outlet_user.id (bukan global user.id)
             $employee = DB::table('employee_info')
-                ->where('user_id', $request->user_id)
+                ->where('user_id', $outletUser->id)
                 ->first();
-            
+
             if (!$employee) {
                 DB::statement("SET search_path TO public");
-                return response()->json(['message' => 'Employee not found'], 404);
+                return response()->json(['message' => 'Data karyawan tidak ditemukan. Pastikan profil karyawan sudah dilengkapi.'], 404);
             }
-            
-            // Get kasbon settings
-            $settings = DB::table('kasbon_settings')->first();
+
+            $settings      = DB::table('kasbon_settings')->first();
             $maxPercentage = $settings->max_percentage ?? 50;
-            
-            // Calculate max allowed kasbon
-            $maxAllowed = ($employee->basic_salary * $maxPercentage) / 100;
-            
+            $maxAllowed    = ($employee->basic_salary * $maxPercentage) / 100;
+
             if ($request->amount > $maxAllowed) {
                 DB::statement("SET search_path TO public");
                 return response()->json([
-                    'message' => "Kasbon amount exceeds maximum allowed ({$maxPercentage}% of salary)",
-                    'max_allowed' => $maxAllowed
+                    'message'     => "Jumlah kasbon melebihi batas maksimal ({$maxPercentage}% dari gaji pokok)",
+                    'max_allowed' => $maxAllowed,
                 ], 422);
             }
-            
-            // Check pending kasbon
+
             $pendingKasbon = DB::table('kasbon')
-                ->where('user_id', $request->user_id)
+                ->where('user_id', $outletUser->id)
                 ->whereIn('status', ['pending', 'approved'])
                 ->where('repayment_status', 'unpaid')
                 ->sum('amount');
-            
+
             if (($pendingKasbon + $request->amount) > $maxAllowed) {
                 DB::statement("SET search_path TO public");
                 return response()->json([
-                    'message' => 'Total unpaid kasbon would exceed maximum allowed',
-                    'current_unpaid' => $pendingKasbon,
-                    'max_allowed' => $maxAllowed
+                    'message'         => 'Total kasbon belum lunas akan melebihi batas maksimal',
+                    'current_unpaid'  => $pendingKasbon,
+                    'max_allowed'     => $maxAllowed,
                 ], 422);
             }
-            
+
             DB::table('kasbon')->insert([
-                'user_id' => $request->user_id,
-                'request_date' => $request->request_date,
-                'amount' => $request->amount,
-                'reason' => $request->reason,
-                'status' => 'pending',
+                'user_id'          => $outletUser->id,   // selalu milik user yang login
+                'request_date'     => $request->request_date,
+                'amount'           => $request->amount,
+                'reason'           => $request->reason,
+                'status'           => 'pending',
                 'repayment_status' => 'unpaid',
-                'created_by' => Auth::id(),
-                'created_at' => now(),
-                'updated_at' => now(),
+                'created_by'       => Auth::id(),
+                'created_at'       => now(),
+                'updated_at'       => now(),
             ]);
-            
+
             DB::statement("SET search_path TO public");
-            
-            return response()->json(['message' => 'Kasbon request created successfully'], 201);
+
+            return response()->json(['message' => 'Pengajuan kasbon berhasil dibuat'], 201);
         } catch (\Exception $e) {
             DB::statement("SET search_path TO public");
             return response()->json(['message' => $e->getMessage()], 500);
@@ -128,38 +128,48 @@ class KasbonController extends Controller
 
     public function approve(Request $request, $outletId, $id)
     {
-        $outlet = $this->authorizeOutlet($outletId);
-        
+        // Superadmin & owner boleh approve. Outlet user harus punya permission approve_kasbon.
+        $outlet = $this->authorizeOutlet($outletId, ['permission' => 'approve_kasbon']);
+
         $request->validate([
-            'approval_proof' => 'required|string',
+            'approval_proof' => 'required|string',   // base64 bukti persetujuan
         ]);
-        
+
         try {
             DB::statement("SET search_path TO {$outlet->schema_name}, public");
-            
+
             $kasbon = DB::table('kasbon')->where('id', $id)->first();
-            
+
             if (!$kasbon) {
                 DB::statement("SET search_path TO public");
-                return response()->json(['message' => 'Kasbon not found'], 404);
+                return response()->json(['message' => 'Kasbon tidak ditemukan'], 404);
             }
-            
+
             if ($kasbon->status !== 'pending') {
                 DB::statement("SET search_path TO public");
-                return response()->json(['message' => 'Kasbon already processed'], 422);
+                return response()->json(['message' => 'Kasbon sudah diproses sebelumnya'], 422);
             }
-            
+
+            // Pastikan approver bukan pemohon itu sendiri
+            $outletUser = $this->currentOutletUser();
+            if ($outletUser && $outletUser->id === $kasbon->user_id) {
+                DB::statement("SET search_path TO public");
+                return response()->json(['message' => 'Anda tidak dapat menyetujui kasbon milik sendiri'], 403);
+            }
+
+            $approverId = $outletUser ? $outletUser->id : null;
+
             DB::table('kasbon')->where('id', $id)->update([
-                'status' => 'approved',
-                'approved_by' => Auth::id(),
-                'approved_at' => now(),
+                'status'         => 'approved',
+                'approved_by'    => $approverId,
+                'approved_at'    => now(),
                 'approval_proof' => $request->approval_proof,
-                'updated_at' => now(),
+                'updated_at'     => now(),
             ]);
 
             DB::statement("SET search_path TO public");
-            
-            return response()->json(['message' => 'Kasbon approved successfully']);
+
+            return response()->json(['message' => 'Kasbon berhasil disetujui']);
         } catch (\Exception $e) {
             DB::statement("SET search_path TO public");
             return response()->json(['message' => $e->getMessage()], 500);
@@ -168,38 +178,46 @@ class KasbonController extends Controller
 
     public function reject(Request $request, $outletId, $id)
     {
-        $outlet = $this->authorizeOutlet($outletId);
-        
+        $outlet = $this->authorizeOutlet($outletId, ['permission' => 'approve_kasbon']);
+
         $request->validate([
             'rejection_reason' => 'required|string',
         ]);
-        
+
         try {
             DB::statement("SET search_path TO {$outlet->schema_name}, public");
-            
+
             $kasbon = DB::table('kasbon')->where('id', $id)->first();
-            
+
             if (!$kasbon) {
                 DB::statement("SET search_path TO public");
-                return response()->json(['message' => 'Kasbon not found'], 404);
+                return response()->json(['message' => 'Kasbon tidak ditemukan'], 404);
             }
-            
+
             if ($kasbon->status !== 'pending') {
                 DB::statement("SET search_path TO public");
-                return response()->json(['message' => 'Kasbon already processed'], 422);
+                return response()->json(['message' => 'Kasbon sudah diproses sebelumnya'], 422);
             }
-            
+
+            $outletUser = $this->currentOutletUser();
+            if ($outletUser && $outletUser->id === $kasbon->user_id) {
+                DB::statement("SET search_path TO public");
+                return response()->json(['message' => 'Anda tidak dapat menolak kasbon milik sendiri'], 403);
+            }
+
+            $reviewerId = $outletUser ? $outletUser->id : null;
+
             DB::table('kasbon')->where('id', $id)->update([
-                'status' => 'rejected',
+                'status'           => 'rejected',
                 'rejection_reason' => $request->rejection_reason,
-                'approved_by' => Auth::id(),
-                'approved_at' => now(),
-                'updated_at' => now(),
+                'approved_by'      => $reviewerId,
+                'approved_at'      => now(),
+                'updated_at'       => now(),
             ]);
 
             DB::statement("SET search_path TO public");
-            
-            return response()->json(['message' => 'Kasbon rejected successfully']);
+
+            return response()->json(['message' => 'Kasbon berhasil ditolak']);
         } catch (\Exception $e) {
             DB::statement("SET search_path TO public");
             return response()->json(['message' => $e->getMessage()], 500);
@@ -208,13 +226,13 @@ class KasbonController extends Controller
 
     public function markAsPaid(Request $request, $outletId, $id)
     {
-        $outlet = $this->authorizeOutlet($outletId);
-        
+        $outlet = $this->authorizeOutlet($outletId, ['permission' => 'approve_kasbon']);
+
         $request->validate([
             'repayment_amount' => 'required|numeric|min:0',
-            'repayment_date' => 'required|date',
-            'repayment_proof' => 'required|string',
-            'notes' => 'nullable|string',
+            'repayment_date'   => 'required|date',
+            'repayment_proof'  => 'required|string',   // base64 bukti pelunasan
+            'notes'            => 'nullable|string',
         ]);
         
         try {
