@@ -789,15 +789,17 @@ const fetchOrders = async () => {
     }
     
     if (dateRange.value?.[0]) {
-      // Start date: beginning of day
-      params.start_date = dateRange.value[0].toISOString().split('T')[0] + ' 00:00:00'
-      
-      // End date: if same day or no end date, use end of start day
+      const toLocalDate = (d) => {
+        const y = d.getFullYear()
+        const m = String(d.getMonth() + 1).padStart(2, '0')
+        const day = String(d.getDate()).padStart(2, '0')
+        return `${y}-${m}-${day}`
+      }
+      params.start_date = toLocalDate(dateRange.value[0]) + ' 00:00:00'
       if (dateRange.value[1]) {
-        params.end_date = dateRange.value[1].toISOString().split('T')[0] + ' 23:59:59'
+        params.end_date = toLocalDate(dateRange.value[1]) + ' 23:59:59'
       } else {
-        // If only one date selected, treat as same day (start to end of that day)
-        params.end_date = dateRange.value[0].toISOString().split('T')[0] + ' 23:59:59'
+        params.end_date = toLocalDate(dateRange.value[0]) + ' 23:59:59'
       }
     }
     
