@@ -113,8 +113,8 @@ const outletId = computed(() => route.params.outletId)
 // ─── Computed ────────────────────────────────────────────────────
 const pageTitle = computed(() => route.meta.title || t('common.dashboard'))
 
-/** Superadmin tetap tampilkan sidebar saat masuk halaman outlet */
-const showSidebar = computed(() => authStore.isSuperAdmin)
+/** Tampilkan sidebar untuk superadmin dan outlet user */
+const showSidebar = computed(() => authStore.isSuperAdmin || authStore.isOutletUser)
 
 const userInitial = computed(() => {
   const name = authStore.user?.name || ''
@@ -131,7 +131,7 @@ const currentLanguage = computed(() =>
   availableLocales.find(l => l.code === locale.value) || availableLocales[0]
 )
 
-/** Superadmin tetap dapat nav links global saat di halaman outlet */
+/** Nav links: superadmin pakai menu dari DB, outlet user pakai menu outlet statis */
 const navLinks = computed(() => {
   if (authStore.isSuperAdmin) {
     return (authStore.menus || []).map(menu => {
@@ -147,7 +147,124 @@ const navLinks = computed(() => {
       return { id: menu.id, type: 'link', label: menu.title, icon: menu.icon, to: menu.url }
     })
   }
-  return []
+
+  // Outlet user — bangun sidebar dari daftar menu grid outlet
+  if (!authStore.isOutletUser || !outletId.value) return []
+
+  const id = outletId.value
+  const can = (perm) => authStore.hasOutletPermission(id, perm)
+  // isOutletAdmin: superadmin, owner, atau punya semua permission
+  const isAdmin = authStore.isSuperAdmin ||
+    authStore.outletMemberships?.some(m =>
+      String(m.encoded_outlet_id) === String(id) ||
+      String(m.outlet_id) === String(id)
+        ? (m.roles || []).some(r => r.is_owner || r.name === 'admin')
+        : false
+    )
+
+  const p = (label, to, icon) => ({ type: 'link', label, to, icon })
+  const items = []
+
+  // ── Transaksi ─────────────────────────────────────────────────
+  if (can('access_pos'))
+    items.push(p('POS / Kasir', `/outlets/${id}/pos`, 'pi pi-shopping-cart'))
+  if (can('view_transactions'))
+    items.push(p('Transaksi', `/outlets/${id}/transactions`, 'pi pi-receipt'))
+  if (can('manage_tables'))
+    items.push(p('Meja', `/outlets/${id}/tables`, 'pi pi-table'))
+  if (can('access_kitchen_display'))
+    items.push(p('Kitchen Display', `/outlets/${id}/kitchen`, 'pi pi-bolt'))
+  if (isAdmin)
+    items.push(p('Stasiun KDS', `/outlets/${id}/stations`, 'pi pi-desktop'))
+
+  // ── Inventori ─────────────────────────────────────────────────
+  if (can('view_inventory')) {
+    items.push({ type: 'divider' })
+    items.push({
+      type: 'collapse',
+      label: 'Bahan Baku',
+      icon: 'pi pi-box',
+      children: [
+        { label: 'Daftar Bahan Baku', to: `/outlets/${id}/bahan-baku`, icon: 'pi pi-list' },
+        { label: 'Kategori', to: `/outlets/${id}/kategori-bahan-baku`, icon: 'pi pi-tags' },
+        { label: 'Satuan', to: `/outlets/${id}/satuan`, icon: 'pi pi-arrows-h' },
+        { label: 'Supplier', to: `/outlets/${id}/supplier`, icon: 'pi pi-building' },
+        { label: 'Lokasi Stok', to: `/outlets/${id}/stock-locations`, icon: 'pi pi-map-marker' },
+      ],
+    })
+    if (can('view_stock_opname'))
+      items.push(p('Stock Opname', `/outlets/${id}/stock-opname`, 'pi pi-clipboard'))
+    if (can('view_purchases'))
+      items.push(p('Barang Masuk', `/outlets/${id}/purchases`, 'pi pi-truck'))
+  }
+
+  // ── Menu & Penjualan ──────────────────────────────────────────
+  if (can('view_menu')) {
+    items.push({ type: 'divider' })
+    items.push({
+      type: 'collapse',
+      label: 'Menu',
+      icon: 'pi pi-book',
+      children: [
+        { label: 'Daftar Menu', to: `/outlets/${id}/menu`, icon: 'pi pi-list' },
+        { label: 'Kategori Menu', to: `/outlets/${id}/kategori-menu`, icon: 'pi pi-th-large' },
+      ],
+    })
+  }
+  if (can('view_promos'))
+    items.push(p('Promo', `/outlets/${id}/promos`, 'pi pi-tag'))
+  if (can('view_members'))
+    items.push(p('Member', `/outlets/${id}/members`, 'pi pi-id-card'))
+
+  // ── HR ────────────────────────────────────────────────────────
+  if (can('view_employees') || can('view_attendance')) {
+    items.push({ type: 'divider' })
+    const hrChildren = []
+    if (can('view_employees')) {
+      hrChildren.push({ label: 'Data Karyawan', to: `/outlets/${id}/hr`, icon: 'pi pi-users' })
+      hrChildren.push({ label: 'Shift', to: `/outlets/${id}/shifts`, icon: 'pi pi-calendar' })
+      hrChildren.push({ label: 'Jatah Minum', to: `/outlets/${id}/employee-beverage`, icon: 'pi pi-star' })
+    }
+    if (can('view_attendance'))
+      hrChildren.push({ label: 'Absensi', to: `/outlets/${id}/attendance`, icon: 'pi pi-clock' })
+    items.push({ type: 'collapse', label: 'HR / Karyawan', icon: 'pi pi-users', children: hrChildren })
+  }
+
+  // ── Keuangan ─────────────────────────────────────────────────
+  if (can('view_expenses') || can('view_reports')) {
+    items.push({ type: 'divider' })
+    if (can('view_expenses'))
+      items.push(p('Pengeluaran', `/outlets/${id}/expenses`, 'pi pi-wallet'))
+    if (can('view_reports')) {
+      items.push({
+        type: 'collapse',
+        label: 'Laporan',
+        icon: 'pi pi-chart-bar',
+        children: [
+          { label: 'Laporan Penjualan', to: `/outlets/${id}/reports?tab=0`, icon: 'pi pi-chart-line' },
+          { label: 'Laporan Menu', to: `/outlets/${id}/reports?tab=1`, icon: 'pi pi-book' },
+          { label: 'Laporan Cuaca', to: `/outlets/${id}/reports?tab=2`, icon: 'pi pi-cloud' },
+          { label: 'Laporan Inventori', to: `/outlets/${id}/reports?tab=3`, icon: 'pi pi-box' },
+          { label: 'Laporan Pengeluaran', to: `/outlets/${id}/reports?tab=4`, icon: 'pi pi-wallet' },
+        ],
+      })
+    }
+  }
+
+  // ── Pengaturan ────────────────────────────────────────────────
+  items.push({ type: 'divider' })
+  if (can('manage_users'))
+    items.push(p('Manajemen User', `/outlets/${id}/users`, 'pi pi-user-edit'))
+  if (isAdmin)
+    items.push(p('Metode Pembayaran', `/outlets/${id}/payment-methods`, 'pi pi-credit-card'))
+  if (isAdmin)
+    items.push(p('WhatsApp', `/outlets/${id}/whatsapp`, 'pi pi-whatsapp'))
+  if (can('edit_settings'))
+    items.push(p('Utilitas', `/outlets/${id}/utilities`, 'pi pi-wrench'))
+  if (can('manage_roles'))
+    items.push(p('Pengaturan RBAC', `/outlets/${id}/rbac`, 'pi pi-shield'))
+
+  return items
 })
 
 const languageMenuItems = computed(() =>
