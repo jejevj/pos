@@ -287,6 +287,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('outlets/{outlet}/employees', [\App\Http\Controllers\Api\Outlet\EmployeeController::class, 'index']);
     Route::get('outlets/{outlet}/employees/{userId}', [\App\Http\Controllers\Api\Outlet\EmployeeController::class, 'show']);
     Route::put('outlets/{outlet}/employees/{userId}/info', [\App\Http\Controllers\Api\Outlet\EmployeeController::class, 'updateInfo']);
+    Route::post('outlets/{outlet}/employees/{userId}/photo', [\App\Http\Controllers\Api\Outlet\EmployeeController::class, 'updatePhoto']);
+    Route::put('outlets/{outlet}/employees/{userId}/username', [\App\Http\Controllers\Api\Outlet\EmployeeController::class, 'updateUsername']);
     Route::get('outlets/{outlet}/payroll-settings', [\App\Http\Controllers\Api\Outlet\EmployeeController::class, 'getPayrollSettings']);
 
     // Employee Beverage Allowance
