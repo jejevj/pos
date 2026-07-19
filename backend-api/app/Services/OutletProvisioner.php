@@ -156,6 +156,8 @@ class OutletProvisioner
                 email VARCHAR(255) NOT NULL UNIQUE,
                 password VARCHAR(255) NOT NULL,
                 phone VARCHAR(255),
+                username VARCHAR(255),
+                photo VARCHAR(255),
                 role VARCHAR(50) DEFAULT 'staff',
                 is_active BOOLEAN DEFAULT true,
                 settings JSONB,
@@ -165,6 +167,10 @@ class OutletProvisioner
             )
         ");
         DB::statement("CREATE INDEX IF NOT EXISTS idx_outlet_users_email ON {$schema}.outlet_users(email)");
+
+        // Ensure columns exist on pre-existing outlets
+        DB::statement("ALTER TABLE {$schema}.outlet_users ADD COLUMN IF NOT EXISTS username VARCHAR(255)");
+        DB::statement("ALTER TABLE {$schema}.outlet_users ADD COLUMN IF NOT EXISTS photo VARCHAR(255)");
     }
 
     private function ensureRbacTables(Outlet $outlet): void
